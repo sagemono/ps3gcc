@@ -1,0 +1,13 @@
+// { dg-do run  }
+// { dg-xfail-if "256K size limit" { "spu-*-*" } "*" "" }
+// 981203 bkoz
+// g++/15071
+// gcc invocation fails to link in libstdc++
+
+#include <iostream>
+
+int main() {
+  std::cout << "hi" << std::endl;
+
+  return 0;
+}

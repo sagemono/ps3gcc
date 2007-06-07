@@ -1,0 +1,24 @@
+if { [info proc fail] != "" } {
+    rename fail fail.orig
+
+    proc fail { message } {
+	global xfail_flag
+	global compiler_conditional_xfail_data
+
+	# if we have a conditional xfail setup, then see if our compiler flags 
+        #match    
+        if [info exists compiler_conditional_xfail_data] {
+	    if [check_conditional_xfail $compiler_conditional_xfail_data] {
+		set xfail_flag 1
+	    }
+	    unset compiler_conditional_xfail_data
+	}
+
+	if $xfail_flag {
+	    record_test XFAIL $message
+	} else {
+	    record_test FAIL $message
+	}
+    }
+}
+
