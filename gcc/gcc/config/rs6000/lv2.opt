@@ -1,0 +1,65 @@
+; Options for LV-2
+;
+; Copyright (C) 2005 Free Software Foundation, Inc.
+;
+; This file is part of GCC.
+;
+; GCC is free software; you can redistribute it and/or modify it under
+; the terms of the GNU General Public License as published by the Free
+; Software Foundation; either version 2, or (at your option) any later
+; version.
+;
+; GCC is distributed in the hope that it will be useful, but WITHOUT
+; ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+; or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
+; License for more details.
+;
+; You should have received a copy of the GNU General Public License
+; along with GCC; see the file COPYING.  If not, write to the Free
+; Software Foundation, 51 Franklin Street, Fifth Floor, Boston, MA
+; 02110-1301, USA.
+
+mprofile-kernel
+Target Report Mask(PROFILE_KERNEL)
+Call mcount for profiling before a function prologue
+
+;  Select pointer size. This flag only used for CellOS Lv-2
+;  Enable 64bit features, but address and pointer is handles in 32bit
+;  space. This flag is asserted by -mp32 or -mlp32 option
+mlp32
+Target Report RejectNegative Mask(PPC64_LP32)
+Generate codes in ILP32 model.(defualt)
+
+;
+mlp64
+Target Report RejectNegative InverseMask(PPC64_LP32, PPC64_LP64)
+Generate codes in LP64 model.
+
+mp32
+Target Report RejectNegative Mask(PPC64_LP32) MaskExists
+same as -mlp32 option
+
+mprxfixup
+Target Report RejectNegative
+Invoke ppu-lv2-prx-fixup after linking. This is default.
+
+mno-prxfixup
+Target Report RejectNegative
+Does not invoke ppu-lv2-prx-fixup after linking. Special option for toolchain developer.
+
+mprx
+Target Report RejectNegative
+Link objects in PRX mode.
+
+mlv2-stub
+Target Report RejectNegative
+Link with the lv2_stub.a library (even when using -mno-prxfixup)
+
+mlto-annotations
+Target Report Var(flag_lto_annotations,1) Init(0)
+Add Link-Time-Optimizer annotations to the object (Default off)
+
+
+
+
+

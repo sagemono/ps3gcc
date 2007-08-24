@@ -1,0 +1,50 @@
+2006-12-21 David Wall  <wall@transmeta.com>
+
+	* lto-info-asm.h, lto-info.def, lto-info.h: capture
+          whether a function has a nonlocal label (e.g. setjmp)
+	  or nonlocal goto (e.g. longjmp).
+
+2006-05-19 David Wall  <wall@transmeta.com>
+
+	* lto-info.def: add LTO_PIC_PC.
+
+2006-05-05 David Wall  <wall@transmeta.com>
+
+	* lto-info-asm.h: add lto_asm_fn_proto.
+	* lto-info.def: add PROTO, ASM_ON, and ASM_OFF annotations.
+
+2006-03-29 David Wall  <wall@transmeta.com>
+
+	* lto-info-asm.h: add "linkonce_name" to argument
+	  list for lto_asm_fn_start, so we can split out
+	  lto annotations for each linkonce section into
+	  its own section, part of an ELF "group" with
+	  the linkonce section.
+
+Fri Feb 10 10:12:51 2006  Changqing Fu  <cqfu@transmeta.com>
+
+	* lto-assert.h: move from cco/ so that every module can
+	  use it.
+
+2005-12-20  David Wall  <wall@transmeta.com>
+
+	* lto-info.h: add comments to explain the argument-result
+	  structures.
+
+2005-12-16 David Wall  <wall@transmeta.com>
+
+	* lto-info-asm.h, lto-info.def: add LTO_VOLATILE annotations.
+
+2005-12-15 David Wall  <wall@transmeta.com>
+
+	* lto-info.h: add "unsigned pair[2]" to each arg-result
+	  union, to make it easier for LTO to convert the raw
+	  annotations.
+
+2005-12-14 David Wall  <wall@transmeta.com>
+
+	* lto-info.def, lto-info.h: move this machinery out
+	  of module/ir so that it can also be used by gcc.
+	* lto-info-asm.h: interface to code used by gcc to
+	  generate annotations.
+

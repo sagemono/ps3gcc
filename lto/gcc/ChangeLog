@@ -1,0 +1,40 @@
+2007-01-16  David Wall  <wall@transmeta.com>
+
+	* lto-info-asm.c: change ".lto.gnu.linkonce.FOO" sections
+	  to ".gnu.linkonce.lto.t.FOO".
+
+2006-12-21 David Wall  <wall@transmeta.com>
+
+	* lto-info-asm.c: capture whether a function has a nonlocal
+	  label (e.g. setjmp).
+
+2006-08-10  David Wall  <wall@transmeta.com>
+
+	* lto-info-asm.c (lto_asm_alias): properly coerce the
+	  64-bit ints to 64-bit unsigneds before shifting and
+	  masking.
+
+2006-05-05 David Wall  <wall@transmeta.com>
+
+	* lto-info-asm.c: add PROTO, ASM_ON, and ASM_OFF annotations.
+
+2006-03-29 David Wall  <wall@transmeta.com>
+
+	* lto-info-asm.c: split out lto annotations for each
+	  linkonce section into its own section, part of an
+	  ELF "group" with the linkonce section.
+
+2006-02-23  Ziemowit Laski  <zlaski@transmeta.com>
+
+	* lto-info-asm.c (lto_asm_fn_call): Output two halves
+	of little-endian 64-bit integer in a big-endian way.
+
+2005-12-16 David Wall  <wall@transmeta.com>
+
+	* lto-info-asm.c: add LTO_VOLATILE annotations.
+
+2005-12-14 David Wall  <wall@transmeta.com>
+
+	* Makefile.in, lto-info-asm.c: contents of new directory,
+	  for code used by gcc to generate annotations.
+

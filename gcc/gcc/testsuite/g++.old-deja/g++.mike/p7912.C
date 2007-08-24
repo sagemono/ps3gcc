@@ -1,0 +1,24 @@
+// { dg-do run { xfail sparc64-*-elf arm-*-pe } }
+// { dg-xfail-if "eh not supported on spu" { "spu-*-*" } "*" "" }
+// { dg-options "-fexceptions" }
+// prms-id: 7912
+
+int count = 0;
+
+class Foo {
+public:
+  Foo() { ++count; };
+  Foo(const Foo&) { ++count; };
+  ~Foo() { --count; };
+};
+
+
+main()
+{
+  try {
+    throw Foo();
+  }
+  catch (Foo object) {
+  }
+  return count;
+}

@@ -1,0 +1,48 @@
+// Information on each "mode" in PGO.
+// A mode in PGO derives from GCC modes.
+// pgo_mode_e is also intended to contain information regarding where in a
+// register a smaller value is.  Eg. If a value is in a register other than
+// its default location (e.g. an SI value in the lower word of an SPU
+// register), then this distinction will be via a pgo_mode_e value.
+// One could try to keep things more orthogonal, and something like that can
+// certainly be built on top of pgo_mode_e, but w.r.t. externalizing GCC
+// values, there's just too much randomness so some form of enumeration seems
+// to be ultimately necessary.
+
+/* Copyright (C) 2006 Sony Computer Entertainment, Inc.,
+
+   PGO is free software; you can redistribute it and/or modify it under
+   the terms of the GNU General Public License as published by the Free
+   Software Foundation; either version 2, or (at your option) any later
+   version.
+
+   PGO is distributed in the hope that it will be useful, but WITHOUT ANY
+   WARRANTY; without even the implied warranty of MERCHANTABILITY or
+   FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+   for more details.
+
+   You should have received a copy of the GNU General Public License
+   along with PGO; see the file COPYING.  If not, write to the Free
+   Software Foundation, 59 Temple Place - Suite 330, Boston, MA
+   02111-1307, USA.  */
+
+
+
+// Syntax: PGO_MODE (SYMBOL, "NAME", KIND, bitsize)
+// Symbol concatenation is avoided to keep searching simple.
+
+#ifndef PGO_MODE
+#error "PGO_MODE not defined"
+#endif
+
+PGO_MODE (PGO_MODE_VOID, "VOID", PGO_MKIND_OTHER, 0)
+
+PGO_MODE (PGO_MODE_QI, "QI", PGO_MKIND_INT, 8)
+PGO_MODE (PGO_MODE_HI, "HI", PGO_MKIND_INT, 16)
+PGO_MODE (PGO_MODE_SI, "SI", PGO_MKIND_INT, 32)
+PGO_MODE (PGO_MODE_DI, "DI", PGO_MKIND_INT, 64)
+PGO_MODE (PGO_MODE_TI, "TI", PGO_MKIND_INT, 128)
+
+// That's it for now.
+
+#undef PGO_MODE
