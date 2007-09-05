@@ -227,7 +227,7 @@ typedef int __V4SI __attribute__((vector_size(16)));
     halfwordsize *ptrp = (halfwordsize*)(void*)(base);	\
   __asm__ ("lhbrx %0,%y1"			\
 	   : "=r" (result)			\
-	   : "m" (*ptrp));			\
+	   : "Z" (*ptrp));			\
   result; })
 
 #define __lwbrx(base) __extension__		\
@@ -236,7 +236,7 @@ typedef int __V4SI __attribute__((vector_size(16)));
     wordsize *ptrp = (wordsize*)(void*)(base);		\
   __asm__ ("lwbrx %0,%y1"			\
 	   : "=r" (result)			\
-	   : "m" (*ptrp));			\
+	   : "Z" (*ptrp));			\
   result; })
 
 
@@ -246,7 +246,7 @@ typedef int __V4SI __attribute__((vector_size(16)));
     doublewordsize *ptrp = (doublewordsize*)(void*)(base);	\
   __asm__ ("ldbrx %0,%y1"				\
 	   : "=r" (result)				\
-	   : "m" (*ptrp));				\
+	   : "Z" (*ptrp));				\
   result; })
 
 
@@ -254,7 +254,7 @@ typedef int __V4SI __attribute__((vector_size(16)));
     typedef  struct {char a[2];} halfwordsize;		\
     halfwordsize *ptrp = (halfwordsize*)(void*)(base);		\
     __asm__ ("sthbrx %1,%y0"				\
-	   : "=m" (*ptrp)				\
+	   : "=Z" (*ptrp)				\
 	   : "r" (value));				\
    } while (0)
 
@@ -262,7 +262,7 @@ typedef int __V4SI __attribute__((vector_size(16)));
     typedef  struct {char a[4];} wordsize;	\
     wordsize *ptrp = (wordsize*)(void*)(base);		\
     __asm__ ("stwbrx %1,%y0"			\
-	   : "=m" (*ptrp)			\
+	   : "=Z" (*ptrp)			\
 	   : "r" (value));			\
    } while (0)
 
@@ -271,7 +271,7 @@ typedef int __V4SI __attribute__((vector_size(16)));
     typedef  struct {char a[8];} doublewordsize;	\
     doublewordsize *ptrp = (doublewordsize*)(void*)(base);	\
     __asm__ ("stdbrx %1,%y0"				\
-	   : "=m" (*ptrp)				\
+	   : "=Z" (*ptrp)				\
 	   : "r" (value));				\
    } while (0)
 
@@ -283,7 +283,7 @@ typedef int __V4SI __attribute__((vector_size(16)));
     wordsize *ptrp = (wordsize*)(void*)(base);		\
   __asm__ ("lwarx %0,%y1"			\
 	   : "=r" (result)			\
-	   : "m" (*ptrp));			\
+	   : "Z" (*ptrp));			\
   result; })
 
 
@@ -293,7 +293,7 @@ typedef int __V4SI __attribute__((vector_size(16)));
     doublewordsize *ptrp = (doublewordsize*)(void*)(base);	\
   __asm__ ("ldarx %0,%y1"				\
 	   : "=r" (result)				\
-	   : "m" (*ptrp));				\
+	   : "Z" (*ptrp));				\
   result; })
 
 
@@ -304,7 +304,7 @@ typedef int __V4SI __attribute__((vector_size(16)));
   __asm__ ("stwcx. %2,%y1\n"			\
 	   "\tmfocrf %0,0x80"			\
 	   : "=r" (result),			\
-	     "=m" (*ptrp)			\
+	     "=Z" (*ptrp)			\
 	   : "r" (value) : "cr0");		\
   (result & 0x20000000); })
 
@@ -316,7 +316,7 @@ typedef int __V4SI __attribute__((vector_size(16)));
   __asm__ ("stdcx. %2,%y1\n"				\
 	   "\tmfocrf %0,0x80"				\
 	   : "=r" (result),				\
-	     "=m" (*ptrp)				\
+	     "=Z" (*ptrp)				\
 	   : "r" (value) : "cr0");			\
   (result & 0x20000000); })
 

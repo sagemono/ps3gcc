@@ -1,9 +1,9 @@
 #! /bin/csh
 # SCE CONFIDENTIAL
-# Copyright(C) 2005 Sony Computer Entertainment Inc.
+# Copyright(C) 2007 Sony Computer Entertainment Inc.
 # All Rights Reserved.
 
-# This script builds and installs ppu-lv2 toolchain for SDK1.8.0.  The
+# This script builds and installs ppu-lv2 toolchain for SDK1.9.0-GCC402.  The
 # existing toolchain directory is backed up as "host-linux/ppu.~N~" where
 # N is a generated number.
 # If environment variable CELLSDK is set, it should be the directory where
@@ -71,19 +71,23 @@ cd ppu-lv2/libsupcxx || exit 1
 ppu-lv2-g++ -c -O2 -g -mno-altivec -I $SRC/libsupcxx \
 	$SRC/libsupcxx/*.cc || exit 1
 ppu-lv2-ar cr libsupc++.a *.o || exit 1
-mkdir -p noeh || exit 1
-cd noeh || exit 1
-foreach f (eh_alloc.cc eh_aux_runtime.cc eh_catch.cc eh_globals.cc \
+foreach d (fno-exceptions fno-exceptions/fno-rtti)
+  mkdir -p $d || exit 1
+  pushd $d || exit 1
+  foreach f (eh_alloc.cc eh_aux_runtime.cc eh_catch.cc eh_globals.cc \
 	eh_personality.cc eh_terminate.cc eh_throw.cc pure.cc tinfo.cc vec.cc)
-  ppu-lv2-g++ -fno-exceptions -c -O2 -g -mno-altivec -I $SRC/libsupcxx \
+    # BUG: -fno-rtti should be added
+    ppu-lv2-g++ -fno-exceptions -c -O2 -g -mno-altivec -I $SRC/libsupcxx \
 	$SRC/libsupcxx/$f || exit 1
+  end
+  ppu-lv2-ar cr libsupc++.a *.o || exit 1
+  popd
 end
-ppu-lv2-ar cr libsupc++.a *.o || exit 1
-cd ..
 set incdir = `ppu-lv2-gcc -print-file-name=include`
 cp -af $SRC/libsupcxx/cxxabi.h $incdir/ || exit 1
-cp -af libsupc++.a $incdir/../ || exit 1
-cp -af noeh/libsupc++.a $incdir/../noeh || exit 1
+foreach d (. fno-exceptions fno-exceptions/fno-rtti)
+  cp -af $d/libsupc++.a $incdir/../$d || exit 1
+end
 cd ../..
 
 cp -af $SRC/gcc/COPYING{,.LIB} $TOOLCHAIN_PREFIX/ || exit 1

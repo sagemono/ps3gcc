@@ -1,9 +1,9 @@
 #! /bin/csh
 # SCE CONFIDENTIAL
-# Copyright(C) 2005 Sony Computer Entertainment Inc.
+# Copyright(C) 2007 Sony Computer Entertainment Inc.
 # All Rights Reserved.
 
-# This script builds and installs mingw->ppu-lv2 toolchain for SDK1.8.0.  The
+# This script builds and installs mingw->ppu-lv2 toolchain for SDK1.9.0-GCC402.  The
 # existing toolchain directory is backed up as "host-win32/ppu.~N~" where
 # N is a generated number.
 # If environment variable CELLSDK is set, it should be the directory where
@@ -78,8 +78,9 @@ foreach h (float.h spe.h stdbool.h varargs.h iso646.h \
 end
 set libsupsrc = $incs:h
 set libsupdst = $incd:h
-cp -af $libsupsrc/libsupc++.a $libsupdst/libsupc++.a || exit 1
-cp -af $libsupsrc/noeh/libsupc++.a $libsupdst/noeh/libsupc++.a || exit 1
+foreach d (. fno-exceptions fno-exceptions/fno-rtti)
+  cp -af $libsupsrc/$d/libsupc++.a $libsupdst/$d/libsupc++.a || exit 1
+end
 cp -af $incs/cxxabi.h $incd/cxxabi.h || exit 1
 cd ../..
 

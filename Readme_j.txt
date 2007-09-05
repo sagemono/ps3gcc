@@ -1,5 +1,5 @@
 [SCE CONFIDENTIAL DOCUMENT]
-                    Copyright(C) 2006 Sony Computer Entertainment Inc.
+                    Copyright(C) 2007 Sony Computer Entertainment Inc.
                                                    All Rights Reserved.
 ======================================================================
 このパッケージには、Cell OS Lv-2 ツールチェーンのソースファイルが含ま
@@ -15,7 +15,7 @@
 メントを参照してください。
 例:
     mkdir work/src
-    unzip toolchain-src-1.8.0.zip -d work/src
+    unzip toolchain-src-1.9.0-GCC402.zip -d work/src
     mkdir work/build
     cd work/build
     ../src/build.sh
@@ -44,7 +44,7 @@ build-mingw.sh          Windows版ツールチェーンの再構築用スクリプト
 build-lm.sh             Linux->Windowsツールチェーンの再構築用スクリプト
 build-mp-lv2.sh         Windows版のLv-2のPPUツールチェーンの再構築用スクリプト
 build-ms-lv2.sh         Windows版のLv-2のSPUツールチェーンの再構築用スクリプト
-diff-from-gcc           GCC 4.0.2およびBinutils 2.16.1からの差分情報
+diff-from-gcc           GCC 4.0.2およびBinutils 2.17からの差分情報
                         これには、当社による変更点のみが含まれます。
 binutils/               GNU development toolsソースファイル
 gcc/                    GNU Compiler Collection (GCC)ソースファイル

@@ -5,7 +5,7 @@
    Sony Computer Entertainment, Inc.,
    Toshiba Corporation,
    International Business Machines Corporation,
-   2001,2002,2003,2004,2005,2006.
+   2001,2002,2003,2004,2005,2006,2007.
 
    This file is free software; you can redistribute it and/or modify it under
    the terms of the GNU General Public License as published by the Free
@@ -676,7 +676,8 @@ enum { SIGNAL_FRAMESIZE = 128 };
 
 #undef CPP_SPEC
 #define	CPP_SPEC "-D__PPU__ -D__CELLOS_LV2__ " \
-	"%{fno-exceptions:-D_NO_EX} " \
+        "%{fno-rtti:-D__NO_RTTI} " \
+        "%{fno-exceptions:-D_NO_EX} " \
         "%{mlp64:-funsigned-char} "
 
 /*  Macro: CPLUSPLUS_CPP_SPEC

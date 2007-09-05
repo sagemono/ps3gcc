@@ -7,7 +7,7 @@
 
  /* CELL FIXME: configure does not like dots in anything other than
     the gcc version below. */
-const char version_string[] = "4.0.2 (CELL 4.1.28, $Rev: 1757 $)";
+const char version_string[] = "4.0.2 (CELL 4.1.28, $Rev: 1849 $)";
 
 /* This is the location of the online document giving instructions for
    reporting bugs.  If you distribute a modified version of GCC,

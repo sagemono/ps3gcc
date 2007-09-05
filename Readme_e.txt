@@ -1,5 +1,5 @@
 [SCE CONFIDENTIAL DOCUMENT]
-                    Copyright(C) 2006 Sony Computer Entertainment Inc.
+                    Copyright(C) 2007 Sony Computer Entertainment Inc.
                                                    All Rights Reserved.
 ======================================================================
 This package includes the source files of Cell OS Lv-2 toolchain.  When
@@ -13,7 +13,7 @@ install directory and the rebuild working directory by setting
 environment variables.  See comments in script files for details.
 Example:
     mkdir work/src
-    unzip toolchain-src-1.8.0.zip -d work/src
+    unzip toolchain-src-1.9.0-GCC402.zip -d work/src
     mkdir work/build
     cd work/build
     ../src/build.sh
@@ -43,7 +43,7 @@ build-mingw.sh          script for rebuilding the toolchain for Windows
 build-lm.sh             script for rebuilding Linux->Windows toolchain
 build-mp-lv2.sh         script for rebuilding Lv-2 PPU toolchain for Windows
 build-ms-lv2.sh         script for rebuilding Lv-2 SPU toolchain for Windows
-diff-from-gcc           differences from GCC 4.0.2 and Binutils 2.16.1
+diff-from-gcc           differences from GCC 4.0.2 and Binutils 2.17
                         Only the changes made by our company are included.
 binutils/               GNU development tools source file
 gcc/                    GNU Compiler Collection (GCC) source file

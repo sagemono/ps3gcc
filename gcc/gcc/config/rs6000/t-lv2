@@ -3,7 +3,7 @@
 #  Sony Computer Entertainment, Inc.,
 #  Toshiba Corporation,
 #  International Business Machines Corporation,
-#  2001,2002,2003,2004,2005,2006.
+#  2001,2002,2003,2004,2005,2006,2007.
 
 #  This file is free software; you can redistribute it and/or modify it under
 #  the terms of the GNU General Public License as published by the Free
@@ -38,8 +38,9 @@ LIB2FUNCS_EXTRA = tramp.S $(srcdir)/config/rs6000/ppc64-fp.c xp-bit.c \
 
 TARGET_LIBGCC2_CFLAGS = -mno-minimal-toc -fPIC -mno-altivec
 
-MULTILIB_OPTIONS        = fno-exceptions
-MULTILIB_DIRNAMES       = noeh
+MULTILIB_OPTIONS        = fno-exceptions fno-rtti
+# need to define MULTILIB_DIRNAMES even if the option and dir name are same...
+MULTILIB_DIRNAMES	= fno-exceptions fno-rtti
 LIBGCC = stmp-multilib
 INSTALL_LIBGCC    = install-multilib
 

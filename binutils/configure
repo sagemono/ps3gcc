@@ -1541,12 +1541,6 @@ case "${target}" in
     ;;
   powerpc-*-eabi* | powerpcle-*-eabi* | powerpc-*-rtems* )
     ;;
-  [sp]pu-*-lv2*)
-    # Lv2OS environment supports profiler.
-    configdirs="$configdirs gprof"
-    skipdirs=`echo " ${skipdirs} " |  sed -e 's/ gprof / /'`
-    noconfigdirs=`echo " ${noconfigdirs} " |  sed -e 's/ gprof / /'`
-    ;;
   [sp]pu-*-tb*)
     # TestBench environment supports profiler.
     configdirs="$configdirs gprof"

@@ -1409,8 +1409,10 @@ enum reg_class
    'U' is for V.4 small data references.
    'W' is a vector constant that can be easily generated (no mem refs).
    'Y' is a indexed or word-aligned displacement memory operand.
+   'Z' is an indexed or indirect memory operand. 
    't' is for AND masks that can be performed by two rldic{l,r} insns.  */
-
+/* begin sec local bugzilla 36978
+   'Z' and 'a' constraints are backported from GCC-4.1.1. */
 #define EXTRA_CONSTRAINT(OP, C)						\
   ((C) == 'Q' ? GET_CODE (OP) == MEM && GET_CODE (XEXP (OP, 0)) == REG	\
    : (C) == 'R' ? legitimate_constant_pool_address_p (OP)		\
@@ -1424,6 +1426,8 @@ enum reg_class
 		   && !mask64_operand (OP, DImode))			\
    : (C) == 'W' ? (easy_vector_constant (OP, GET_MODE (OP)))		\
    : (C) == 'Y' ? (word_offset_memref_operand (OP, GET_MODE (OP)))      \
+   : (C) == 'Z' ? (indexed_or_indirect_operand (OP, GET_MODE (OP)))	\
+   : (C) == 'a' ? (indexed_or_indirect_address (OP, GET_MODE (OP)))	\
    : 0)
 
 /* Define which constraints are memory constraints.  Tell reload
@@ -1431,7 +1435,11 @@ enum reg_class
    memory address into a base register if required.  */
 
 #define EXTRA_MEMORY_CONSTRAINT(C, STR)				\
-  ((C) == 'Q' || (C) == 'Y')
+  ((C) == 'Q' || (C) == 'Y' || (C) == 'Z' )
+
+#define EXTRA_ADDRESS_CONSTRAINT(C, STR)			\
+  ((C) == 'a')
+/* end sce local bugzilla 36979 */
 
 /* Given an rtx X being reloaded into a reg required to be
    in class CLASS, return the class of reg to actually use.

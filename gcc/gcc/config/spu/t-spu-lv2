@@ -39,7 +39,9 @@ CROSS_LIBGCC1 =
 # Build libgcc.a with special flags
 TARGET_LIBGCC2_CFLAGS = -fPIC
 
-LIB2FUNCS_EXTRA = $(srcdir)/config/spu/divf.c  $(srcdir)/config/spu/sqrtf.c 
+LIB2FUNCS_EXTRA = $(srcdir)/config/spu/divf.c  $(srcdir)/config/spu/sqrtf.c \
+	$(srcdir)/config/spu/float_unssidf.c \
+	$(srcdir)/config/spu/float_unsdidf.c
 
 LIB2ADDEH = $(srcdir)/unwind-dw2.c $(srcdir)/unwind-dw2-fde.c \
    $(srcdir)/unwind-sjlj.c $(srcdir)/unwind-c.c

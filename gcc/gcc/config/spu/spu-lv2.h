@@ -3,7 +3,7 @@
    Sony Computer Entertainment, Inc.,
    Toshiba Corporation,
    International Business Machines Corporation,
-   2001,2002,2003,2004,2005,2006.
+   2001,2002,2003,2004,2005,2006,2007
 
    This file is free software; you can redistribute it and/or modify it under
    the terms of the GNU General Public License as published by the Free
@@ -65,7 +65,7 @@
                         "  mraw|mapusim:crt3%O%s; " \
                         "  mcellsim|mspusim:cs-crt0%O%s; " \
                         "  mis:crt4%O%s; " \
-                        "  mspurs-job:job_start%O%s; " \
+                        "  mspurs-job:job_start_gcc%O%s; " \
                         "  mspurs-task:spurs_task%O%s; " \
                         "  :crt1%O%s} "
 /* Bugzilla 31752 

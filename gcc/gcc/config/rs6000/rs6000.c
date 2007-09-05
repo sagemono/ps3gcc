@@ -3420,6 +3420,47 @@ word_offset_memref_operand (rtx op, enum machine_mode mode ATTRIBUTE_UNUSED)
   return (off % 4) == 0;
 }
 
+/* begin sce local 36979 
+   Backported indexed_or_indirect_address from GCC-4.1.1
+   to support 'Z' constraint. 
+   These function are converted from define_predicates in 
+   gcc-4.1/gcc/gcc/config/rs6000/predicates.md */
+/* return 1 if OP can be address part of X-form insn.
+   Otherwise, return 0. */
+int
+indexed_or_indirect_operand (rtx op, enum machine_mode mode)
+{
+  if (!memory_operand (op, mode))
+    return 0;
+
+  op = XEXP (op, 0);
+  if (TARGET_ALTIVEC
+      && ALTIVEC_VECTOR_MODE (mode)
+      && GET_CODE (op) == AND
+      && GET_CODE (XEXP (op, 1)) == CONST_INT
+      && INTVAL (XEXP (op, 1)) == -16)
+    op = XEXP (op, 0);
+
+  return indexed_or_indirect_address (op, mode);
+}
+
+int
+indexed_or_indirect_address (rtx op, enum machine_mode mode)
+{
+  if (GET_MODE (op) != Pmode)
+    return 0;
+
+  if (GET_CODE (op) == REG)
+    return 1;
+    
+  if (GET_CODE (op) == PLUS 
+      && GET_CODE (XEXP (op, 0)) == REG
+      && GET_CODE (XEXP (op, 1)) == REG)
+    return 1;
+  return 0;
+}
+/* end sce local 36979 */
+
 /* Return true if either operand is a general purpose register.  */
 
 bool

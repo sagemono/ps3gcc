@@ -20,6 +20,9 @@ OTHER_GOT_SECTIONS=".toe ALIGN(128) : { *(.toe) } = 0"
 # To put the special residential section at the top of .text
 # I modified scriptstempl/elf.sc so that it refers to the shell variable
 # SPECIAL_SECTION_BEFORE_TEXT_SECTION.
+#
+# bugzilla 30757
+# Add new section .before_text.
 SPECIAL_SECTION_BEFORE_TEXT_SECTION="
   .SpuGUID ALIGN(128) : ONLY_IF_SPUGUID
   {
@@ -29,5 +32,6 @@ SPECIAL_SECTION_BEFORE_TEXT_SECTION="
 	LONG(0x0)
 	LONG(0x0)
   }
+  .before_text : { *(.before_text) }
 "
 
