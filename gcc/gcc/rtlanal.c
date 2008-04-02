@@ -229,7 +229,8 @@ rtx_varies_p (rtx x, int for_alias)
    alignment machines.  */
 
 static int
-rtx_addr_can_trap_p_1 (rtx x, enum machine_mode mode, bool unaligned_mems)
+rtx_addr_can_trap_p_1 (rtx x ATTRIBUTE_UNUSED, enum machine_mode mode ATTRIBUTE_UNUSED,
+		       bool unaligned_mems ATTRIBUTE_UNUSED)
 {
 /* CELL LOCAL Begin */
 #ifdef ADDRESSES_NEVER_TRAP

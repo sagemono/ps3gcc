@@ -104,6 +104,8 @@ static size_t deferred_count;
 /* Number of deferred options scanned for -include.  */
 static size_t include_cursor;
 
+int flag_argument_lookup = true;
+
 static void set_Wimplicit (int);
 static void handle_OPT_d (const char *);
 static void set_std_cxx98 (int);
@@ -276,6 +278,13 @@ c_common_handle_option (size_t scode, const char *arg, int value)
 	break;
 #endif
       result = 0;
+      break;
+
+    case OPT_fsource_402:
+      flag_source_4_0_2 = value;
+      flag_argument_lookup = !value;
+      flag_friend_injection = value;
+      flag_resolve_non_dependent_early = !value;
       break;
 
     case OPT__output_pch_:
@@ -593,6 +602,10 @@ c_common_handle_option (size_t scode, const char *arg, int value)
       flag_no_asm = !value;
       break;
 
+    case OPT_fkoenig_argument_lookup:
+      flag_argument_lookup = value;
+      break;
+
     case OPT_fbuiltin:
       flag_no_builtin = !value;
       break;
@@ -756,6 +769,10 @@ c_common_handle_option (size_t scode, const char *arg, int value)
       flag_use_repository = value;
       if (value)
 	flag_implicit_templates = 0;
+      break;
+
+    case OPT_fresolve_non_dependent_early:
+      flag_resolve_non_dependent_early = value;
       break;
 
     case OPT_frtti:

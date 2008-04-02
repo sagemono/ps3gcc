@@ -587,14 +587,29 @@ crash_signal (int signo)
   internal_error ("%s", strsignal (signo));
 }
 
-/* Arrange to dump core on error.  (The regular error message is still
+/* Arrange to dump core on error including seg fauls.  (The regular error message is still
    printed first, except in the case of abort().)  */
 
 static void
 setup_core_dumping (void)
 {
+#ifdef SIGSEGV
+  signal (SIGSEGV, SIG_DFL);
+#endif
+#ifdef SIGILL
+  signal (SIGILL, SIG_DFL);
+#endif
+#ifdef SIGBUS
+  signal (SIGBUS, SIG_DFL);
+#endif
 #ifdef SIGABRT
   signal (SIGABRT, SIG_DFL);
+#endif
+#if defined SIGIOT && (!defined SIGABRT || SIGABRT != SIGIOT)
+  signal (SIGIOT, SIG_DFL);
+#endif
+#ifdef SIGFPE
+  signal (SIGFPE, SIG_DFL);
 #endif
 #if defined(HAVE_SETRLIMIT)
   {
@@ -1088,7 +1103,7 @@ decode_d_option (const char *arg)
       case 'I':
 	break;
       case 'H':
-	setup_core_dumping();
+	setup_core_dumping ();
 	break;
 
       case 'a':

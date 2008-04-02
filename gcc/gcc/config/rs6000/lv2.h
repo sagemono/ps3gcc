@@ -363,15 +363,41 @@
 "	.previous");
 #endif
 
+#undef	FP_SAVE_INLINE
+#define FP_SAVE_INLINE(FIRST_REG) 1
+
 /* FP save and restore routines.  */
 #undef  SAVE_FP_PREFIX
-#define SAVE_FP_PREFIX (TARGET_64BIT ? "._savef" : "_savefpr_")
+#define SAVE_FP_PREFIX "_savefpr_"
 #undef  SAVE_FP_SUFFIX
-#define SAVE_FP_SUFFIX (TARGET_64BIT ? "" : "_l")
+#define SAVE_FP_SUFFIX ""
 #undef  RESTORE_FP_PREFIX
-#define RESTORE_FP_PREFIX (TARGET_64BIT ? "._restf" : "_restfpr_")
+#define RESTORE_FP_PREFIX "_restfpr_"
 #undef  RESTORE_FP_SUFFIX
-#define RESTORE_FP_SUFFIX (TARGET_64BIT ? "" : "_l")
+#define RESTORE_FP_SUFFIX "" 
+
+
+/* Macros for using external functions to save general registers.
+   Currently never use inline stores. */
+#undef	GP_SAVE_INLINE
+#define GP_SAVE_INLINE(FIRST_REG)  1
+
+#undef  SAVE_GP_PREFIX
+#define SAVE_GP_PREFIX "_savegpr1_"
+#undef  SAVE_GP_SUFFIX
+#define SAVE_GP_SUFFIX ""
+#undef  RESTORE_GP_PREFIX
+#define RESTORE_GP_PREFIX "_restgpr1_"
+#undef  RESTORE_GP_SUFFIX
+#define RESTORE_GP_SUFFIX "" 
+#undef  SAVE_GP_LR_PREFIX
+#define SAVE_GP_LR_PREFIX "_savegpr0_"
+#undef  SAVE_GP_LR_SUFFIX
+#define SAVE_GP_LR_SUFFIX ""
+#undef  RESTORE_GP_LR_PREFIX
+#define RESTORE_GP_LR_PREFIX "_restgpr0_"
+#undef  RESTORE_GP_LR_SUFFIX
+#define RESTORE_GP_LR_SUFFIX "" 
 
 /* Dwarf2 debugging.  */
 #undef  PREFERRED_DEBUGGING_TYPE
@@ -682,7 +708,6 @@ enum { SIGNAL_FRAMESIZE = 128 };
 
 #undef CC1PLUS_SPEC
 #define CC1PLUS_SPEC \
-	"%{fno-exceptions:%{!frtti:-fno-rtti}} " \
 	"%{!fthreadsafe-statics:-fno-threadsafe-statics}"
 
 /*  Macro: CC1_ONLY_SPEC */
@@ -727,21 +752,24 @@ enum { SIGNAL_FRAMESIZE = 128 };
    If -mprx option is specified, invoke addtional hairy command sequences.
    Actual specs are defiend in SUBTARGET_EXTRA_SPECS. See below */
 #undef LINK_COMMAND_SPEC
-#define LINK_COMMAND_SPEC "%{mprx: %(prx_link_command); :%(lv2_old_link_command)} "
+#define LINK_COMMAND_SPEC "%{mprx|mprx-with-runtime: %(prx_link_command); : %(lv2_old_link_command)} "
 
 /*  Macro: LINK_SPEC
 
     A C string constant that tells the GCC driver program options to
     pass to the linker. It can also specify how to translate options you
     give to GCC into options for GCC to pass to the linker.  */
-
+/* sce local bugzilla 37796
+   add condition to handle mno-sn-ld option. */
 #undef	LINK_SPEC
-#define	LINK_SPEC "\
-%{h*} %{v:-V} %{!msdata=none:%{G*}} %{msdata=none:-G0} \
-%{YP,*} %{R*} \
-%{Qy:} %{!Qn:-Qy} \
-%{mlp64:-melf64ppc} \
-%{shared}"
+#define	LINK_SPEC \
+  "%{h*} %{v:-V} %{!msdata=none:%{G*}} %{msdata=none:-G0} " \
+  "%{YP,*} %{R*} "					 \
+  "%{Qy:} %{!Qn:-Qy} "					 \
+  "%{mlp64:-melf64ppc} "						\
+  "%{mno-sn-ld|mprx|mprx-with-runtime: ; : " \
+  "  %{!mlp64:--alternative-ld=ps3ppuld --gnu-mode %{!mno-prxfixup: %{!mforce-prx-fixup:--prx-fixup}} %{mprx|mprx-with-runtime:--no-check-unresolved} } } " \
+  "%{shared}"
 
 /*  Macro: LIB_SPEC
 
@@ -755,9 +783,11 @@ enum { SIGNAL_FRAMESIZE = 128 };
 #undef LIB_SPEC
  /* TRANSMETA begin
     - for incremental linking: "-r" == "-Wl,-r -mno-prxfixup -mlv2-stub" */
-#define LIB_SPEC "--start-group -lc -lgcc -lstdc++ -lsupc++" \
-  " %{mlv2-stub|!mno-prxfixup:-llv2_stub; :-llv2} --end-group" \
-  " %{r|mno-prxfixup|T: ; : -T %:prepend-cmddir(../../../target/ppu/lib/elf64_lv2_prx.x) }"
+#define LIB_SPEC \
+  "%{!mno-sn-ld: -L%R/lib} " \
+  "--start-group -lc -lgcc -lstdc++ -lsupc++" \
+  " %{mlv2-stub|!mno-prxfixup:-llv2_stub; :-llv2} -lsyscall --end-group" \
+  " %{r|mno-prxfixup|T: ; : -T %R/lib/elf64_lv2_prx.x} "
 /* TRANSMETA end */
 
 /*  Macro: LIBGCC_SPEC
@@ -791,7 +821,7 @@ enum { SIGNAL_FRAMESIZE = 128 };
 	"ecrti.o%s " \
 	"%{!shared:%{!mmambo:crt0.o%s crt1.o%s;: " \
 	"mmambo:--whole-archive mambo-crt1.o%s libmambo.a%s --no-whole-archive}} "\
-	"%{shared: crtbeginS.o%s; :crtbegin.o%s} " 
+	"%{shared: crtbeginS.o%s; :crtbegin.o%s} "
 
 /*  Macro: ENDFILE_SPEC
 
@@ -842,105 +872,12 @@ enum { SIGNAL_FRAMESIZE = 128 };
 #undef	SUBTARGET_EXTRA_SPECS
 #define        SUBTARGET_EXTRA_SPECS \
   { "prx_fixup",       PRX_FIXUP_COMMAND_SPEC },       \
-  { "xxxlibgen",        PRX_XXXLIBGEN_COMMAND_SPEC },  \
-  { "xxxfixup",         PRX_XXXFIXUP_COMMAND_SPEC },   \
-  { "link_script",      PRX_LINK_SCRIPT_SPEC },        \
-  { "prelink_normal",   PRX_PRELINK_NORMAL_SPEC },     \
-  { "prelink_with_libc", PRX_PRELINK_WITH_LIBC_SPEC }, \
-  { "prelink",          PRX_PRELINK_SPEC },            \
-  { "postlink",         PRX_POSTLINK_SPEC },           \
-  { "gen_entry_source", PRX_GEN_ENTRY_SOURCE_SPEC },   \
-  { "gen_stub_source",  PRX_GEN_STUB_SOURCE_SPEC },    \
-  { "gen_stub_archive", PRX_GEN_STUB_ARCHIVE_SPEC },   \
-  { "gen_prx",          PRX_GEN_PRX_SPEC },            \
-  { "gen_prx_or_stub",  PRX_GEN_PRX_OR_STUB_SPEC },    \
   { "prx_link_command", PRX_LINK_COMMAND_SPEC },       \
   { "lv2_old_link_command", LV2_OLD_LINK_COMMAND_SPEC },
 
-#define PRX_FIXUP_COMMAND_SPEC         "%:prepend-cmddir(../../bin/ppu-lv2-prx-fixup) "
-#define PRX_XXXLIBGEN_COMMAND_SPEC     "%:prepend-cmddir(../../bin/ppu-lv2-prx-libgen) "
-#define PRX_XXXFIXUP_COMMAND_SPEC      "%:prepend-cmddir(../../bin/ppu-lv2-prx-fixup) "
+#define PRX_FIXUP_COMMAND_SPEC         "ppu-lv2-prx-fixup"
 
-#define PRX_LINK_SCRIPT_SPEC   \
-"-T %{mlp64: %:prepend-cmddir(../../../target/ppu/lib/prx64.xr); " \
-"     : %:prepend-cmddir(../../../target/ppu/lib/prx32.xr)} "
-
-#define PRX_PRELINK_NORMAL_SPEC \
-"    %{startfiles:%(startfile_prx)} " \
-"    %{static:} %{L*} %(link_script) %(link_libgcc) %o " \
-"    %(export_objecs)  " \
-"    %{!stdlib:%{!startfiles:%{!nodefaultlibs:%(link_gcc_c_sequence_prx)}}} " \
-"    %{!stdlib:%{startfiles:%{!nodefaultlibs:%(link_gcc_c_sequence)}}}  " \
-"    %{stdlib:%{!startfiles:%{!nodefaultlibs:%(link_gcc_c_sequence)}}} " \
-"    %{stdlib:%{startfiles:%{!nodefaultlibs:%(link_gcc_c_sequence)}}}  " \
-"    %{startfiles:%E} "
-
-#define PRX_PRELINK_WITH_LIBC_SPEC  \
-"    %{!nostartfiles:%(startfile_prx)} " \
-"    %{static:} %{L*} %(link_script) %(link_libgcc) %o " \
-"    %(export_objecs) " \
-"    %{!nodefaultlibs:%(link_gcc_c_sequence)} " \
-"    %{!nostartfiles:%E} "
-
-#define PRX_PRELINK_SPEC \
-"%(linker) %l -dc -r %X %{t} %{u*} " \
-"%{zgen-prx-with-libc:%(prelink_with_libc)} " \
-"%{!zgen-prx-with-libc:%(prelink_normal)} "
-
-#define PRX_POSTLINK_SPEC   "%(linker) %{Map=*:-Map %*} -dc -r %X %{x} "
-
-
-#define PRX_GEN_ENTRY_SOURCE_SPEC \
-"%(prelink) -o %g.psp.rela.o \n" \
-"    %(xxxlibgen) %{zv:-v} %{zdump:--dump} %{o*:-e %*} " \
-"        %{zweak-entry:--weak-entry} %{zno-weak-entry:--no-weak-entry} " \
-"        %{zweak-entry=*:--weak-entry=%*} " \
-"        %{zversionlog-dir=*:--versionlog-dir=%*} " \
-"        %g.psp.rela.o "
-
-#define PRX_GEN_STUB_SOURCE_SPEC \
-"%(prelink) -o %g.psp.rela.o \n" \
-"    %(xxxlibgen) %{zv:-v} %{zdump:--dump} %{zlevel=*:-l %*} " \
-"        %{zweak-stub:--weak-stub} %{zno-weak-stub:--no-weak-stub} " \
-"        %{zweak-stub=*:--weak-stub=%*} %{zstub-prefix=*:--stub-prefix=%*} " \
-"        %{zversionlog-dir=*:--versionlog-dir=%*} " \
-"        --stub-src %{zgenstub:--stub-archive} %g.psp.rela.o "
-
-#define PRX_GEN_STUB_ARCHIVE_SPEC \
-"%(prelink) -o %g.psp.rela.o \n" \
-"    %(xxxlibgen) %{zv:-v} %{zdump:--dump} %{zlevel=*:-l %*} " \
-"        %{zweak-stub:--weak-stub} %{zno-weak-stub:--no-weak-stub} " \
-"        %{zweak-stub=*:--weak-stub=%*} %{zstub-prefix=*:--stub-prefix=%*} " \
-"        %{zversionlog-dir=*:--versionlog-dir=%*} " \
-"        --stub-archive %g.psp.rela.o "
-
-#define PRX_GEN_PRX_SPEC \
-"%(prelink) -o %g.psp.rela.o \n" \
-"    %(xxxlibgen) %{zv:-v} %{zdump:--dump} " \
-"        %{zweak-entry:--weak-entry} " \
-"       %{zno-weak-entry:--no-weak-entry} " \
-"       %{zweak-entry=*:--weak-entry=%*} -e %g.lib.ent.s " \
-"       %{zlevel=*:-l %*}  " \
-"       %{zweak-stub:--weak-stub} %{zno-weak-stub:--no-weak-stub}  " \
-"        %{zweak-stub=*:--weak-stub=%*} %{zstub-prefix=*:--stub-prefix=%*}  " \
-"       %{zversionlog-dir=*:--versionlog-dir=%*}  " \
-"       %{zgenstub:--stub-archive} %g.psp.rela.o \n" \
-"    as %a %g.lib.ent.s -o %g.lib.ent.o \n" \
-"    %(postlink) -o %g.psp.relb.o %g.psp.rela.o %g.lib.ent.o \n" \
-"    %(xxxfixup) %{!Ttext*:%{e*} %{s:%{o*}} %{!s:%{o*:-r %*}}} " \
-"        %{Ttext*:%{e*} %{o*:-f %*} -t %*} %g.psp.relb.o "
-
-#define PRX_GEN_PRX_OR_STUB_SPEC \
-"    %{zgenprx:%(gen_prx)} " \
-"    %{!zgenprx:%{zgenstub:%(gen_stub_archive)} %{!zgenstub:%(gen_prx)}} "
-
-#define PRX_LINK_COMMAND_SPEC \
-"%{!fsyntax-only: " \
-"  %{!c:%{!M:%{!MM:%{!E:%{!S: " \
-"      %{!zgenstubsrc:%{!zgenentry:%(gen_prx_or_stub)} " \
-"                  %{zgenentry:%(gen_entry_source)}}  " \
-"      %{zgenstubsrc:%{!zgenentry:%(gen_stub_source)}}  " \
-" }}}}}} "
+#define PRX_LINK_COMMAND_SPEC ""
 
 #define LV2_OLD_LINK_COMMAND_SPEC \
 "%{!fsyntax-only:%{!c:%{!M:%{!MM:%{!E:%{!S: " \
@@ -952,7 +889,7 @@ enum { SIGNAL_FRAMESIZE = 128 };
 "%{!A:%{!nostdlib:%{!nostartfiles:%E}}} %{T*} " \
 "  %{r|mno-prxfixup: ; :" \
 "     \n " \
-"     %(prx_fixup) --stub-fix-only %{!o: a.out} %{o*: %*} " \
+"     %{mforce-prx-fixup|mno-sn-ld:%(prx_fixup) --stub-fix-only %{!o: a.out} %{o*: %*}} " \
 "  }" \
 "}}}}}} "
 
@@ -1125,7 +1062,8 @@ enum { SIGNAL_FRAMESIZE = 128 };
 }
 
 #undef DRIVER_SELF_SPECS
-#define DRIVER_SELF_SPECS "%{m32:%eThe lv2 compiler is 64 bit only.}"
+#define DRIVER_SELF_SPECS "%{m32:%eThe lv2 compiler is 64 bit only.}" \
+  "%{mlp64: %{msn-ld: %eSN linker cannot handle objects compiled with -mlp64.} }"
 
 /* This is normally set by configure if prefix and sysroot are the same.
    This is not true for lv2, but we still want the sysroot to be
@@ -1172,3 +1110,18 @@ enum { SIGNAL_FRAMESIZE = 128 };
    default one.*/
 #define MD_SPEC_FILE "prxspec"
 /* end sce local bugzilla 23831 */
+
+/* begin sce local bugzilla 37796 */
+#undef  SYSROOT_SPEC
+#define SYSROOT_SPEC "%{mno-sn-ld|mlp64: --sysroot=%R; : } "
+/* end sce local bugzilla 37796 */
+
+/* begin sce local bugzilla 37796 */
+/* WARNING! This macro is one of SCE extention. No such macro in FSF GCC.
+
+   Macro: SYSTEM_EXEC_DIR_RELATIVE
+   Specify additional directory list where the system commands are installed.
+   This macro should be the list of relative paths from the prefix directory
+   (specified by --prefix), that are concatinated with ':'. */
+#define SYSTEM_EXEC_DIR_RELATIVE  "../sn/bin:../bin"
+/* end sce local bugzilla 37796 */

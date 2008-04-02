@@ -1452,3 +1452,18 @@ bfd_fill_in_gnu_debuglink_section (bfd *abfd,
 
   return TRUE;
 }
+
+/*
+ * Added at SCEA - set direction.  Needed to compensate for WIN32
+ * lack of fcntl
+ */
+void
+bfd_set_direction(bfd *abfd, int fdflags)
+{
+  switch (fdflags & (O_ACCMODE)) {
+    case O_RDONLY: abfd->direction = read_direction; break;
+    case O_WRONLY: abfd->direction = write_direction; break;
+    case O_RDWR: abfd->direction = both_direction; break;
+    default: abort ();
+  }
+}

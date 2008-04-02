@@ -40,6 +40,10 @@ Software Foundation, 51 Franklin Street, Fifth Floor, Boston, MA
 #include "target.h"
 #include "tree-pass.h"
 
+/* This is the alignment, in bits, guaranteed to be returned by global
+   operator new */
+unsigned int global_new_align = BIGGEST_ALIGNMENT;
+
 /* Value of the -G xx switch, and whether it was passed or not.  */
 unsigned HOST_WIDE_INT g_switch_value;
 bool g_switch_set;
@@ -558,7 +562,8 @@ decode_options (unsigned int argc, const char **argv)
       flag_cse_skip_blocks = 1;
       flag_gcse = 1;
       flag_expensive_optimizations = 1;
-      flag_ipa_type_escape = 1;
+      /* SCE local : bz40058 */
+      /*flag_ipa_type_escape = 1;*/
       flag_strength_reduce = 1;
       flag_rerun_cse_after_loop = 1;
       flag_rerun_loop_opt = 1;
@@ -863,6 +868,10 @@ common_handle_option (size_t scode, const char *arg, int value)
       fix_register (arg, 1, 1);
       break;
 
+    case OPT_fglobal_new_align_:
+      global_new_align = value * BITS_PER_UNIT;
+      break;
+
     case OPT_finline_limit_:
     case OPT_finline_limit_eq:
       set_param_value ("max-inline-insns-single", value / 2);
@@ -1056,6 +1065,13 @@ common_handle_option (size_t scode, const char *arg, int value)
 
     case OPT_fforce_mem:
       warning (0, "-f[no-]force-mem is nop and option will be removed in 4.2");
+      break;
+
+    case OPT_ftree_loop_linear:
+      if (value)
+        warning (OPT_Wtree_loop_linear,
+		 "-ftree-loop-linear is not fully supported and can cause "
+		 "internal errors and wrong code, use at your own risk.");
       break;
 
     default:

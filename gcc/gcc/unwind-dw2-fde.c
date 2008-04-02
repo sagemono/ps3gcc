@@ -454,7 +454,7 @@ fde_split (struct object *ob, fde_compare_t fde_compare,
 	   struct fde_vector *linear, struct fde_vector *erratic)
 {
 #if !(defined (__MINGW32__ ) || defined (__CYGWIN__))
-  static fde *marker;
+  static const fde *marker;
 #else
 #define marker  (*(const fde **)&__w32_sharedptr->dw2_marker)
 #endif

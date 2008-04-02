@@ -12,6 +12,7 @@ NO_SMALL_DATA=true
 EMBEDDED=true
 MAXPAGESIZE=0x80
 DATA_ADDR="ALIGN(${MAXPAGESIZE})"
+OTHER_SECTIONS=".note.spu_name 0 : { KEEP(*(.note.spu_name)) }"
 GENERATE_SHLIB_SCRIPT=yes
 OTHER_GOT_SECTIONS=".toe ALIGN(128) : { *(.toe) } = 0"
 
@@ -35,3 +36,8 @@ SPECIAL_SECTION_BEFORE_TEXT_SECTION="
   .before_text : { *(.before_text) }
 "
 
+# sce local bugzilla 39745
+# SPURS team requested us to provide the pair of symbols
+# to indentify where is the readonly segment.
+SYMBOL_READONLY_SEGMENT_START="  PROVIDE (__ro_segment_start = .); "
+SYMBOL_READONLY_SEGMENT_END="  PROVIDE (__ro_segment_end = .); "

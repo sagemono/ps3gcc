@@ -91,8 +91,6 @@ static gcov_unsigned_t gcov_crc32;
 /* Size of the longest file name. */
 static size_t gcov_max_filename = 0;
 
-/* CELL FIXME */
-#if !defined __SPU__ && !defined __PPU__
 #ifdef TARGET_POSIX_IO
 /* Make sure path component of the given FILENAME exists, create 
    missing directories. FILENAME must be writable. 
@@ -126,8 +124,6 @@ create_file_directory (char *filename)
   return 0;
 }
 #endif
-#endif 
-/* CELL FIXME */
 
 /* Check if VERSION of the info block PTR matches libgcov one.
    Return 1 on success, or zero in case of versions mismatch.
@@ -198,6 +194,11 @@ gcov_exit (void)
 	}
     }
 
+#if defined(__PPU__) && defined(__CELLOS_LV2__)
+  gcov_prefix = "/host_root";
+  prefix_length = strlen (gcov_prefix);
+#else
+
   /* Get file name relocation prefix.  Non-absolute values are ignored. */
   gcov_prefix = getenv("GCOV_PREFIX");
   if (gcov_prefix && IS_ABSOLUTE_PATH (gcov_prefix))
@@ -220,6 +221,7 @@ gcov_exit (void)
     }
   else
     prefix_length = 0;
+#endif
   
   /* Allocate and initialize the filename scratch space.  */
   gi_filename = alloca (prefix_length + gcov_max_filename + 1);
@@ -314,15 +316,7 @@ gcov_exit (void)
 	      continue;
 	    }
 #endif
-#if defined(__PPU__) && defined(__CELLOS_LV2__)
-      /** sce local **/
-      char tmp_file_name[FILENAME_MAX] = "/host_root";
-
-      if (!gcov_open (strncat (tmp_file_name, gi_filename, 
-                               FILENAME_MAX - strlen ("/host_root") - 1)))
-#else /* __PPU__ */      
-      if (!gcov_open (gi_ptr->filename))
-#endif /* __PPU__ */
+          if (!gcov_open (gi_ptr->filename))
 	    {
               fprintf (stderr, "profiling:%s:Cannot open\n", gi_filename);
 	      continue;
@@ -704,8 +698,6 @@ __gcov_merge_delta (gcov_type *counters, unsigned n_counters)
 }
 #endif /* L_gcov_merge_delta */
 
-/* CELL FIXME: cannot compile */
-#if !defined __SPU__ && !defined __PPU__
 #ifdef L_gcov_interval_profiler
 /* If VALUE is in interval <START, START + STEPS - 1>, then increases the
    corresponding counter in COUNTERS.  If the VALUE is above or below
@@ -766,7 +758,6 @@ __gcov_one_value_profiler (gcov_type *counters, gcov_type value)
   counters[2]++;
 }
 #endif
-#endif /* CELL FIXME */
 
 /* CELL FIXME: cannot compile */
 #if !defined __SPU__ && !defined __PPU__

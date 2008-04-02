@@ -3924,7 +3924,7 @@ const struct powerpc_opcode powerpc_opcodes[] = {
 { "mfthrm3",    XSPR(31,339,1022), XSPR_MASK, PPC750,   { RT } },
 { "mfpbu2",     XSPR(31,339,1023), XSPR_MASK, PPC403,	{ RT } },
 { "mfspr",      X(31,339),	   X_MASK,    COM,	{ RT, SPR } },
-{ "mfctrl",     X(31,339),         XSPR_MASK, PPC64,   { RT } },
+{ "mfctrl",     XSPR(31,339,136),  XSPR_MASK, PPC64,   { RT } },
 
 { "lwax",    X(31,341),	X_MASK,		PPC64,		{ RT, RA0, RB } },
 
@@ -4207,7 +4207,7 @@ const struct powerpc_opcode powerpc_opcodes[] = {
 { "mtthrm3",   XSPR(31,467,1022), XSPR_MASK, PPC750,    { RS } },
 { "mtpbu2",    XSPR(31,467,1023), XSPR_MASK, PPC403,	{ RS } },
 { "mtspr",     X(31,467),	  X_MASK,    COM,	{ SPR, RS } },
-{ "mtctrl",    X(31,467),         XSPR_MASK, PPC64,    { RS } },
+{ "mtctrl",    XSPR(31,467,152),  XSPR_MASK, PPC64,    { RS } },
 
 { "dcbi",    X(31,470),	XRT_MASK,	PPC,		{ RA, RB } },
 

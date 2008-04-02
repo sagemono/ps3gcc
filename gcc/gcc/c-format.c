@@ -286,14 +286,14 @@ static const format_length_info printf_length_specs[] =
   { "h", FMT_LEN_h, STD_C89, "hh", FMT_LEN_hh, STD_C99 },
   { "l", FMT_LEN_l, STD_C89, "ll", FMT_LEN_ll, STD_C9L },
   { "q", FMT_LEN_ll, STD_EXT, NULL, 0, 0 },
-#ifdef __MINGW32__
-  { "I64", FMT_LEN_ll, STD_EXT, NULL, 0, 0 },
-#endif
   { "L", FMT_LEN_L, STD_C89, NULL, 0, 0 },
   { "z", FMT_LEN_z, STD_C99, NULL, 0, 0 },
   { "Z", FMT_LEN_z, STD_EXT, NULL, 0, 0 },
   { "t", FMT_LEN_t, STD_C99, NULL, 0, 0 },
   { "j", FMT_LEN_j, STD_C99, NULL, 0, 0 },
+#ifdef TARGET_EXTRA_PRINTF_LENGTH_SPECIFIERS
+  TARGET_EXTRA_PRINTF_LENGTH_SPECIFIERS,
+#endif
   { NULL, 0, 0, NULL, 0, 0 }
 };
 
@@ -324,13 +324,13 @@ static const format_length_info scanf_length_specs[] =
   { "h", FMT_LEN_h, STD_C89, "hh", FMT_LEN_hh, STD_C99 },
   { "l", FMT_LEN_l, STD_C89, "ll", FMT_LEN_ll, STD_C9L },
   { "q", FMT_LEN_ll, STD_EXT, NULL, 0, 0 },
-#ifdef __MINGW32__
-  { "I64", FMT_LEN_ll, STD_EXT, NULL, 0, 0 },
-#endif
   { "L", FMT_LEN_L, STD_C89, NULL, 0, 0 },
   { "z", FMT_LEN_z, STD_C99, NULL, 0, 0 },
   { "t", FMT_LEN_t, STD_C99, NULL, 0, 0 },
   { "j", FMT_LEN_j, STD_C99, NULL, 0, 0 },
+#ifdef TARGET_EXTRA_SCANF_LENGTH_SPECIFIERS
+  TARGET_EXTRA_SCANF_LENGTH_SPECIFIERS,
+#endif
   { NULL, 0, 0, NULL, 0, 0 }
 };
 
@@ -352,9 +352,7 @@ static const format_flag_spec printf_flag_specs[] =
   { '0',  0, 0, N_("'0' flag"),        N_("the '0' printf flag"),              STD_C89 },
   { '-',  0, 0, N_("'-' flag"),        N_("the '-' printf flag"),              STD_C89 },
   { '\'', 0, 0, N_("''' flag"),        N_("the ''' printf flag"),              STD_EXT },
-#ifndef __MINGW32__
   { 'I',  0, 0, N_("'I' flag"),        N_("the 'I' printf flag"),              STD_EXT },
-#endif
   { 'w',  0, 0, N_("field width"),     N_("field width in printf format"),     STD_C89 },
   { 'p',  0, 0, N_("precision"),       N_("precision in printf format"),       STD_C89 },
   { 'L',  0, 0, N_("length modifier"), N_("length modifier in printf format"), STD_C89 },
@@ -434,9 +432,7 @@ static const format_flag_spec scanf_flag_specs[] =
   { 'w',  0, 0, N_("field width"),            N_("field width in scanf format"),              STD_C89 },
   { 'L',  0, 0, N_("length modifier"),        N_("length modifier in scanf format"),          STD_C89 },
   { '\'', 0, 0, N_("''' flag"),               N_("the ''' scanf flag"),                       STD_EXT },
-#ifndef __MINGW32__
   { 'I',  0, 0, N_("'I' flag"),               N_("the 'I' scanf flag"),                       STD_EXT },
-#endif
   { 0, 0, 0, NULL, NULL, 0 }
 };
 
@@ -704,18 +700,12 @@ static const format_char_info monetary_char_table[] =
   { NULL, 0, 0, NOLENGTHS, NULL, NULL, NULL }
 };
 
-#ifdef __MINGW32__
-#define PRINTF_FLAG_CHARS " +#0-'"
-#define SCANF_FLAG_CHARS "*'"
-#else
-#define PRINTF_FLAG_CHARS " +#0-'I"
-#define SCANF_FLAG_CHARS "*'I"
-#endif
 
 /* This must be in the same order as enum format_type.  */
 static const format_kind_info format_types_orig[] =
 {
-  { "printf",   printf_length_specs,  print_char_table, PRINTF_FLAG_CHARS, NULL, 
+  { "printf",   printf_length_specs,  print_char_table,
+    " +#0-'" TARGET_EXTRA_PRINTF_FLAG_CHARS, NULL, 
     printf_flag_specs, printf_flag_pairs,
     FMT_FLAG_ARG_CONVERT|FMT_FLAG_DOLLAR_MULTIPLE|FMT_FLAG_USE_DOLLAR|FMT_FLAG_EMPTY_PREC_OK,
     'w', 0, 'p', 0, 'L',
@@ -757,7 +747,8 @@ static const format_kind_info format_types_orig[] =
     0, 0, 0, 0, 0,
     NULL, NULL
   },
-  { "scanf",    scanf_length_specs,   scan_char_table,  SCANF_FLAG_CHARS, NULL, 
+  { "scanf",    scanf_length_specs,   scan_char_table,
+    "*'" TARGET_EXTRA_SCANF_FLAG_CHARS, NULL, 
     scanf_flag_specs, scanf_flag_pairs,
     FMT_FLAG_ARG_CONVERT|FMT_FLAG_SCANF_A_KLUDGE|FMT_FLAG_USE_DOLLAR|FMT_FLAG_ZERO_WIDTH_BAD|FMT_FLAG_DOLLAR_GAP_POINTER_OK,
     'w', 0, 0, '*', 'L',
@@ -1750,17 +1741,12 @@ check_format_info_main (format_check_results *res,
       length_chars_std = STD_C89;
       if (fli)
 	{
-	  while (fli->name != 0 && fli->name[0] != *format_chars)
+	  while (fli->name != 0
+		 && strncmp (fli->name, format_chars, strlen (fli->name)))
 	    fli++;
-	  if (fli->name != 0
-#ifdef __MINGW32__
-	      /* Only accept "I64", not 'I' by itself.  */	
-	      && (format_chars[0] != 'I'
-		  || (format_chars[1] == '6' &&  format_chars[2] == '4'))
-#endif
-	     ) 
+	  if (fli->name != 0)
 	    {
-	      format_chars++;
+	      format_chars += strlen (fli->name);
 	      if (fli->double_name != 0 && fli->name[0] == *format_chars)
 		{
 		  format_chars++;
@@ -1770,10 +1756,6 @@ check_format_info_main (format_check_results *res,
 		}
 	      else
 		{
-#ifdef __MINGW32__
-	          if (fli->name[0] == 'I')
-		    format_chars += 2;
-#endif
 		  length_chars = fli->name;
 		  length_chars_val = fli->index;
 		  length_chars_std = fli->std;

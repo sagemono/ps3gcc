@@ -51,7 +51,7 @@ proc dg-pch { subdir test options suffix } {
 	    dg-test -keep-output $test $flags "-I."
 	    file delete "$bname$suffix.gch"
 	    if { [ file exists "$bname.s" ] } {
-		file rename "$bname.s" "$bname.s-gch"
+		catch { file rename "$bname.s" "$bname.s-gch" }
 		gcc_copy_files "[file rootname $test]${suffix}s" "$bname$suffix"
 		dg-test -keep-output $test $flags "-I."
 		set tmp [ diff "$bname.s" "$bname.s-gch" ]

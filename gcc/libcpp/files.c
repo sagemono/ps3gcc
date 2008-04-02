@@ -229,7 +229,7 @@ open_file (_cpp_file *file)
   else if (errno == ENOTDIR)
     errno = ENOENT;
 
-  /* CELL LOCAL: Fix BZ 8300.
+  /* CELL LOCAL: Fix BZ 8300. */
   /* An attempt to open() a directory may fail and set errno to EACCES.
      On __MINGW32__ host an attempt to open() _any_ directory will do this.
      Check and reset errno to ENOENT.  */
@@ -852,7 +852,7 @@ static void
 open_file_failed (cpp_reader *pfile, _cpp_file *file, int angle_brackets)
 {
   int sysp = pfile->line_table->highest_line > 1 && pfile->buffer ? pfile->buffer->sysp : 0;
-  bool print_dep = CPP_OPTION (pfile, deps.style) > (angle_brackets || !!sysp);
+  bool print_dep = CPP_OPTION (pfile, deps.style) > !!sysp;
 
   errno = file->err_no;
   if (print_dep && CPP_OPTION (pfile, deps.missing_files) && errno == ENOENT)

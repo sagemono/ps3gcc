@@ -66,6 +66,8 @@
   {
     if (spu_reg_operand (op, mode))
       return 1;
+    if (!immediate_operand (op, mode))
+      return 0;
     if (GET_CODE (op) == CONST_INT || GET_CODE (op) == CONST_VECTOR)
       return arith_immediate_p (op, mode, -0x200, 0x1ff);
     return 0;
@@ -76,6 +78,8 @@
   {
     if (spu_reg_operand (op, mode))
       return 1;
+    if (!immediate_operand (op, mode))
+      return 0;
     if (GET_CODE (op) == CONST_INT || GET_CODE (op) == CONST_DOUBLE
 	|| GET_CODE (op) == CONST_VECTOR)
       return logical_immediate_p (op, mode);
@@ -87,6 +91,8 @@
   {
     if (spu_reg_operand (op, mode))
       return 1;
+    if (!immediate_operand (op, mode))
+      return 0;
     if (GET_CODE (op) == CONST_INT || GET_CODE (op) == CONST_DOUBLE
 	|| GET_CODE (op) == CONST_VECTOR)
       return logical_immediate_p (op, mode)
@@ -96,7 +102,8 @@
 
 (define_predicate "spu_shifti_operand"
   (and (match_code "const_int,const_vector")
-       (match_test "arith_immediate_p (op, SImode, -0x80000000ll, 0x7fffffffll)")))
+       (and (match_operand 0 "immediate_operand")
+	    (match_test "arith_immediate_p (op, SImode, -0x80000000ll, 0x7fffffffll)"))))
 
 (define_predicate "spu_shift_operand"
   (ior (match_operand 0 "spu_reg_operand")
@@ -104,7 +111,13 @@
 
 (define_predicate "imm_K_operand"
   (and (match_code "const_int")
-       (match_test "arith_immediate_p (op, mode, -0x200, 0x1ff)")))
+       (and (match_operand 0 "immediate_operand")
+	    (match_test "arith_immediate_p (op, mode, -0x200, 0x1ff)"))))
+
+(define_predicate "imm_t_operand"
+  (and (match_code "const_int,const_vector")
+       (and (match_operand 0 "immediate_operand")
+	    (match_test "arith_immediate_p (op, mode, 0, 0x1ff) || arith_immediate_p (op, mode, 0xfe00, 0xffff)"))))
 
 ;; Return 1 if OP is a comparison operation that is valid for a branch insn.
 ;; We only check the opcode against the mode of the register value here. 

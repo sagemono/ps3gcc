@@ -25,23 +25,6 @@
 #include "rtl.h"
 
 
-#include "lto/lto-info.h"
-#include "lto/lto-info-asm.h"
-extern void lto_info (rtx insn, annotation_kind_t kind, HOST_WIDE_INT info);
-extern long long unsigned lto_arg_mask (tree funtype);
-#define LTO_ARG_MASK lto_arg_mask
-extern void lto_inline_asm (int on);
-#define LTO_INLINE_ASM lto_inline_asm
-extern void lto_function_arg_advance(CUMULATIVE_ARGS);
-extern void spu_preface_tablejump (rtx label);
-extern void spu_preface_load (rtx memaddr);
-extern void spu_preface_store (rtx memaddr);
-extern void spu_preface_il (void);
-extern void spu_preface_addsi3 (void);
-extern void spu_preface_call (int sibcall);
-extern void spu_preface_return (void);
-extern void spu_final_prescan_insn (rtx insn, rtx *operands,
-				    int noperands ATTRIBUTE_UNUSED);
 /* Prototypes generated using gcc's -aux-info flag. */
 extern void spu_init_builtins			(void);
 extern tree spu_resolve_overloaded_builtin	(tree, tree);
@@ -73,7 +56,6 @@ extern rtx spu_const_vector			(enum machine_mode mode, rtx inner);
 extern rtx spu_const_from_ints			(enum machine_mode mode, int a, int b, int c, int d); 
 extern void spu_split_trunc_shift_asm		(rtx *operands, int unsigned_p, int ashift); 
 extern rtx spu_float_const			(const char *string, enum machine_mode mode); 
-extern int legitimate_const			(rtx x, int aligned); 
 extern int spu_constant_address_p		(rtx x); 
 extern int immediate_load_p			(rtx op, enum machine_mode mode); 
 extern int logical_immediate_p			(rtx op, enum machine_mode mode); 
@@ -116,6 +98,17 @@ extern bool satisfies_constraint_A (rtx op);
 extern bool satisfies_constraint_B (rtx op);
 extern bool satisfies_constraint_C (rtx op);
 extern bool satisfies_constraint_D (rtx op);
+extern bool satisfies_constraint_I (rtx op);
+extern bool satisfies_constraint_J (rtx op);
+extern bool satisfies_constraint_K (rtx op);
+extern bool satisfies_constraint_M (rtx op);
+extern bool satisfies_constraint_N (rtx op);
+extern bool satisfies_constraint_O (rtx op);
+extern bool satisfies_constraint_P (rtx op);
+extern bool satisfies_constraint_Q (rtx op);
+extern bool satisfies_constraint_R (rtx op);
+extern bool satisfies_constraint_S (rtx op);
+extern bool satisfies_constraint_T (rtx op);
 extern bool satisfies_constraint_U (rtx op);
 extern bool satisfies_constraint_W (rtx op);
 extern bool satisfies_constraint_Y (rtx op);
@@ -127,16 +120,7 @@ extern bool satisfies_constraint_f (rtx op);
 extern bool satisfies_constraint_j (rtx op);
 extern bool satisfies_constraint_k (rtx op);
 extern bool satisfies_constraint_l (rtx op);
-extern bool satisfies_constraint_I (rtx op);
-extern bool satisfies_constraint_J (rtx op);
-extern bool satisfies_constraint_K (rtx op);
-extern bool satisfies_constraint_M (rtx op);
-extern bool satisfies_constraint_N (rtx op);
-extern bool satisfies_constraint_O (rtx op);
-extern bool satisfies_constraint_P (rtx op);
-extern bool satisfies_constraint_R (rtx op);
-extern bool satisfies_constraint_S (rtx op);
-extern bool satisfies_constraint_T (rtx op);
+extern bool satisfies_constraint_t (rtx op);
 extern bool constraint_satisfied_p (rtx op, int c);
 
 extern const char* spu_emit_pgo_info (rtx *ops, rtx insn);
@@ -145,4 +129,10 @@ void spu_init_expanders (void);
 
 struct ddg;
 int spu_res_mii (struct ddg *);
+
+/** SCE bugzilla #11003 **/
+extern void darwin_pragma_reverse_bitfields (struct cpp_reader *);
+extern void darwin_pragma_ms_struct (struct cpp_reader *);
 #endif
+
+extern void spu_notice_static_storage_vars (tree vars);

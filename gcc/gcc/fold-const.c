@@ -2643,6 +2643,13 @@ operand_equal_p (tree arg0, tree arg1, unsigned int flags)
 	case IMAGPART_EXPR:
 	  return OP_SAME (0);
 
+	case TARGET_MEM_REF:
+	  return (OP_SAME_WITH_NULL (0)
+		  && OP_SAME_WITH_NULL (1)
+		  && OP_SAME_WITH_NULL (2)
+		  && OP_SAME_WITH_NULL (3)
+		  && OP_SAME_WITH_NULL (4));
+
 	case ARRAY_REF:
 	case ARRAY_RANGE_REF:
 	  /* Operands 2 and 3 may be null.  */
@@ -10326,7 +10333,8 @@ fold_ternary (enum tree_code code, tree type, tree op0, tree op1, tree op2)
       return NULL_TREE;
 
     case BIT_FIELD_REF:
-      if (TREE_CODE (arg0) == VECTOR_CST
+      if ((TREE_CODE (arg0) == VECTOR_CST
+	  || (TREE_CODE (arg0) == CONSTRUCTOR && TREE_CONSTANT (arg0)))
 	  && type == TREE_TYPE (TREE_TYPE (arg0))
 	  && host_integerp (arg1, 1)
 	  && host_integerp (op2, 1))
@@ -10340,7 +10348,19 @@ fold_ternary (enum tree_code code, tree type, tree op0, tree op1, tree op2)
 	      && (idx = idx / width)
 		 < TYPE_VECTOR_SUBPARTS (TREE_TYPE (arg0)))
 	    {
-	      tree elements = TREE_VECTOR_CST_ELTS (arg0);
+	      tree elements = NULL_TREE;
+
+	      if (TREE_CODE (arg0) == VECTOR_CST)
+		elements = TREE_VECTOR_CST_ELTS (arg0);
+	      else
+		{
+		  unsigned HOST_WIDE_INT idx;
+		  tree value;
+
+		  FOR_EACH_CONSTRUCTOR_VALUE (CONSTRUCTOR_ELTS (arg0), idx, value)
+		    elements = tree_cons (NULL_TREE, value, elements);
+		}
+
 	      while (idx-- > 0 && elements)
 		elements = TREE_CHAIN (elements);
 	      if (elements)
@@ -11768,6 +11788,33 @@ fold_indirect_ref_1 (tree type, tree op0)
 	  tree part_width = TYPE_SIZE (type);
 	  tree index = bitsize_int (0);
 	  return fold_build3 (BIT_FIELD_REF, type, op, part_width, index);
+	}
+    }
+
+  /* ((foo*)&vectorfoo)[1] => BIT_FIELD_REF<vectorfoo,...> */
+  if (TREE_CODE (sub) == PLUS_EXPR
+      && TREE_CODE (TREE_OPERAND (sub, 1)) == INTEGER_CST)
+    {
+      tree op00 = TREE_OPERAND (sub, 0);
+      tree op01 = TREE_OPERAND (sub, 1);
+      tree op00type;
+
+      STRIP_NOPS (op00);
+      op00type = TREE_TYPE (op00);
+      if (TREE_CODE (op00) == ADDR_EXPR
+ 	  && TREE_CODE (TREE_TYPE (op00type)) == VECTOR_TYPE
+	  && type == TREE_TYPE (TREE_TYPE (op00type)))
+	{
+	  HOST_WIDE_INT offset = tree_low_cst (op01, 0);
+	  tree part_width = TYPE_SIZE (type);
+	  tree part_width1 = TYPE_SIZE (op00type);
+	  HOST_WIDE_INT part_widthi = tree_low_cst (part_width, 0)/BITS_PER_UNIT;
+	  HOST_WIDE_INT part_widthi1 = tree_low_cst (part_width1, 0);
+	  HOST_WIDE_INT indexi = offset * BITS_PER_UNIT;
+	  tree index = bitsize_int (indexi);
+	  if (offset/part_widthi <= TYPE_VECTOR_SUBPARTS (TREE_TYPE (op00type)))
+	    return fold_build3 (BIT_FIELD_REF, type, TREE_OPERAND (op00, 0), part_width, index);
+
 	}
     }
 

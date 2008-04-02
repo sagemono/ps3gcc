@@ -42,7 +42,6 @@
 #include "../libcpp/internal.h"
 #include "target.h"
 #include "spu_types.h"
-#include "spu-builtins.h"
 
 static cpp_hashnode *spu_categorize_keyword (const cpp_token *);
 static void spu_init_vector_keywords (cpp_reader *pfile);
@@ -87,6 +86,9 @@ struct spu_builtin_description spu_builtins[] = {
 #undef DEF_BUILTIN
 };
 
+/* Built in types.  */
+tree spu_builtin_types[SPU_BTI_MAX];
+
 
 /*
  * target hook for resolve_overloaded_builtin(). Returns a
@@ -98,7 +100,7 @@ spu_resolve_overloaded_builtin (tree fndecl, tree fnargs)
 #define SCALAR_TYPE_P(t) (INTEGRAL_TYPE_P (t) \
 			  || SCALAR_FLOAT_TYPE_P (t) \
 			  || POINTER_TYPE_P (t))
-  spu_function_code new_fcode, fcode = DECL_FUNCTION_CODE (fndecl) - END_BUILTINS;
+  enum spu_function_code new_fcode, fcode = DECL_FUNCTION_CODE (fndecl) - END_BUILTINS;
   struct spu_builtin_description *desc;
   tree match = NULL_TREE; 
 
@@ -224,10 +226,13 @@ spu_check_builtin_parm( struct spu_builtin_description *d, rtx op, int p)
       if (v < spu_builtin_range[range].low
 	  || v > spu_builtin_range[range].high)
 	error ("%s expects an integer literal in the range [%d, %d]. ("
-	       HOST_WIDE_INT_PRINT_DEC ")",
+	       HOST_WIDE_INT_PP_PRINT_DEC ")",
 	       d->name,
 	       spu_builtin_range[range].low, spu_builtin_range[range].high,
 	       v);
+
+      if (d->fcode == SI_STOP && v == 0 && TARGET_WARN_STOP0)
+	warning (0, "Recommend using non-zero argument to si_stop and spu_stop.");
 
       switch (p)
 	{
@@ -371,7 +376,6 @@ spu_expand_builtin_1 (struct spu_builtin_description *d,
     if (d->fcode == SPU_MASK_FOR_LOAD)
     {
       int icode = (int) CODE_FOR_spu_lvsr;
-      enum machine_mode tmode = insn_data[icode].operand[0].mode;
       enum machine_mode mode = insn_data[icode].operand[1].mode;
       tree arg;
       rtx addr, op, pat;
@@ -797,5 +801,62 @@ spu_c_common_override_options (void)
 {
   warn_main = 0;
 }
+
+/** SCE bugilla #11003 **/
+/* APPLE LOCAL begin pragma reverse_bitfields, ms_struct */
+/* Handle the reverse_bitfields pragma.  */
+extern int darwin_reverse_bitfields;
+
+void
+darwin_pragma_reverse_bitfields (cpp_reader *pfile ATTRIBUTE_UNUSED)
+{
+  const char* arg;
+  tree t;
+
+  if (c_lex (&t) != CPP_NAME) {
+    warning (0, "malformed '#pragma options', ignoring");
+    return;
+  }
+  arg = IDENTIFIER_POINTER (t);
+
+  if (!strcmp (arg, "on")) {
+    darwin_reverse_bitfields = true;
+  }
+  else if (!strcmp (arg, "off") || !strcmp (arg, "reset"))
+    darwin_reverse_bitfields = false;
+  else
+    warning (0, "malformed '#pragma reverse_bitfields {on|off|reset}', ignoring");
+  if (c_lex (&t) != CPP_EOF)
+    warning (0, "junk at end of '#pragma reverse_bitfields'");
+}
+
+extern int darwin_ms_struct;
+
+/* Parse the ms_struct pragma.  */
+void
+darwin_pragma_ms_struct (cpp_reader *pfile ATTRIBUTE_UNUSED)
+{
+  const char *arg;
+  tree t;
+
+  if (c_lex (&t) != CPP_NAME) {
+    warning (0, "malformed '#pragma ms_struct', ignoring");
+    return;
+  }
+  arg = IDENTIFIER_POINTER (t);
+
+  if (!strcmp (arg, "on")) {
+    darwin_ms_struct = true;
+  }
+  else if (!strcmp (arg, "off") || !strcmp (arg, "reset"))
+    darwin_ms_struct = false;
+  else
+    warning (0, "malformed '#pragma ms_struct {on|off|reset}', ignoring");
+
+  if (c_lex (&t) != CPP_EOF)
+    warning (0, "junk at end of '#pragma ms_struct'");
+}
+/* APPLE LOCAL end pragma reverse_bitfields, ms_struct */
+
 
 #include "gt-spu-c.h"

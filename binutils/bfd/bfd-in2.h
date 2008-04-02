@@ -954,6 +954,9 @@ struct bfd_section *bfd_create_gnu_debuglink_section
 bfd_boolean bfd_fill_in_gnu_debuglink_section
    (bfd *abfd, struct bfd_section *sect, const char *filename);
 
+/* Added at SCEA */
+void bfd_set_direction(bfd *abfd, int fdflags);
+
 /* Extracted from libbfd.c.  */
 
 /* Byte swapping macros for user section data.  */
@@ -2424,6 +2427,22 @@ relocation types already defined.  */
   BFD_RELOC_SPARC_TLS_DTPOFF64,
   BFD_RELOC_SPARC_TLS_TPOFF32,
   BFD_RELOC_SPARC_TLS_TPOFF64,
+
+/* SPU Relocations.  */
+  BFD_RELOC_SPU_IMM7,
+  BFD_RELOC_SPU_IMM8,
+  BFD_RELOC_SPU_IMM10,
+  BFD_RELOC_SPU_IMM10W,
+  BFD_RELOC_SPU_IMM16,
+  BFD_RELOC_SPU_IMM16W,
+  BFD_RELOC_SPU_IMM18,
+  BFD_RELOC_SPU_PCREL9a,
+  BFD_RELOC_SPU_PCREL9b,
+  BFD_RELOC_SPU_PCREL16,
+  BFD_RELOC_SPU_LO16,
+  BFD_RELOC_SPU_HI16,
+  BFD_RELOC_SPU_PPU32,
+  BFD_RELOC_SPU_PPU64,
 
 /* Alpha ECOFF and ELF relocations.  Some of these treat the symbol or
 "addend" in some special way.
@@ -4012,20 +4031,6 @@ This is the 5 bits of a value.  */
   BFD_RELOC_860_HIGH,
   BFD_RELOC_860_HIGOT,
   BFD_RELOC_860_HIGOTOFF,
-
-/* SPU Relocations.  */
-  BFD_RELOC_SPU_IMM7,
-  BFD_RELOC_SPU_IMM8,
-  BFD_RELOC_SPU_IMM10,
-  BFD_RELOC_SPU_IMM10W,
-  BFD_RELOC_SPU_IMM16,
-  BFD_RELOC_SPU_IMM16W,
-  BFD_RELOC_SPU_IMM18,
-  BFD_RELOC_SPU_PCREL9a,
-  BFD_RELOC_SPU_PCREL9b,
-  BFD_RELOC_SPU_PCREL16,
-  BFD_RELOC_SPU_LO16,
-  BFD_RELOC_SPU_HI16,
 
 /* OpenRISC Relocations.  */
   BFD_RELOC_OPENRISC_ABS_26,

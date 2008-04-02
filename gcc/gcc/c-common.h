@@ -310,6 +310,13 @@ extern bool has_c_linkage (tree decl);
 
 extern int flag_preprocess_only;
 
+/* */
+extern int flag_argument_lookup;
+
+extern int flag_source_4_0_2;
+
+extern int flag_resolve_non_dependent_early;
+
 /* Zero means that faster, ...NonNil variants of objc_msgSend...
    calls will be used in ObjC; passing nil receivers to such calls
    will most likely result in crashes.  */
@@ -843,7 +850,7 @@ extern tree builtin_type_for_size (int, bool);
 
 /* In c-gimplify.c  */
 extern void c_genericize (tree);
-extern int c_gimplify_expr (tree *, tree *, tree *);
+extern int c_gimplify_expr (tree *, tree *, tree *, int);
 extern tree c_build_bind_expr (tree, tree);
 
 /* In c-pch.c  */

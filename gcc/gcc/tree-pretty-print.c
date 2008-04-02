@@ -163,7 +163,7 @@ dump_decl_name (pretty_printer *buffer, tree node, int flags)
     {
       if (TREE_CODE (node) == LABEL_DECL
 	  && LABEL_DECL_UID (node) != -1)
-	pp_printf (buffer, "L." HOST_WIDE_INT_PRINT_DEC,
+	pp_printf (buffer, "L." HOST_WIDE_INT_PP_PRINT_DEC,
 		   LABEL_DECL_UID (node));
       else
 	{
@@ -713,7 +713,7 @@ dump_generic_node (pretty_printer *buffer, tree node, int spc, int flags,
       if (DECL_NAME (node))
 	dump_decl_name (buffer, node, flags);
       else if (LABEL_DECL_UID (node) != -1)
-        pp_printf (buffer, "<L" HOST_WIDE_INT_PRINT_DEC ">",
+        pp_printf (buffer, "<L" HOST_WIDE_INT_PP_PRINT_DEC ">",
 		   LABEL_DECL_UID (node));
       else
         pp_printf (buffer, "<D%u>", DECL_UID (node));

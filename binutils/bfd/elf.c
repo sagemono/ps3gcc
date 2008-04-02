@@ -2478,8 +2478,7 @@ _bfd_elf_new_section_hook (bfd *abfd, asection *sec)
 	 
 	 FIXME: Here I only handle SHF_ALLOC, SHF_WRITE and SHF_EXECINSTR.
 	 Should I also consider SHF_TLS, SHF_GROUP and so on? */
-      if (strcmp (sec->name, ".toe") == 0
-	  || strcmp (sec->name, ".SpuGUID") == 0)
+      if (strcmp (sec->name, ".SpuGUID") == 0)
 	{
 	  if ((ssect->attr & SHF_ALLOC) == SHF_ALLOC)
 	    sec->flags |= SEC_ALLOC;
@@ -3641,10 +3640,6 @@ map_sections_to_segments (bfd *abfd)
   asection *dynsec, *eh_frame_hdr;
   bfd_size_type amt;
 
-#if defined(BPA)
-  bfd_boolean toe_segment=FALSE;
-#endif
-
   if (elf_tdata (abfd)->segment_map != NULL)
     return TRUE;
 
@@ -3755,19 +3750,6 @@ map_sections_to_segments (bfd *abfd)
 	     one (we build the last one after this loop).  */
 	  new_segment = FALSE;
 	}
-#if defined(BPA)
-      else if (strcmp (hdr->name, ".toe") == 0)
-	{
-	  new_segment = TRUE;
-	  toe_segment = TRUE;
-	}
-      else if (toe_segment == TRUE)
-	{
-	  /* no longer in toe_segment */
-	  new_segment = TRUE;
-	  toe_segment = FALSE;
-	}
-#endif
       else if (last_hdr->lma - last_hdr->vma != hdr->lma - hdr->vma)
 	{
 	  /* If this section has a different relation between the
@@ -4791,6 +4773,12 @@ assign_file_positions_for_segments (bfd *abfd, struct bfd_link_info *link_info)
   
   elf_tdata (abfd)->next_file_pos = off;
 
+  if (bed->elf_backend_modify_program_headers != NULL)
+    {
+      if (!(*bed->elf_backend_modify_program_headers) (abfd, link_info))
+	return FALSE;
+    }
+
   /* Write out the program headers.  */
   if (bfd_seek (abfd, (bfd_signed_vma) bed->s->sizeof_ehdr, SEEK_SET) != 0
       || bed->s->write_out_phdrs (abfd, phdrs, alloc) != 0)
@@ -5404,52 +5392,9 @@ _bfd_elf_symbol_from_bfd_symbol (bfd *abfd, asymbol **asym_ptr_ptr)
        7. SHF_TLS sections are only in PT_TLS or PT_LOAD segments.
        8. PT_DYNAMIC should not contain empty sections at the beginning
           (with the possible exception of .dynamic).  */
-#if (!defined(BPA))
-#define INCLUDE_SECTION_IN_SEGMENT(section, segment, bed)		\
-  ((((segment->p_paddr							\
-      ? IS_CONTAINED_BY_LMA (section, segment, segment->p_paddr)	\
-      : IS_CONTAINED_BY_VMA (section, segment))				\
-     && (section->flags & SEC_ALLOC) != 0)				\
-    || IS_COREFILE_NOTE (segment, section))				\
-   && section->output_section != NULL					\
-   && segment->p_type != PT_GNU_STACK					\
-   && (segment->p_type != PT_TLS					\
-       || (section->flags & SEC_THREAD_LOCAL))				\
-   && (segment->p_type == PT_LOAD					\
-       || segment->p_type == PT_TLS					\
-       || (section->flags & SEC_THREAD_LOCAL) == 0)			\
-   && (segment->p_type != PT_DYNAMIC					\
-       || SECTION_SIZE (section, segment) > 0				\
-       || (segment->p_paddr						\
-           ? segment->p_paddr != section->lma				\
-           : segment->p_vaddr != section->vma)				\
-       || (strcmp (bfd_get_section_name (ibfd, section), ".dynamic")	\
-           == 0))							\
-   && ! section->segment_mark)
-#else
-#define INCLUDE_SECTION_IN_SEGMENT(section, segment, bed)	\
+#define INCLUDE_SECTION_IN_SEGMENT(section, segment, bed)      \
   include_section_in_segment(ibfd, section, segment, bed)
-#endif
 
-
-  /* Returns TRUE iff seg1 starts after the end of seg2.  */
-#define SEGMENT_AFTER_SEGMENT(seg1, seg2, field)			\
-  (seg1->field >= SEGMENT_END (seg2, seg2->field))
-
-  /* Returns TRUE iff seg1 and seg2 overlap. Segments overlap iff both
-     their VMA address ranges and their LMA address ranges overlap.
-     It is possible to have overlapping VMA ranges without overlapping LMA
-     ranges.  RedBoot images for example can have both .data and .bss mapped
-     to the same VMA range, but with the .data section mapped to a different
-     LMA.  */
-#define SEGMENT_OVERLAPS(seg1, seg2)					\
-  (   !(SEGMENT_AFTER_SEGMENT (seg1, seg2, p_vaddr)			\
-        || SEGMENT_AFTER_SEGMENT (seg2, seg1, p_vaddr)) 		\
-   && !(SEGMENT_AFTER_SEGMENT (seg1, seg2, p_paddr)			\
-        || SEGMENT_AFTER_SEGMENT (seg2, seg1, p_paddr)))
-
-
-#ifdef BPA
 static bfd_boolean
 include_section_in_segment (bfd *ibfd,
 			    asection *section,
@@ -5486,7 +5431,22 @@ include_section_in_segment (bfd *ibfd,
 
   return FALSE;
 }
-#endif
+
+  /* Returns TRUE iff seg1 starts after the end of seg2.  */
+#define SEGMENT_AFTER_SEGMENT(seg1, seg2, field)			\
+  (seg1->field >= SEGMENT_END (seg2, seg2->field))
+
+  /* Returns TRUE iff seg1 and seg2 overlap. Segments overlap iff both
+     their VMA address ranges and their LMA address ranges overlap.
+     It is possible to have overlapping VMA ranges without overlapping LMA
+     ranges.  RedBoot images for example can have both .data and .bss mapped
+     to the same VMA range, but with the .data section mapped to a different
+     LMA.  */
+#define SEGMENT_OVERLAPS(seg1, seg2)					\
+  (   !(SEGMENT_AFTER_SEGMENT (seg1, seg2, p_vaddr)			\
+        || SEGMENT_AFTER_SEGMENT (seg2, seg1, p_vaddr)) 		\
+   && !(SEGMENT_AFTER_SEGMENT (seg1, seg2, p_paddr)			\
+        || SEGMENT_AFTER_SEGMENT (seg2, seg1, p_paddr)))
 
 
 /* Copy private BFD data.  This copies any program header information.  */

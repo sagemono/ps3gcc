@@ -78,6 +78,11 @@ static struct
 } sink_stats;
 
 
+/* The maximum number of predecessor a basic block may have in order 
+   to consider it as a candidate for the store sinking algorithm.  */
+
+#define SS_PREDS_MAX 3
+
 /* Given a PHI, and one of its arguments (DEF), find the edge for
    that argument and return it.  If the argument occurs twice in the PHI node,
    we return NULL.  */
@@ -483,6 +488,21 @@ sink_code_in_bb (basic_block bb)
     }
 }  
 
+/* Return true if T1 equals T2.  */
+
+static int
+tree_equal_p (tree t1, tree t2)
+{
+
+  if (t1 == NULL_TREE && t2 == NULL_TREE)
+    return true;
+
+  if (t1 == NULL_TREE || t2 == NULL_TREE)
+    return false;
+
+  return (operand_equal_p (t1, t2, 0));
+}
+
 /* Perform code sinking.
    This moves code down the flowgraph when we know it would be
    profitable to do so, or it wouldn't increase the number of
@@ -534,12 +554,462 @@ execute_sink_code (void)
   loop_optimizer_finalize (loops, dump_file);
 }
 
+/* Return true if REF1 equals REF2 and record the index 
+   of the memory references if it exists in SS_INDX. 
+   Otherwise return false.  */
+
+static bool
+equal_memory_ref_p (tree ref1, tree ref2, tree *ss_index)
+{
+  tree index1, index2;
+  tree index_def_stmt1, index_def_stmt2, rhs1, rhs2;
+
+  if (ref1 == NULL_TREE || ref2 == NULL_TREE)
+    return false;
+
+  if (operand_equal_p (ref1, ref2, 0))
+    return true;
+
+  /* In case those references were analyzed before we can use
+     this information to determine if they are equal.  */
+  if (TREE_CODE (ref1) != TARGET_MEM_REF
+      || TREE_CODE (ref2) != TARGET_MEM_REF)
+    return false;
+
+  /* Fail if the two references are not equal.  */
+
+  if (!tree_equal_p (TMR_OFFSET (ref1), TMR_OFFSET (ref2))
+      || !tree_equal_p (TMR_BASE (ref1), TMR_BASE (ref2))
+      || !tree_equal_p (TMR_SYMBOL (ref1), TMR_SYMBOL (ref2))
+      || !tree_equal_p (TMR_STEP (ref1), TMR_STEP (ref2)))
+    return false;
+
+  index1 = TMR_INDEX (ref1);
+  index2 = TMR_INDEX (ref2);
+
+  if (index1 == NULL_TREE && index2 == NULL_TREE)
+    return true;
+
+  if (index1 == NULL_TREE || index2 == NULL_TREE)
+    return false;
+
+  if (operand_equal_p (index1, index2, 0))
+    return true;
+
+  if (TREE_CODE (index1) != SSA_NAME || TREE_CODE (index2) != SSA_NAME)
+    return false;
+  /* It can be that the indexes of the memory references are different just
+     because they have a different SSA name.  For example:
+
+     if (cond)
+     D.2243_119 = ivtmp.48_2; 
+     MEM[base: c0_22, index: D.2243_119, step: 4B]{*D.2071} = tmp1;
+     else
+     D.2243_120 = ivtmp.48_2; 
+     MEM[base: c0_22, index: D.2243_120, step: 4B]{*D.2071} = tmp2;
+
+     In that case we still want to apply the transformation 
+     and save the original index (ivtmp.48_2) to use it later.  */
+
+
+  index_def_stmt1 = SSA_NAME_DEF_STMT (index1);
+  index_def_stmt2 = SSA_NAME_DEF_STMT (index2);
+
+  if ((TREE_CODE (index_def_stmt1) != MODIFY_EXPR)
+      || (TREE_CODE (index_def_stmt2) != MODIFY_EXPR))
+    return false;
+
+  rhs1 = TREE_OPERAND (index_def_stmt1, 1);
+  rhs2 = TREE_OPERAND (index_def_stmt2, 1);
+
+  if (operand_equal_p (rhs1, rhs2, 0))
+    {
+      /* Save the index.  */
+      if (*ss_index && *ss_index != rhs1)
+	return false;
+
+      *ss_index = rhs1;
+      return true;
+    }
+
+  return false;
+}
+
+/* Sink store in SS_BSI to the beginning of SINK_BB.  
+   In some cases the indexes of the memory references differ
+   in their indexes; for example -  
+
+    if (cond)
+      D.2243_119 = ivtmp.48_2;
+      MEM[base: c0_22, index: D.2243_119, step: 4B]{*D.2071} = tmp1;
+    else
+      D.2243_120 = ivtmp.48_2;
+      MEM[base: c0_22, index: D.2243_120, step: 4B]{*D.2071} = tmp2;
+
+    In that case we still apply the transformation and 
+    the original index (ivtmp.48_2) will be in SS_INDEX.
+
+    We will use it to update the sinked store:
+
+    if (cond)
+      D.2243_119 = ivtmp.48_2;
+      tmp_ss = tmp1;
+    else
+      D.2243_120 = ivtmp.48_2;
+      tmp_ss = tmp2;
+
+    ssi = ivtmp.48_2;
+    MEM[base: c0_22, index: ssi, step: 4B]{*D.2071} = tmp_ss
+*/ 
+
+static void
+sink_store (basic_block sink_bb, block_stmt_iterator *ss_bsi,
+	    tree ss_index)
+{
+  tree tmp_var, type, lhs;
+  tree ss_stmts[SS_PREDS_MAX];
+  tree new_sink_stmt, new_lhs;
+  block_stmt_iterator sink_bsi;
+  unsigned int i;
+
+  sink_bsi = bsi_start (sink_bb);
+
+  for (i = 0; i < EDGE_COUNT (sink_bb->preds); i++)
+    ss_stmts[i] = bsi_stmt (ss_bsi[i]);
+
+  lhs = TREE_OPERAND (ss_stmts[0], 0);
+  type = TREE_TYPE (lhs);
+
+  /* Create new temporary variable to replace the sinked store.  */
+  tmp_var = create_tmp_var (type, "_ss_");
+  add_referenced_tmp_var (tmp_var);
+  mark_sym_for_renaming (tmp_var);
+
+  new_lhs = unshare_expr (lhs);
+
+  if (ss_index)
+    {
+      tree type1, tmp_var1, new_index_stmt;
+
+      gcc_assert (TREE_CODE (new_lhs) == TARGET_MEM_REF);
+
+      /* Create new temporary variable for the index of the
+         memory reference and update the store with that index.  */
+      type1 = TREE_TYPE (ss_index);
+      tmp_var1 = create_tmp_var (type, "_ssi_");
+      add_referenced_tmp_var (tmp_var1);
+      mark_sym_for_renaming (tmp_var1);
+      new_index_stmt =
+	build2 (MODIFY_EXPR, type1, tmp_var1, unshare_expr (ss_index));
+      /* Replace the index of the memory reference with the new variable.  */
+      TMR_INDEX (new_lhs) = tmp_var1;
+      bsi_insert_after (&sink_bsi, new_index_stmt, BSI_NEW_STMT);
+    }
+  for (i = 0; i < EDGE_COUNT (sink_bb->preds); i++)
+    {
+      ssa_op_iter iter;
+      tree var;
+
+      /* Update the virtual operands.  */
+      FOR_EACH_SSA_TREE_OPERAND (var, ss_stmts[i], iter,
+				 SSA_OP_ALL_VIRTUALS)
+      {
+	if (TREE_CODE (var) == SSA_NAME)
+	  var = SSA_NAME_VAR (var);
+	mark_sym_for_renaming (var);
+      }
+      /* Replace the store with the new variable.  */
+      TREE_OPERAND (ss_stmts[i], 0) = tmp_var;
+      mark_sym_for_renaming (TREE_OPERAND (ss_stmts[i], 0));
+      update_stmt (ss_stmts[i]);
+    }
+  /* Sink the store.  */
+  new_sink_stmt = build2 (MODIFY_EXPR, type, new_lhs, tmp_var);
+  bsi_insert_after (&sink_bsi, new_sink_stmt, BSI_NEW_STMT);
+}
+
+/* Scan BB and find unmovable store stmt.  If found, return
+   true. Return false oterwise.  Do not change ss_bsi.  */
+
+static bool
+unmovable_store_found_p (block_stmt_iterator * ss_bsi)
+{
+  block_stmt_iterator bsi;
+  bool obstacle_found = false;
+
+  for (bsi = *ss_bsi; !bsi_end_p (bsi); bsi_prev (&bsi))
+    {
+      tree stmt;
+      tree rhs, lhs;
+      stmt_ann_t ann;
+
+      stmt = bsi_stmt (bsi);
+
+      if (TREE_CODE (stmt) != MODIFY_EXPR)
+	continue;
+
+      rhs = TREE_OPERAND (stmt, 1);
+      lhs = TREE_OPERAND (stmt, 0);
+      ann = stmt_ann (stmt);
+
+      if (get_call_expr_in (stmt))
+        {
+	  obstacle_found = true;
+	  continue;
+	}
+
+      /*  There are a few classes of things we can't or don't move.
+         For example: 
+         We don't want to sink loads from memory.
+         We can't sink statements that have volatile operands.
+       */
+
+      if (!is_gimple_reg (lhs))
+	{
+	  if (obstacle_found)
+	    return true;
+	  continue;
+	}
+
+      /* Fail if there are virtual operands in stmt.  */
+      if (!ZERO_SSA_OPERANDS (stmt, SSA_OP_ALL_VIRTUALS))
+        {
+	  obstacle_found = true;
+	  continue;
+	}
+    }
+  return false;
+}
+
+/* Scan BB and find the first (bottom-up) store stmt. If found, return
+   true and SS_BSI points to the stmt.  Return false if it does not exist 
+   or there  is a load beneath it.  */
+
+static bool
+next_store_found_p (block_stmt_iterator * ss_bsi)
+{
+  block_stmt_iterator bsi;
+
+  for (bsi = *ss_bsi; !bsi_end_p (bsi); bsi_prev (&bsi))
+    {
+      tree stmt;
+      tree rhs, lhs;
+      stmt_ann_t ann;
+
+      stmt = bsi_stmt (bsi);
+
+      if (TREE_CODE (stmt) != MODIFY_EXPR)
+	continue;
+
+      rhs = TREE_OPERAND (stmt, 1);
+      lhs = TREE_OPERAND (stmt, 0);
+      ann = stmt_ann (stmt);
+
+      if (get_call_expr_in (stmt))
+	return false;
+
+      /*  There are a few classes of things we can't or don't move.
+         For example: 
+         We don't want to sink loads from memory.
+         We can't sink statements that have volatile operands.
+       */
+
+      if (!is_gimple_reg (lhs)
+	  && !stmt_ends_bb_p (stmt)
+	  && !TREE_SIDE_EFFECTS (rhs)
+	  && TREE_CODE (rhs) != EXC_PTR_EXPR
+	  && TREE_CODE (rhs) != FILTER_EXPR
+	  && !ann->has_volatile_ops
+	  && (INTEGRAL_TYPE_P (TREE_TYPE (rhs)) || SCALAR_FLOAT_TYPE_P (rhs)))
+	{
+	  *ss_bsi = bsi;
+	  return true;
+	}
+
+      /* Fail if there are virtual operands in stmt.  */
+      if (!ZERO_SSA_OPERANDS (stmt, SSA_OP_ALL_VIRTUALS))
+	return false;
+
+      if (!is_gimple_reg (lhs))
+	return false;
+    }
+  return false;
+}
+
+/* Main entry point of store motion.
+
+  IE given:
+   if (c)
+   {  
+    ...
+    arr[i] = x1;
+    ...
+   }
+   else
+   {
+    ...
+    arr[i] = x2;
+    ...
+   }
+
+   we'll transform this into:
+
+   if(c)
+   {
+    ...
+    tmp = x1;
+    ...
+   }
+   else
+   {
+    ...
+    tmp = x2;
+    ...
+   }
+   arr[i] = tmp; 
+
+  A short description of the algorithm:
+
+  A suitable candidate for applying the sink is a basic block which has
+  between 2 and SS_PREDS_MAX predecessors such that each one of them
+  has only one successors.
+
+  For each such candidate bb we do the following:
+
+  Get the next store from each of it's predecessors's bb by walking them
+  in bottom-up order.  If all of those stores are equal sink the store and
+  repeat this process until there are no stores to sink.
+
+  TODO: 
+  1) Handle pointers.  
+  2) Handle partial sink where only part of the predecessors
+     suitable for the applying the algorithm.  */
+
+static void
+execute_store_sink_code (void)
+{
+  basic_block bb;
+
+  FOR_EACH_BB (bb)
+  {
+    basic_block ss_bbs[SS_PREDS_MAX];
+    tree ss_stmts[SS_PREDS_MAX];
+    tree ss_index = NULL_TREE;
+    block_stmt_iterator ss_bsi[SS_PREDS_MAX];
+    unsigned int i;
+    bool no_more_stores_for_bb = false;
+    unsigned int num_of_preds = EDGE_COUNT (bb->preds);
+
+    if (dump_file && (dump_flags & TDF_DETAILS))
+      fprintf (dump_file, "SS: process bb --- [%d] ---\n", bb->index);
+
+    if ((num_of_preds <= 1) || (num_of_preds > SS_PREDS_MAX))
+      {
+	if (dump_file && (dump_flags & TDF_DETAILS))
+	  fprintf (dump_file,
+		   "SS: don't apply: this bb has %d not between two and %d "
+		   "preds.\n", num_of_preds, SS_PREDS_MAX);
+	continue;
+      }
+
+    for (i = 0; i < num_of_preds; i++)
+      ss_bbs[i] = (EDGE_PRED (bb, i))->src;
+
+    for (i = 0; i < num_of_preds; i++)
+      if (!single_succ_p (ss_bbs[i]))
+	{
+	  if (dump_file && (dump_flags & TDF_DETAILS))
+	    fprintf (dump_file,
+		     "SS: don't apply: [%d] previous bb has no single"
+		     " successor\n", i);
+	  no_more_stores_for_bb = true;
+	  break;
+	}
+    if (no_more_stores_for_bb)
+      continue;
+
+    if (dump_file && (dump_flags & TDF_DETAILS))
+      {
+	fprintf (dump_file, "	 sink candidate bb ......... %d\n",
+		 bb->index);
+	for (i = 0; i < num_of_preds; i++)
+	  fprintf (dump_file, "    [%d] prev bb ............. %d\n",
+		   i, ss_bbs[i]->index);
+      }
+
+    /* Initialize the iterators of the bbs to last stmt in each one.  */
+    for (i = 0; i < num_of_preds; i++)
+      ss_bsi[i] = bsi_last (ss_bbs[i]);
+
+    for (i = 0; i < num_of_preds; i++)
+      if (unmovable_store_found_p (&ss_bsi[i]))
+	{
+	  if (dump_file && (dump_flags & TDF_DETAILS))
+	    fprintf (dump_file, "SS: don't apply: found unmovable store in [%d]"
+		      " prev bb\n", i);
+	  no_more_stores_for_bb = true;
+	  break;
+	}
+    if (no_more_stores_for_bb)
+      break;
+
+    do
+      {
+	for (i = 0; i < num_of_preds; i++)
+	  if (!next_store_found_p (&ss_bsi[i]))
+	    {
+	      if (dump_file && (dump_flags & TDF_DETAILS))
+		fprintf (dump_file, "SS: don't apply: no stores in [%d]"
+			 " prev bb\n", i);
+	      no_more_stores_for_bb = true;
+	      break;
+	    }
+	if (no_more_stores_for_bb)
+	  break;
+
+	for (i = 0; i < num_of_preds; i++)
+	  {
+	    ss_stmts[i] = bsi_stmt (ss_bsi[i]);
+	    if (dump_file && (dump_flags & TDF_DETAILS))
+	      {
+		fprintf (dump_file, "Found [%d] store stmt:\n", i);
+		print_generic_stmt_indented (dump_file, ss_stmts[i],
+					     TDF_DETAILS | TDF_VOPS, 16);
+	      }
+	  }
+	/* Check that all the stores are the same.  */
+
+	for (i = 1; i < num_of_preds; i++)
+	  if (!equal_memory_ref_p (TREE_OPERAND (ss_stmts[0], 0),
+				   TREE_OPERAND (ss_stmts[i], 0), &ss_index))
+	    {
+
+	      if (dump_file && (dump_flags & TDF_DETAILS))
+		fprintf (dump_file, "SS: don't apply: stores are not same\n");
+	      no_more_stores_for_bb = true;
+	      break;
+	    }
+	if (no_more_stores_for_bb)
+	  break;
+
+	if (dump_file && (dump_flags & TDF_DETAILS))
+	  fprintf (dump_file, "SS: going to perform sinking of this set"
+		   " of stores\n");
+
+	sink_store (bb, ss_bsi, ss_index);
+      }
+    while (!no_more_stores_for_bb);
+  }
+}
+
 /* Gate and execute functions for PRE.  */
 
 static void
 do_sink (void)
 {
   execute_sink_code ();
+  if (flag_tree_store_sink)
+    execute_store_sink_code ();
 }
 
 static bool

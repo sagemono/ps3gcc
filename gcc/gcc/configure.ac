@@ -2198,22 +2198,52 @@ else
    [elf,2,16,0], [--fatal-warnings],
    [.section .text,"axG",%progbits,.foo,comdat])
 fi
-if test $in_tree_ld != yes && test x"$ld_vers" != x; then
-  comdat_group=yes
-  if test 0"$ld_date" -lt 20050308; then
-    if test -n "$ld_date"; then
-      # If there was date string, but was earlier than 2005-03-08, fail
-      comdat_group=no
-    elif test "$ld_vers_major" -lt 2; then
-      comdat_group=no
-    elif test "$ld_vers_major" -eq 2 -a "$ld_vers_minor" -lt 16; then
-      comdat_group=no
-    fi
+AC_CACHE_CHECK(linker for COMDAT support, gcc_comdat_group,
+[if test $in_tree_ld = yes ; then
+  gcc_comdat_group=no
+  if test "$gcc_cv_gld_major_version" -eq 2 -a "$gcc_cv_gld_minor_version" -ge 17 -o "$gcc_cv_gld_major_version" -gt 2 \
+     && test $in_tree_ld_is_elf = yes; then
+     gcc_comdat_group=yes
   fi
 else
-  # assume linkers other than GNU ld don't support COMDAT group
-  comdat_group=no
-fi
+  gcc_comdat_group=yes
+  ld_ver=`$gcc_cv_ld --version 2>/dev/null | sed 1q`
+  if echo "$ld_ver" | grep GNU > /dev/null; then
+changequote(,)dnl
+    ld_vers=`echo $ld_ver | sed -n \
+	-e 's,^.*[	 ]\([0-9][0-9]*\.[0-9][0-9]*\)$,\1,p' \
+	-e 's,^.*[	 ]\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)$,\1,p' \
+	-e 's,^.*[	 ]\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)$,\1,p' \
+	-e 's,^.*[	 ]\([0-9][0-9]*\.[0-9][0-9]*\)[	 ].*$,\1,p' \
+	-e 's,^.*[	 ]\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)[	 ].*$,\1,p' \
+	-e 's,^.*[ 	 ]\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)[ 	].*$,\1,p' \
+	-e 's,^.*[	 ]\([0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\.[0-9][0-9]*\)[	 ].*$,\1,p'`
+    ld_date=`echo $ld_ver | sed -n 's,^.*\([2-9][0-9][0-9][0-9]\)[-]*\([01][0-9]\)[-]*\([0-3][0-9]\).*$,\1\2\3,p'`
+    ld_vers_major=`expr "$ld_vers" : '\([0-9]*\)'`
+    ld_vers_minor=`expr "$ld_vers" : '[0-9]*\.\([0-9]*\)'`
+    ld_vers_patch=`expr "$ld_vers" : '[0-9]*\.[0-9]*\.\([0-9]*\)'`
+    if test 0"$ld_date" -lt 20050308; then
+      if test -n "$ld_date"; then
+	# If there was date string, but was earlier than 2005-03-08, fail
+	gcc_comdat_group=no
+      elif test -z "$ld_vers"; then
+	# If there was no date string nor ld version number, something is wrong
+	gcc_comdat_group=no
+      else
+	test -z "$ld_vers_patch" && ld_vers_patch=0
+	if test "$ld_vers_major" -lt 2; then
+	  gcc_comdat_group=no
+	elif test "$ld_vers_major" -eq 2 -a "$ld_vers_minor" -lt 17; then
+	  gcc_comdat_group="no"
+	fi
+      fi
+changequote([,])dnl
+    fi
+  fi
+fi])
+
+comdat_group=$gcc_comdat_group
+
 if test $comdat_group = no; then
   gcc_cv_as_comdat_group=no
   gcc_cv_as_comdat_group_percent=no

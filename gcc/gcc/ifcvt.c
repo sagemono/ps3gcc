@@ -1785,7 +1785,7 @@ mark_regs_in_rtx (rtx x, regset exposed_set)
 /* If *PX is a REG and the corresponding entry is set in REG_MAP_ORIG 
    we need to make a copy of the register and change *PX.  */
 static void
-copy_regs_in_rtx (rtx *px, rtx *reg_map_orig)
+copy_regs_in_rtx (rtx *px, rtx *reg_map_orig, int nregs)
 {
   rtx x = *px;
   int i, code;
@@ -1797,7 +1797,7 @@ copy_regs_in_rtx (rtx *px, rtx *reg_map_orig)
   code = GET_CODE (x);
   if (code == REG)
     {
-      if (reg_map_orig [REGNO (x)])
+      if (REGNO (x) < (unsigned) nregs && reg_map_orig [REGNO (x)])
 	{
 	  rtx nr = gen_reg_rtx (GET_MODE (x));
 	  emit_move_insn (nr, x);
@@ -1812,12 +1812,12 @@ copy_regs_in_rtx (rtx *px, rtx *reg_map_orig)
   for (i = GET_RTX_LENGTH (code) - 1; i >= 0; i--)
     {
       if (fmt[i] == 'e')
-	copy_regs_in_rtx (&XEXP (x, i), reg_map_orig);
+	copy_regs_in_rtx (&XEXP (x, i), reg_map_orig, nregs);
       else if (fmt[i] == 'E')
 	{
 	  int j;
 	  for (j = 0; j < XVECLEN (x, i); j++)
-	    copy_regs_in_rtx (&XVECEXP (x, i, j), reg_map_orig);
+	    copy_regs_in_rtx (&XVECEXP (x, i, j), reg_map_orig, nregs);
 	}
     }
 }
@@ -1875,7 +1875,7 @@ noce_try_cmove_aggressive (ce_if_block_t * ce_info)
   if (taken)
     IOR_REG_SET (exposed_set, taken->il.rtl->global_live_at_end);
 
-  nregs = max_regno;
+  nregs = max_reg_num();
 
   /* Change all register references so that there will be no conflicts 
      when moving the fallthru and taken blocks to the test block. */
@@ -1908,7 +1908,7 @@ noce_try_cmove_aggressive (ce_if_block_t * ce_info)
 	 moves.  Don't modify the original condition because we could
 	 still fail after this point. */
       info.cond = copy_rtx(info.cond);
-      copy_regs_in_rtx (&info.cond, reg_map_orig);
+      copy_regs_in_rtx (&info.cond, reg_map_orig, nregs);
 
       for (i = 0; i < nregs; i++)
 	{

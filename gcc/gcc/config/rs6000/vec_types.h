@@ -29,27 +29,27 @@
 #ifndef _VEC_TYPES_H_
 #define _VEC_TYPES_H_	1
 
-#define qword		vector unsigned char
+#define qword		__vector unsigned char
 
-#define vec_uchar16	vector unsigned char
-#define vec_char16	vector signed char
-#define vec_bchar16	vector bool char
+#define vec_uchar16	__vector unsigned char
+#define vec_char16	__vector signed char
+#define vec_bchar16	__vector bool char
 
-#define vec_ushort8	vector unsigned short
-#define vec_short8	vector signed short
-#define vec_bshort8	vector bool short
+#define vec_ushort8	__vector unsigned short
+#define vec_short8	__vector signed short
+#define vec_bshort8	__vector bool short
 
-#define vec_pixel8	vector pixel
+#define vec_pixel8	__vector __pixel
 
-#define vec_uint4	vector unsigned int
-#define vec_int4	vector signed int
-#define vec_bint4	vector bool int
+#define vec_uint4	__vector unsigned int
+#define vec_int4	__vector signed int
+#define vec_bint4	__vector bool int
 
-#define vec_float4	vector float
+#define vec_float4	__vector float
 
-#define vec_ullong2	vector bool char
-#define vec_llong2	vector bool short
+#define vec_ullong2	__vector bool char
+#define vec_llong2	__vector bool short
 
-#define vec_double2	vector bool int
+#define vec_double2	__vector bool int
 
 #endif /* _VEC_TYPES_H_ */

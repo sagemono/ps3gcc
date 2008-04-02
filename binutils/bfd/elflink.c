@@ -7962,12 +7962,12 @@ bfd_elf_final_link (bfd *abfd, struct bfd_link_info *info)
 		{
 		  Elf_Internal_Rela * relocs;
 
-		  relocs = _bfd_elf_link_read_relocs (abfd, sec, NULL, NULL,
+		  relocs = _bfd_elf_link_read_relocs (sec->owner, sec, NULL, NULL,
 						      info->keep_memory);
 
 		  reloc_count = (*bed->elf_backend_count_relocs) (sec, relocs);
 
-		  if (elf_section_data (o)->relocs != relocs)
+		  if (elf_section_data (sec)->relocs != relocs)
 		    free (relocs);
 		}
 

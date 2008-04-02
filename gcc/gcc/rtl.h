@@ -299,11 +299,6 @@ struct rtx_def GTY((chain_next ("RTX_NEXT (&%h)"),
      1 in a SYMBOL_REF for a weak symbol.  */
   unsigned return_val : 1;
 
-  unsigned           lto_kind;
-  long long unsigned lto_info;
-  tree               lto_tree;
-
-
   /* The first element of the operands of this rtx.
      The number of operands and their types are controlled
      by the `code' field, according to rtl.def.  */
@@ -1192,8 +1187,8 @@ do {						\
    refer to part of a DECL.  */
 #define REG_EXPR(RTX) (REG_ATTRS (RTX) == 0 ? 0 : REG_ATTRS (RTX)->decl)
 
-/* For a MEM rtx, the offset from the start of MEM_DECL, if known, as a
-   RTX that is always a CONST_INT.  */
+/* For a REG rtx, the offset from the start of REG_EXPR, if known, as an
+   HOST_WIDE_INT.  */
 #define REG_OFFSET(RTX) (REG_ATTRS (RTX) == 0 ? 0 : REG_ATTRS (RTX)->offset)
 
 /* Copy the attributes that apply to memory locations from RHS to LHS.  */

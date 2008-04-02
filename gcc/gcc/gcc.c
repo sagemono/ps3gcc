@@ -1,6 +1,7 @@
 /* Compiler driver program that can handle many languages.
    Copyright (C) 1987, 1989, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
-   1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006 Free Software Foundation,
+   1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006,
+   2007 Free Software Foundation,
    Inc.
 
 This file is part of GCC.
@@ -483,6 +484,7 @@ or with constant text in a single argument.
  %1	process CC1_SPEC as a spec.
  %2	process CC1PLUS_SPEC as a spec.
  %3	process CC1_ONLY_SPEC as a spec.	(CELL LOCAL)
+ %4	process ASM_ONLY_SPEC as a spec.	(CELL LOCAL)
  %*	substitute the variable part of a matched option.  (See below.)
 	Note that each comma in the substituted string is replaced by
 	a single space.
@@ -600,6 +602,12 @@ proper position among the other output files.  */
    or extra switch-translations.  */
 #ifndef CC1_ONLY_SPEC
 #define CC1_ONLY_SPEC ""
+#endif
+
+/* config.h can define ASM_ONLY_SPEC which is only processed for a user
+ * assembly file. */
+#ifndef ASM_ONLY_SPEC
+#define ASM_ONLY_SPEC ""
 #endif
 /* CELL LOCAL End */
 
@@ -756,6 +764,7 @@ static const char *link_gcc_c_sequence_spec = LINK_GCC_C_SEQUENCE_SPEC;
 static const char *link_ssp_spec = LINK_SSP_SPEC;
 static const char *asm_spec = ASM_SPEC;
 static const char *asm_final_spec = ASM_FINAL_SPEC;
+static const char *asm_only_spec = ASM_ONLY_SPEC;
 static const char *link_spec = LINK_SPEC;
 static const char *lib_spec = LIB_SPEC;
 static const char *mfwrap_spec = MFWRAP_SPEC;
@@ -807,7 +816,7 @@ static const char *cpp_unique_options =
 static const char *cpp_options =
 "%(cpp_unique_options) %1 %{m*} %{std*&ansi&trigraphs} %{W*&pedantic*} %{w}\
  %{f*} %{g*:%{!g0:%{!fno-working-directory:-fworking-directory}}} %{O*}\
- %{undef} %{save-temps:-fpch-preprocess}";
+ %{undef} %{save-temps|save-temps-o:-fpch-preprocess}";
 
 /* This contains cpp options which are not passed when the preprocessor
    output will be used by another program.  */
@@ -819,7 +828,7 @@ static const char *cc1_options =
  %1 %{!Q:-quiet} -dumpbase %B %{d*} %{m*} %{a*}\
  %{c|S:%{o*:-auxbase-strip %*}%{!o*:-auxbase %b}}%{!c:%{!S:-auxbase %b}}\
  %{g*} %{O*} %{W*&pedantic*} %{w} %{std*&ansi&trigraphs}\
- %{v:-version} %{pg:-p} %{p} %{f*} %{undef}\
+ %{v:-version} %{pg:-p} %{p} %{save-temps*:%<fpch-deps} %{f*} %{undef}\
  %{Qn:-fno-ident} %{--help:--help}\
  %{--target-help:--target-help}\
  %{!fsyntax-only:%{S:%W{o*}%{!o*:-o %b.s}}}\
@@ -828,13 +837,13 @@ static const char *cc1_options =
  %{coverage:-fprofile-arcs -ftest-coverage}";
 
 static const char *asm_options =
-"%a %Y %{c:%W{o*}%{!o*:-o %w%b%O}}%{!c:-o %d%w%u%O}";
+"%a %Y %{c:%W{o*}%{!o*:-o %w%b%O}}%{!c:-o %{save-temps-o:%{o*:%p}}%d%w%u%O}";
 
 static const char *invoke_as =
 #ifdef AS_NEEDS_DASH_FOR_PIPED_INPUT
-"%{!S:-o %|.s |\n as %(asm_options) %|.s %A }";
+"%{!S:-o %{save-temps-o:%{o*:%p}}%|.s |\n as %(asm_options) %{save-temps-o:%{o*:%p}}%|.s %A }";
 #else
-"%{!S:-o %|.s |\n as %(asm_options) %m.s %A }";
+"%{!S:-o %{save-temps-o:%{o*:%p}}%|.s |\n as %(asm_options) %{save-temps-o:%{o*:%p}}%m.s %A }";
 #endif
 
 /* Some compilers have limits on line lengths, and the multilib_select
@@ -969,19 +978,19 @@ static const struct compiler default_compilers[] =
           %{traditional|ftraditional:\
 %eGNU C no longer supports -traditional without -E}\
        %{!combine:\
-	  %{save-temps|traditional-cpp|no-integrated-cpp:%(trad_capable_cpp) %3 \
-		%(cpp_options) -o %{save-temps:%b.i} %{!save-temps:%g.i} \n\
-		    cc1 -fpreprocessed %{save-temps:%b.i} %{!save-temps:%g.i} \
+	  %{save-temps|save-temps-o|traditional-cpp|no-integrated-cpp:%(trad_capable_cpp) %3 \
+		%(cpp_options) -o %{save-temps-o:%{o*:%p}}%g.i \n\
+		    cc1 -fpreprocessed %{save-temps-o:%{o*:%p}}%g.i \
 			%3 %(cc1_options)}\
-	  %{!save-temps:%{!traditional-cpp:%{!no-integrated-cpp:\
-		cc1 %(cpp_unique_options) %3 %(cc1_options)}}}\
+	  %{!save-temps:%{!save-temps-o:%{!traditional-cpp:%{!no-integrated-cpp:\
+		cc1 %(cpp_unique_options) %3 %(cc1_options)}}}}\
           %{!fsyntax-only:%(invoke_as)}} \
       %{combine:\
-	  %{save-temps|traditional-cpp|no-integrated-cpp:%(trad_capable_cpp) \
-		%(cpp_options) -o %{save-temps:%b.i} %{!save-temps:%g.i}}\
-	  %{!save-temps:%{!traditional-cpp:%{!no-integrated-cpp:\
+	  %{save-temps|save-temps-o|traditional-cpp|no-integrated-cpp:%(trad_capable_cpp) \
+		%(cpp_options) -o %{save-temps-o:%{o*:%p}}%g.i }\
+	  %{!save-temps:%{!save-temps-o:%{!traditional-cpp:%{!no-integrated-cpp:\
 		cc1 %(cpp_unique_options) %3 %(cc1_options)}}\
-                %{!fsyntax-only:%(invoke_as)}}}}}}", 0, 1, 1},
+                %{!fsyntax-only:%(invoke_as)}}}}}}}", 0, 1, 1},
   {"-",
    "%{!E:%e-E or -x required when input is from standard input}\
     %(trad_capable_cpp) %3 %(cpp_options) %(cpp_debug_options)", 0, 0, 0},
@@ -991,35 +1000,35 @@ static const struct compiler default_compilers[] =
       external preprocessor if -save-temps is given.  */
      "%{E|M|MM:%(trad_capable_cpp) %3 %(cpp_options) %(cpp_debug_options)}\
       %{!E:%{!M:%{!MM:\
-	  %{save-temps|traditional-cpp|no-integrated-cpp:%(trad_capable_cpp) %3 \
-		%(cpp_options) -o %{save-temps:%b.i} %{!save-temps:%g.i} \n\
-		    cc1 -fpreprocessed %{save-temps:%b.i} %{!save-temps:%g.i} \
+	  %{save-temps|save-temps-o|traditional-cpp|no-integrated-cpp:%(trad_capable_cpp) %3 \
+		%(cpp_options) -o %{save-temps-o:%{o*:%p}}%g.i \n\
+		    cc1 -fpreprocessed %{save-temps-o:%{o*:%p}}%g.i \
 			%3 %(cc1_options)\
-                        -o %g.s %{!o*:--output-pch=%i.gch}\
+                        -o %{save-temps-o:%{o*:%p}}%g.s %{!o*:--output-pch=%i.gch}\
                         %W{o*:--output-pch=%*}%V}\
-	  %{!save-temps:%{!traditional-cpp:%{!no-integrated-cpp:\
+	  %{!save-temps:%{!save-temps-o:%{!traditional-cpp:%{!no-integrated-cpp:\
 		cc1 %(cpp_unique_options) %3 %(cc1_options)\
-                    -o %g.s %{!o*:--output-pch=%i.gch}\
-                    %W{o*:--output-pch=%*}%V}}}}}}", 0, 0, 0},
+                    -o %{save-temps-o:%{o*:%p}}%g.s %{!o*:--output-pch=%i.gch}\
+                    %W{o*:--output-pch=%*}%V}}}}}}}", 0, 0, 0},
   {".i", "@cpp-output", 0, 1, 0},
   {"@cpp-output",
    "%{!M:%{!MM:%{!E:cc1 -fpreprocessed %i %3 %(cc1_options) %{!fsyntax-only:%(invoke_as)}}}}", 0, 1, 0},
   /* CELL LOCAL End */
   {".s", "@assembler", 0, 1, 0},
   {"@assembler",
-   "%{!M:%{!MM:%{!E:%{!S:as %(asm_debug) %(asm_options) %i %A }}}}", 0, 1, 0},
+   "%{!M:%{!MM:%{!E:%{!S:as %(asm_debug) %(asm_options) %4 %i %A }}}}", 0, 1, 0},
   {".S", "@assembler-with-cpp", 0, 1, 0},
   {"@assembler-with-cpp",
 #ifdef AS_NEEDS_DASH_FOR_PIPED_INPUT
    "%(trad_capable_cpp) -lang-asm %(cpp_options)\
       %{E|M|MM:%(cpp_debug_options)}\
-      %{!M:%{!MM:%{!E:%{!S:-o %|.s |\n\
-       as %(asm_debug) %(asm_options) %|.s %A }}}}"
+      %{!M:%{!MM:%{!E:%{!S:-o %{save-temps-o:%{o*:%p}}%|.s |\n\
+       as %(asm_debug) %(asm_options) %4 %{save-temps-o:%{o*:%p}}%|.s %A }}}}"
 #else
    "%(trad_capable_cpp) -lang-asm %(cpp_options)\
       %{E|M|MM:%(cpp_debug_options)}\
-      %{!M:%{!MM:%{!E:%{!S:-o %|.s |\n\
-       as %(asm_debug) %(asm_options) %m.s %A }}}}"
+      %{!M:%{!MM:%{!E:%{!S:-o %{save-temps-o:%{o*:%p}}%|.s |\n\
+       as %(asm_debug) %(asm_options) %4 %{save-temps-o:%{o*:%p}}%m.s %A }}}}"
 #endif
    , 0, 1, 0},
 
@@ -1139,6 +1148,7 @@ static const struct option_map option_map[] =
    {"--quiet", "-q", 0},
    {"--resource", "-fcompile-resource=", "aj"},
    {"--save-temps", "-save-temps", 0},
+   {"--save-temps-o", "-save-temps-o", 0},
    {"--shared", "-shared", 0},
    {"--silent", "-q", 0},
    {"--specs", "-specs=", "aj"},
@@ -1493,6 +1503,12 @@ static const char *md_spec_file = MD_SPEC_FILE;
 #define MD_STARTFILE_PREFIX_1 ""
 #endif
 
+/* begin sce local bugzilla 37796 */
+#ifndef SYSTEM_EXEC_DIR_RELATIVE
+#define SYSTEM_EXEC_DIR_RELATIVE NULL
+#endif
+/* end sce local bugzilla 37796*/
+
 static const char *const standard_exec_prefix = STANDARD_EXEC_PREFIX;
 static const char *const standard_exec_prefix_1 = "/usr/libexec/gcc/";
 static const char *const standard_exec_prefix_2 = "/usr/lib/gcc/";
@@ -1512,6 +1528,10 @@ static const char *tooldir_prefix;
 static const char *const standard_bindir_prefix = STANDARD_BINDIR_PREFIX;
 
 static const char *standard_libexec_prefix = STANDARD_LIBEXEC_PREFIX;
+
+/* begin sce local bugzilla 37796 */
+static const char *system_exec_dir_relative = SYSTEM_EXEC_DIR_RELATIVE;
+/* end sce local bugzilla 37796 */
 
 /* Subdirectory to use for locating libraries.  Set by
    set_multilib_dir based on the compilation options.  */
@@ -1552,6 +1572,7 @@ static struct spec_list static_specs[] =
   INIT_STATIC_SPEC ("asm_debug",		&asm_debug),
   INIT_STATIC_SPEC ("asm_final",		&asm_final_spec),
   INIT_STATIC_SPEC ("asm_options",		&asm_options),
+  INIT_STATIC_SPEC ("asm_only",			&asm_only_spec),	/* CELL LOCAL */
   INIT_STATIC_SPEC ("invoke_as",		&invoke_as),
   INIT_STATIC_SPEC ("cpp",			&cpp_spec),
   INIT_STATIC_SPEC ("cpp_options",		&cpp_options),
@@ -2746,7 +2767,7 @@ execute (void)
     {
       /* FIXME: allocated memory for saving argv is leaked.(?) */
       char * response_filename = create_response_file (commands[0].prog, &argbuf[1]);
-      char ** newargv = (char **)xmalloc (sizeof (char **) * 3);
+      const char ** newargv = (const char **) xmalloc (sizeof (char **) * 3);
 
       newargv[0] = commands[0].prog;
       newargv[1] = response_filename;
@@ -2759,6 +2780,8 @@ execute (void)
       /* FIXME fix_argv allocates memory. fix memory leak. */
       commands[0].argv = fix_argv(commands[0].argv);
 #endif
+      if (!save_temps_flag)
+	record_temp_file (response_filename+1, 1, 1);
     }
   else
     commands[0].argv = &argbuf[0];
@@ -2894,13 +2917,18 @@ execute (void)
 			NULL, NULL, &err);
       if (errmsg != NULL)
 	{
+	  char *newerror;
+#define newerror1pattern "Error while trying to execute `%s': %s"
+	  newerror = alloca (strlen (errmsg) + strlen (newerror1pattern) + strlen (commands[i].argv) + 1);
+	  sprintf (newerror, newerror1pattern, string, errmsg);
 	  if (err == 0)
-	    fatal (errmsg);
+	    fatal (newerror);
 	  else
 	    {
 	      errno = err;
-	      pfatal_with_name (errmsg);
+	      pfatal_with_name (newerror);
 	    }
+#undef newerror1pattern
 	}
 
       if (string != commands[i].prog)
@@ -2963,16 +2991,6 @@ See %s for instructions.",
 	      greatest_status = WEXITSTATUS (status);
 	    ret_code = -1;
 	  }
-
-	/* begin sce local bugzilla #10990 */
-	/* clean temparary response file. */
-	if (response_file_flag
-	    && commands[i].argv[1][0] == '@' && !save_temps_flag)
-	  {
-	    if (unlink (&commands[i].argv[1][1]))
-	      perror_with_name (&commands[i].argv[1][1]);
-	  }
-	/* end sce local  */
 
 	if (report_times)
 	  {
@@ -3149,6 +3167,7 @@ display_help (void)
   fputs (_("  -Xlinker <arg>           Pass <arg> on to the linker\n"), stdout);
   fputs (_("  -combine                 Pass multiple source files to compiler at once\n"), stdout);
   fputs (_("  -save-temps              Do not delete intermediate files\n"), stdout);
+  fputs (_("  -save-temps-o            Save intermediate files in same directory as -o\n"), stdout);
   fputs (_("  -pipe                    Use pipes rather than intermediate files\n"), stdout);
   fputs (_("  -time                    Time the execution of each subprocess\n"), stdout);
   fputs (_("  -specs=<file>            Override built-in specs with the contents of <file>\n"), stdout);
@@ -3319,7 +3338,7 @@ process_command (int argc, const char **argv)
 			  (argc + 1) * sizeof (argv[0]));
       new_argv[0] = new_argv0;
 
-      execvp (new_argv0, (const char *const *)new_argv);	/* CELL LOCAL */
+      execvp (new_argv0, (char * const *) new_argv);	/* CELL LOCAL */
       fatal ("couldn't run '%s': %s", new_argv0, xstrerror (errno));
     }
 
@@ -3638,7 +3657,8 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
 	}
       else if (strncmp (argv[i], "-l", 2) == 0)
 	n_infiles++;
-      else if (strcmp (argv[i], "-save-temps") == 0)
+      else if (strcmp (argv[i], "-save-temps") == 0
+	       || strcmp (argv[i], "-save-temps-o") == 0)
 	{
 	  save_temps_flag = 1;
 	  n_switches++;
@@ -4189,6 +4209,7 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
 	  switches[n_switches].ordering = 0;
 	  /* These are always valid, since gcc.c itself understands them.  */
 	  if (!strcmp (p, "save-temps")
+	      || !strcmp (p, "save-temps-o")
 	      || !strcmp (p, "static-libgcc")
 	      || !strcmp (p, "shared-libgcc")
 	      || !strcmp (p, "pipe"))
@@ -4368,6 +4389,10 @@ static int input_from_pipe;
 /* Nonnull means substitute this for any suffix when outputting a switches
    arguments.  */
 static const char *suffix_subst;
+
+/* Nonnull means prefix the next %b, %|, %g, %u, %m with this dirname. */
+static const char *dirname_prefix;
+static int use_dirname_prefix;
 
 /* Process the spec SPEC and run the commands specified therein.
    Returns 0 if the spec is successfully processed; -1 if failed.  */
@@ -4729,6 +4754,12 @@ do_spec_1 (const char *spec, int inswitch, const char *soft_matched_part)
 	break;
 
       case '%':
+	if (dirname_prefix
+	    && (*p == 'b' || *p == 'm' || *p == '|' || *p == 'u' || *p == 'g'))
+	  {
+	    obstack_grow (&obstack, dirname_prefix, strlen (dirname_prefix));
+	    dirname_prefix = NULL;
+	  }
 	switch (c = *p++)
 	  {
 	  case 0:
@@ -5168,6 +5199,12 @@ do_spec_1 (const char *spec, int inswitch, const char *soft_matched_part)
 	    if (value != 0)
 	      return value;
 	    break;
+
+	  case '4':
+	    value = do_spec_1 (asm_only_spec, 0, NULL);
+	    if (value != 0)
+	      return value;
+	    break;
 	  /* CELL LOCAL End */
 
 	  case 'a':
@@ -5291,6 +5328,9 @@ do_spec_1 (const char *spec, int inswitch, const char *soft_matched_part)
 	      p += len;
 	    }
 	    break;
+
+	  case 'p':
+	    use_dirname_prefix = 1;
 
 	  case '*':
 	    if (soft_matched_part)
@@ -5467,6 +5507,8 @@ eval_spec_function (const char *func, const char *args)
   int save_this_is_library_file;
   int save_input_from_pipe;
   const char *save_suffix_subst;
+  const char *save_dirname_prefix;
+  int save_use_dirname_prefix;
 
 
   sf = lookup_spec_function (func);
@@ -5484,6 +5526,8 @@ eval_spec_function (const char *func, const char *args)
   save_this_is_library_file = this_is_library_file;
   save_input_from_pipe = input_from_pipe;
   save_suffix_subst = suffix_subst;
+  save_dirname_prefix = dirname_prefix;
+  save_use_dirname_prefix = use_dirname_prefix;
 
   /* Create a new spec processing context, and build the function
      arguments.  */
@@ -5509,6 +5553,8 @@ eval_spec_function (const char *func, const char *args)
   this_is_library_file = save_this_is_library_file;
   input_from_pipe = save_input_from_pipe;
   suffix_subst = save_suffix_subst;
+  dirname_prefix = save_dirname_prefix;
+  use_dirname_prefix = save_use_dirname_prefix;
 
   return funcval;
 }
@@ -5837,7 +5883,7 @@ process_brace_body (const char *p, const char *atom, const char *end_atom,
 	}
       else if (*p == ';' && nesting_level == 1)
 	break;
-      else if (*p == '%' && p[1] == '*' && nesting_level == 1)
+      else if (*p == '%' && (p[1] == '*' || p[1] == 'p') && nesting_level == 1)
 	have_subst = true;
       else if (*p == '\0')
 	goto invalid;
@@ -5880,6 +5926,7 @@ process_brace_body (const char *p, const char *atom, const char *end_atom,
 		/* Pass any arguments this switch has.  */
 		give_switch (i, 1);
 		suffix_subst = NULL;
+		use_dirname_prefix = 0;
 	      }
 	}
     }
@@ -5992,7 +6039,17 @@ give_switch (int switchnum, int omit_first_word)
 	  const char *arg = *p;
 
 	  do_spec_1 (" ", 0, NULL);
-	  if (suffix_subst)
+	  if (use_dirname_prefix)
+	    {
+	      unsigned l = 0;
+	      unsigned sep = 0;
+	      for (l = 0; arg[l]; l++)
+		if (IS_DIR_SEPARATOR (arg[l]))
+		  sep = l;
+	      if (sep)
+		dirname_prefix = save_string (arg, sep + 1);
+	    }
+	  else if (suffix_subst)
 	    {
 	      unsigned length = strlen (arg);
 	      int dot = 0;
@@ -6141,10 +6198,10 @@ fatal_error (int signum)
   kill (getpid (), signum);
 }
 
-extern int main (int, const char **);
+extern int main (int, char **);
 
 int
-main (int argc, const char **argv)
+main (int argc, char **argv)
 {
   size_t i;
   int value;
@@ -6262,7 +6319,7 @@ main (int argc, const char **argv)
      Make a table of specified input files (infiles, n_infiles).
      Decode switches that are handled locally.  */
 
-  process_command (argc, argv);
+  process_command (argc, (const char **) argv);
 
   /* Initialize the vector of specs to just the default.
      This means one element containing 0s, as a terminator.  */
@@ -6335,7 +6392,10 @@ main (int argc, const char **argv)
      should be using.  */
   if (target_system_root)
     {
-      obstack_grow (&obstack, "%(sysroot_spec) ", strlen ("%(sysroot_spec) "));
+      /* begzilla 37796 */
+      const char * sysroot_link_spec = "%(sysroot_spec) ";
+      obstack_grow (&obstack, sysroot_link_spec, strlen (sysroot_link_spec));
+      /* end  */
       obstack_grow0 (&obstack, link_spec, strlen (link_spec));
       set_spec ("link", XOBFINISH (&obstack, const char *));
     }
@@ -6427,6 +6487,34 @@ main (int argc, const char **argv)
     }
   /* end sce local bugzilla 23841 */
 
+  /* begin sce local bugzilla 37796, 41289*/
+  if (system_exec_dir_relative != NULL)
+    {
+      char * system_exec_dir;
+      char * current_prefix_dir = make_relative_prefix (saved_argv0, "/bin", "/");
+      char * writable_system_exec_dir_relative = xstrdup (system_exec_dir_relative);
+      char * path_elem;
+
+      for (path_elem = strtok(writable_system_exec_dir_relative, ":");
+	   path_elem != NULL;
+	   path_elem = strtok(NULL, ":"))
+	{
+	  int lc = strlen(path_elem) - 1;
+	  if (path_elem[lc] != '/')
+	    system_exec_dir = concat(current_prefix_dir, path_elem, "/",NULL);
+	  else
+	    system_exec_dir = concat(current_prefix_dir, path_elem, NULL);
+
+	  add_prefix (&exec_prefixes, system_exec_dir, "GCC", PREFIX_PRIORITY_LAST, 0, 0);
+	  add_prefix (&exec_prefixes, system_exec_dir, "BINUTILS", PREFIX_PRIORITY_LAST, 0, 0);
+
+	  free (system_exec_dir);
+	}
+
+      free (writable_system_exec_dir_relative);
+      free (current_prefix_dir);
+    }
+  /* end sce local bugzilla 37796, 41289 */
 
   /* Process any user specified specs in the order given on the command
      line.  */
@@ -7845,12 +7933,12 @@ prepend_cmddir_function (int argc, const char **argv)
 #endif
 
     value = xmalloc(sizeof(PREPEND_CMDDIR_FUNCTION_FMT)
-		    + strlen(target_system_root)
+		    + (target_system_root ? strlen(target_system_root) : 1)
 		    + strlen(target_prefix)
 		    + strlen(argv[0]));
 
     sprintf(value, PREPEND_CMDDIR_FUNCTION_FMT,
-	    target_system_root, target_prefix, argv[0]);
+	    target_system_root ? target_system_root : ".", target_prefix, argv[0]);
 
 #ifdef __MINGW32__
   {

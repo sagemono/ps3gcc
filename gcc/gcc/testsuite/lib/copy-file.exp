@@ -20,13 +20,13 @@
 proc gcc_copy_files {srcfiles dstdir} {
     foreach f $srcfiles {
 	if { [catch { set symlink [file readlink $f] } x] } then {
-	    file copy -force $f $dstdir
+	    catch { file copy -force $f $dstdir }
 	} else {
 	    if { [regexp "^/" "$symlink"] } then {
-		file copy -force $symlink $dstdir
+		catch { file copy -force $symlink $dstdir }
 	    } else {
 		set dirname [file dirname $f]
-		file copy -force $dirname/$symlink $dstdir
+		catch { file copy -force $dirname/$symlink $dstdir }
 	    }
 	}
     }

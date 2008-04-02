@@ -2,6 +2,7 @@
 #include <stdlib.h>
 #include <sys/ppu_thread.h>
 
+#define SYNC_OBJECT_NAME        "_lgcmtx"  /* follow the naming rule */
 #define KEY_MAX 4
 
 typedef void (*dtor_t)(void *);
@@ -22,7 +23,7 @@ static __gthread_mutex_t key_mutex;
 static __gthread_mutexattr_t key_mutex_attr = {
   SYS_SYNC_PRIORITY,
   SYS_SYNC_NOT_RECURSIVE,
-  "\0"
+  SYNC_OBJECT_NAME
 };
 
 struct tls_data_entry {
@@ -38,7 +39,7 @@ static struct _tls_data_list {
 static __gthread_mutexattr_t _Mutex_attr = {
   SYS_SYNC_PRIORITY,
   SYS_SYNC_RECURSIVE,
-  "\0"
+  SYNC_OBJECT_NAME
 };
 
 static __gthread_mutex_t once_mutex;

@@ -1127,8 +1127,6 @@ read_and_display_attr_value (unsigned long attribute,
 	case DW_AT_associated:
 	case DW_AT_data_location:
 	case DW_AT_stride:
-	case DW_AT_upper_bound:
-	case DW_AT_lower_bound:
 	  if (form == DW_FORM_data4 || form == DW_FORM_data8)
 	    {
 	      /* Process location list.  */
@@ -1334,6 +1332,9 @@ read_and_display_attr_value (unsigned long attribute,
     case DW_AT_location:
     case DW_AT_data_member_location:
     case DW_AT_vtable_elem_location:
+      if (form == DW_FORM_data4 || form == DW_FORM_data8)
+	printf (_("(location list)"));
+      /* Fall through.  */
     case DW_AT_allocated:
     case DW_AT_associated:
     case DW_AT_data_location:
@@ -1353,8 +1354,6 @@ read_and_display_attr_value (unsigned long attribute,
 	  if (need_frame_base && !have_frame_base)
 	    printf (_(" [without DW_AT_frame_base]"));
 	}
-      else if (form == DW_FORM_data4 || form == DW_FORM_data8)
-	printf (_("(location list)"));
 
       break;
 

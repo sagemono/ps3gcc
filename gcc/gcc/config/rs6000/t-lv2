@@ -33,17 +33,6 @@ int-hdr-cleanup:
 	  rm -f include/$$f ; \
 	done
 
-# Assume that lto directory is a sibling of toolchain directory
-LTO_DIR = $(srcdir)/../../lto
-INCLUDES += -I$(LTO_DIR)/include
-EXTRA_OBJS = lto-info-asm.o
-
-LTO_INFO_ASM = $(LTO_DIR)/gcc/lto-info-asm.c
-LTO_HDRS = $(LTO_DIR)/include/lto/*
-lto-info-asm.o: $(LTO_INFO_ASM) $(LTO_HDRS)
-	$(CC) -c $(ALL_CFLAGS) $(ALL_CPPFLAGS) $(INCLUDES) \
-		$< $(OUTPUT_OPTION)
-
 LIB2FUNCS_EXTRA = tramp.S $(srcdir)/config/rs6000/ppc64-fp.c xp-bit.c \
 			$(srcdir)/config/rs6000/gthr-lv2.c
 
@@ -75,3 +64,11 @@ fp-bit32.c: $(srcdir)/config/fp-bit.c
 xp-bit.c: $(srcdir)/config/fp-bit.c
 	echo '#define EXTENDED_FLOAT_STUBS' > xp-bit.c
 	cat $(srcdir)/config/fp-bit.c >> xp-bit.c
+
+# The SN linker needs an implementation of the save/restore functions.
+EXTRA_PARTS = lv2saveres.o
+
+$(T)lv2saveres.o: $(srcdir)/config/rs6000/lv2saveres.S $(GCC_PASSES)
+	$(GCC_FOR_TARGET) $(GCC_CFLAGS) $(INCLUDES) \
+	-c -o $(T)lv2saveres.o $(srcdir)/config/rs6000/lv2saveres.S
+

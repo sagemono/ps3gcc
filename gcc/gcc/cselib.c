@@ -784,6 +784,7 @@ cselib_lookup_mem (rtx x, int create)
   cselib_val *addr;
   cselib_val *mem_elt;
   struct elt_list *l;
+  unsigned size;
 
   if (mode == BLKmode
       || !cselib_record_memory
@@ -795,9 +796,12 @@ cselib_lookup_mem (rtx x, int create)
   if (! addr)
     return 0;
 
-  /* Find a value that describes a value of our mode at that address.  */
+  size = GET_MODE_PRECISION (mode);
+
+  /* Find a value that describes a value of our mode's size
+     at that address.  */
   for (l = addr->addr_list; l; l = l->next)
-    if (GET_MODE (l->elt->u.val_rtx) == mode)
+    if (GET_MODE_PRECISION (GET_MODE (l->elt->u.val_rtx)) == size)
       break;
 
   if (l)

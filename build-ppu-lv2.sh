@@ -1,9 +1,9 @@
 #! /bin/csh
 # SCE CONFIDENTIAL
-# Copyright(C) 2007 Sony Computer Entertainment Inc.
+# Copyright(C) 2008 Sony Computer Entertainment Inc.
 # All Rights Reserved.
 
-# This script builds and installs ppu-lv2 toolchain for SDK1.9.0-GCC411.  The
+# This script builds and installs ppu-lv2 toolchain for SDK2.2.0-GCC411.  The
 # existing toolchain directory is backed up as "host-linux/ppu.~N~" where
 # N is a generated number.
 # If environment variable CELLSDK is set, it should be the directory where
@@ -74,10 +74,16 @@ ppu-lv2-ar cr libsupc++.a *.o || exit 1
 foreach d (fno-exceptions fno-exceptions/fno-rtti)
   mkdir -p $d || exit 1
   pushd $d || exit 1
-  foreach f (eh_alloc.cc eh_aux_runtime.cc eh_catch.cc eh_globals.cc \
-	eh_personality.cc eh_terminate.cc eh_throw.cc pure.cc tinfo.cc vec.cc)
-    # BUG: -fno-rtti should be added
-    ppu-lv2-g++ -fno-exceptions -c -O2 -g -mno-altivec -I $SRC/libsupcxx \
+  set options = -fno-exceptions
+  set files = (eh_alloc.cc eh_aux_runtime.cc eh_catch.cc eh_globals.cc \
+	eh_personality.cc eh_terminate.cc eh_throw.cc pure.cc tinfo.cc tinfo2.cc \
+	vec.cc guard.cc)
+  if($d != fno-exceptions) then
+    set options = (-fno-exceptions -fno-rtti)
+    set files = ($files[-9] $files[11-]) # remove tinfo2.cc
+  endif
+  foreach f ($files)
+    ppu-lv2-g++ $options -c -O2 -g -mno-altivec -I $SRC/libsupcxx \
 	$SRC/libsupcxx/$f || exit 1
   end
   ppu-lv2-ar cr libsupc++.a *.o || exit 1

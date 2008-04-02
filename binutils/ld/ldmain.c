@@ -161,7 +161,9 @@ static struct bfd_link_callbacks link_callbacks =
   reloc_dangerous,
   unattached_reloc,
   notice,
-  einfo
+  einfo,
+  info_msg,
+  minfo
 };
 
 struct bfd_link_info link_info;
@@ -328,7 +330,6 @@ main (int argc, char **argv)
 
   link_info.just_syms = FALSE;	/* sce loca bugzilla 13719 */
 #if defined(BPA)
-  link_info.spuplugin = FALSE;
   link_info.spuguid = TRUE;	/* sce local bugzilla #2878 */
 #endif
 

@@ -25,6 +25,9 @@ Boston, MA 02110-1301, USA.  */
 #ifdef HAVE_CONFIG_H
 #include "config.h"
 #endif
+#ifdef HAVE_UNISTD_H
+#include <unistd.h>
+#endif
 #include "ansidecl.h"
 #include "libiberty.h"
 #include "safe-ctype.h"
@@ -223,10 +226,13 @@ char **buildargv (const char *input)
 		      bsquote = 0;
 		      *arg++ = *input;
 		    }
+/* Under windows treat backslash as a normal character.  */
+#ifndef _WIN32
 		  else if (*input == '\\')
 		    {
 		      bsquote = 1;
 		    }
+#endif
 		  else if (squote)
 		    {
 		      if (*input == '\'')
@@ -374,11 +380,6 @@ expandargv (argcp, argvp
      char ***argvp;
      int *expanded; /* CELL LOCAL */
 {
-  /* CELL LOCAL Begin */
-  /* If non-NULL, the name of the response file that caused a
-     failure.  */
-  const char *error_file = NULL;
-  /* CELL LOCAL End */
   /* The argument we are currently processing.  */
   int i = 0;
   /* Non-zero if ***argvp has been dynamically allocated.  */
@@ -540,7 +541,7 @@ create_response_file (basename, argv)
   tmpdir = getenv ("TMPDIR");
   if (tmpdir == NULL)
     {
-      if (getcwd (curdir, PATHMAX) == -1)
+      if (getcwd (curdir, PATHMAX) == NULL)
 	return NULL;
       tmpdir = curdir;
     }
@@ -560,17 +561,45 @@ create_response_file (basename, argv)
   if (rsp_fp == NULL)
     return NULL;
 
-  /* dont emit commnad name into the response file */
+  /* Don't emit command name into the response file.  */
   while (*argv != NULL)
     {
-      if (**argv == NULL)
+      char *string;
+      unsigned i, len;
+#ifdef _WIN32
+      int quote = 0;
+#endif
+      if (**argv == '\0')
 	continue;
-
-      /* check if the argv requres quoted. */
-      if (index (*argv, ' ') != NULL || index (*argv, '\t') != NULL)
+      string = *argv;
+      len = strlen (string);
+      for (i = 0; i < len; i++)
+	{
+	  /* Escape spaces, \, and the quotes if on unix, just quote under
+	     windows if including space or single quote.  */
+	  if (string[i] == '\''
+	      || ISSPACE (string[i])
+#ifndef _WIN32
+	      || string[i] == '\\' || string[i] == '\"'
+#endif
+	     )
+#ifndef _WIN32
+	    fprintf (rsp_fp, "\\%c", string[i]);
+	  else
+	    fprintf (rsp_fp, "%c", string[i]);
+#else
+	    quote = 1;
+#endif
+	}
+#ifdef _WIN32
+      /* Check if the argv requires quotes.  */
+      if (quote)
 	fprintf (rsp_fp, "\"%s\"\n", *argv);
       else
 	fprintf (rsp_fp, "%s\n", *argv);
+#else
+      fprintf (rsp_fp, "\n");
+#endif
 
       ++argv;
     }

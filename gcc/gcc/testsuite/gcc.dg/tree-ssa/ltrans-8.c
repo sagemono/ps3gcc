@@ -1,5 +1,5 @@
 /* { dg-do compile } */ 
-/* { dg-options "-O2 -ftree-loop-linear -fdump-tree-ltrans-all" } */
+/* { dg-options "-O2 -ftree-loop-linear -fdump-tree-ltrans-all -Wno-tree-loop-linear" } */
 double foo(double *a)
 {
        int i,j;

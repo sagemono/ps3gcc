@@ -2120,6 +2120,13 @@ dump_dwarf (bfd *abfd)
   /* FIXME: bfd_get_arch_size may return -1.  We assume that 64bit
      targets will return 64.  */
   eh_addr_size = bfd_get_arch_size (abfd) == 64 ? 8 : 4;
+  /* begin sce local , Bz #20822 */
+  Elf_Internal_Ehdr *iehdr = elf_elfheader (abfd);
+  if ((iehdr->e_ident[EI_OSABI] == ELFOSABI_CELLOSLV2
+       && iehdr->e_ident[EI_ABIVERSION] == 0x0)
+       || strcmp (bfd_get_target (abfd), "elf64-powerpc-celloslv2") == 0)
+    eh_addr_size = 4;
+  /* end sce local , Bz #20822 */
 
   if (bfd_big_endian (abfd))
     byte_get = byte_get_big_endian;

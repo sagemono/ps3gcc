@@ -4879,6 +4879,14 @@ iterative_hash_expr (tree t, hashval_t val)
       /* we can just compare by pointer.  */
       return iterative_hash_pointer (t, val);
 
+    case TARGET_MEM_REF:
+      val = iterative_hash_expr (TMR_SYMBOL (t), val);
+      val = iterative_hash_expr (TMR_BASE (t), val);
+      val = iterative_hash_expr (TMR_INDEX (t), val);
+      val = iterative_hash_expr (TMR_STEP (t), val);
+      val = iterative_hash_expr (TMR_OFFSET (t), val);
+      return val;
+
     case TREE_LIST:
       /* A list of expressions, for a CALL_EXPR or as the elements of a
 	 VECTOR_CST.  */
@@ -4977,6 +4985,9 @@ build_pointer_type_for_mode (tree to_type, enum machine_mode mode,
   if (to_type == error_mark_node)
     return error_mark_node;
 
+  if (lookup_attribute ("may_alias", TYPE_ATTRIBUTES (to_type)))
+    can_alias_all = true;
+
   /* In some cases, languages will have things that aren't a POINTER_TYPE
      (such as a RECORD_TYPE for fat pointers in Ada) as TYPE_POINTER_TO.
      In that case, return that type without regard to the rest of our
@@ -5025,6 +5036,9 @@ build_reference_type_for_mode (tree to_type, enum machine_mode mode,
 			       bool can_alias_all)
 {
   tree t;
+
+  if (lookup_attribute ("may_alias", TYPE_ATTRIBUTES (to_type)))
+    can_alias_all = true;
 
   /* In some cases, languages will have things that aren't a REFERENCE_TYPE
      (such as a RECORD_TYPE for fat pointers in Ada) as TYPE_REFERENCE_TO.

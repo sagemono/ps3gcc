@@ -113,6 +113,14 @@ typedef struct rs6000_stack {
   int toc_size;			/* size to hold TOC if not in save_size */
   HOST_WIDE_INT total_size;	/* total bytes allocated for stack */
   int spe_64bit_regs_used;
+  char *save_fpr_name;		/* These contain the names of the functions */
+  char *rest_fpr_name;		/* to call to save and restore registers. */
+  char *save_gpr_name;		/* Do it inline, when they are NULL. */
+  char *rest_gpr_name;
+  char *save_vr_name;
+  char *rest_vr_name;
+  int lr_save_inline_p;		/* true if the link reg should be saved inline */
+  
 } rs6000_stack_t;
 
 /* A C structure for machine-specific, per-function data.
@@ -635,6 +643,7 @@ static tree rs6000_handle_d64_abi_attribute (tree *, tree, tree, int, bool *);
 /* TRANSMETA LOCAL End */
 static tree rs6000_handle_vecreturn_attribute (tree *, tree, tree, int, bool *);
 static tree rs6000_handle_extern_attribute (tree *, tree, tree, int, bool *);
+static tree rs6000_handle_inlinesrf_attribute (tree *, tree, tree, int, bool *);
 static void rs6000_eliminate_indexed_memrefs (rtx operands[2]);
 static const char *rs6000_mangle_fundamental_type (tree);
 extern const struct attribute_spec rs6000_attribute_table[];
@@ -741,7 +750,7 @@ static rtx altivec_expand_dst_builtin (tree, rtx, bool *);
 static rtx altivec_expand_abs_builtin (enum insn_code, tree, rtx);
 static rtx altivec_expand_predicate_builtin (enum insn_code,
 					     const char *, tree, rtx);
-static rtx altivec_expand_lv_builtin (enum insn_code, tree, rtx);
+static rtx altivec_expand_lv_builtin (enum insn_code, tree, rtx, bool);
 static rtx altivec_expand_stv_builtin (enum insn_code, tree);
 static rtx altivec_expand_vec_init_builtin (tree, tree, rtx);
 static rtx altivec_expand_vec_set_builtin (tree);
@@ -1117,316 +1126,18 @@ static const char* rs6000_invalid_conversion PARAMS ((tree, tree));
 #undef TARGET_USE_BLOCKS_FOR_CONSTANT_P
 #define TARGET_USE_BLOCKS_FOR_CONSTANT_P rs6000_use_blocks_for_constant_p
 
+/** SCE bugilla #11003 **/
+static bool rs6000_ms_bitfield_layout_p (tree);
+#undef TARGET_MS_BITFIELD_LAYOUT_P
+#define TARGET_MS_BITFIELD_LAYOUT_P rs6000_ms_bitfield_layout_p
+
+static bool rs6000_reverse_bitfields_p (tree);
+#undef TARGET_REVERSE_BITFIELDS_P
+#define TARGET_REVERSE_BITFIELDS_P rs6000_reverse_bitfields_p
+
 struct gcc_target targetm = TARGET_INITIALIZER;
 
 #include "alias.h"
-#include "lto/lto-info-asm.h"
-
-static CUMULATIVE_ARGS *lto_current_callee_args;
-
-void
-lto_info (rtx insn, annotation_kind_t kind, HOST_WIDE_INT info)
-{
-    if (insn == NULL) insn = get_last_insn();
-    insn->lto_kind = kind;
-    insn->lto_info = info;
-}
-
-static void
-lto_unused_arg_words (CUMULATIVE_ARGS *cum, unsigned n, unsigned start)
-{
-    unsigned mask = (1 << n) - 1;
-    cum->greg_unused_mask |= mask << start;
-}
-
-static long long unsigned
-lto_arg_mask_util (struct function *cfun, const CUMULATIVE_ARGS *funargs,
-		   tree funtype)
-{
-    tree valtype = TREE_TYPE (funtype);
-    enum machine_mode mode = TYPE_MODE (valtype);
-    lto_ppuargs_t argmask;
-    unsigned base_size;
-    unsigned nregs;
-    int gregno, fregno, vregno;
-    gregno = funargs->words;
-    if (gregno > GP_ARG_NUM_REG) gregno = GP_ARG_NUM_REG;
-    if( cfun != NULL && cfun->stdarg) gregno = GP_ARG_NUM_REG;
-    fregno = funargs->fregno;
-    if( fregno > FP_ARG_MAX_REG ) fregno = FP_ARG_MAX_REG + 1;
-    vregno = funargs->vregno;
-    if( vregno > ALTIVEC_ARG_MAX_REG ) vregno = ALTIVEC_ARG_MAX_REG + 1;
-    argmask.u = 0;
-    argmask.f.gpr_argmask
-		= (((1 << gregno) - 1) & ~funargs->greg_unused_mask)
-		  << GP_ARG_MIN_REG;
-    argmask.f.fpr_argmask
-		= ((1 << (fregno - FP_ARG_MIN_REG)) - 1)
-		  << (FP_ARG_MIN_REG - 32);
-    argmask.f.vcr_argmask
-		= ((1 << (vregno - ALTIVEC_ARG_MIN_REG)) - 1)
-		  << (ALTIVEC_ARG_MIN_REG - FIRST_ALTIVEC_REGNO);
-    if (mode == VOIDmode ) {
-	argmask.f.result_loc = LTO_RESULT_NONE;
-	argmask.f.result_firstreg = 0;
-	argmask.f.result_nregs = 0;
-    } else if (mode == BLKmode) {
-	if (TREE_CODE(valtype) == VECTOR_TYPE) {
-	    // Returning a vector packed into gpr
-	    base_size = int_size_in_bytes(valtype);
-	    nregs = (base_size + UNITS_PER_WORD - 1) / UNITS_PER_WORD;
-	    argmask.f.result_loc = LTO_RESULT_GPR;
-	    argmask.f.result_firstreg = GP_ARG_RETURN;
-	    argmask.f.result_nregs = nregs;
-	} else {
-	    // Returning a struct via hidden argument; no actual result.
-	    argmask.f.result_loc = LTO_RESULT_NONE;
-	    argmask.f.result_firstreg = 0;
-	    argmask.f.result_nregs = 0;
-	}
-    } else if (VECTOR_MODE_P (mode)
-	   && TARGET_ALTIVEC && TARGET_ALTIVEC_ABI
-	   && ALTIVEC_VECTOR_MODE (mode)) {
-	argmask.f.result_loc = LTO_RESULT_VEC;
-	argmask.f.result_firstreg = ALTIVEC_ARG_RETURN - FIRST_ALTIVEC_REGNO;
-	argmask.f.result_nregs = 1;
-    } else if (INTEGRAL_MODE_P (mode)) {
-	if (COMPLEX_MODE_P(mode)) {
-	    base_size = GET_MODE_SIZE(mode) / 2;
-	    nregs = (base_size + UNITS_PER_WORD - 1) / UNITS_PER_WORD * 2;
-	} else {
-	    base_size = GET_MODE_SIZE(mode);
-	    nregs = (base_size + UNITS_PER_WORD - 1) / UNITS_PER_WORD;
-	}
-	argmask.f.result_loc = LTO_RESULT_GPR;
-	argmask.f.result_firstreg = GP_ARG_RETURN;
-	argmask.f.result_nregs = nregs;
-    } else if (FLOAT_MODE_P (mode)) {
-	if (COMPLEX_MODE_P(mode)) {
-	    base_size = GET_MODE_SIZE(mode) / 2;
-	    nregs = (base_size + UNITS_PER_WORD - 1) / UNITS_PER_WORD * 2;
-	} else {
-	    base_size = GET_MODE_SIZE(mode);
-	    nregs = (base_size + UNITS_PER_WORD - 1) / UNITS_PER_WORD;
-	}
-	argmask.f.result_loc = LTO_RESULT_FPR;
-	argmask.f.result_firstreg = FP_ARG_RETURN - 32;
-	argmask.f.result_nregs = nregs;
-    } else {
-	abort();
-    }
-    return argmask.u;
-}
-
-static long long unsigned
-lto_parm_mask (tree funtype)
-{
-    enum tree_code code = TREE_CODE (funtype);
-    if (code != FUNCTION_DECL)
-	abort ();
-    if (sizeof(long long unsigned) < 8)
-	abort();
-    return lto_arg_mask_util (cfun, &cfun->args_info, TREE_TYPE(funtype));
-}
-
-long long unsigned
-lto_arg_mask (tree funtype)
-{
-    enum tree_code code = TREE_CODE (funtype);
-    if (code != FUNCTION_TYPE && code != METHOD_TYPE)
-	abort ();
-    if (sizeof(long long unsigned) < 8)
-	abort();
-    return lto_arg_mask_util (NULL, lto_current_callee_args, funtype);
-}
-
-void
-lto_inline_asm (int on)
-{
-    if( !flag_lto_annotations ) return;
-    lto_asm_noargs (asm_out_file, (on ? LTO_ASM_ON : LTO_ASM_OFF));
-}
-
-static void
-lto_function_prologue (FILE * file)
-{
-    tree f = current_function_decl;
-    bool no_return = TREE_THIS_VOLATILE(f) != 0;
-    const char *linkonce_name = DECL_ONE_ONLY(f)
-		    ?  IDENTIFIER_POINTER(DECL_ASSEMBLER_NAME(f))
-		    : NULL;
-    if( !flag_lto_annotations ) return;
-    lto_asm_fn_start (file, no_return, cfun->has_nonlocal_label,
-			linkonce_name);
-    lto_asm_fn_proto (file, LTO_ARGS_PPU, lto_parm_mask(f));
-}
-
-static void
-lto_function_end (FILE * file)
-{
-    if( !flag_lto_annotations ) return;
-    lto_asm_noargs (file, LTO_FEND);
-}
-
-void
-ppu_preface_call (int sibcall)
-{
-    rtx insn = current_output_insn;
-    tree callee_type = insn->lto_tree;
-    bool no_return;
-    if( !flag_lto_annotations ) return;
-    if (callee_type == NULL)
-	no_return = false;
-    else
-	no_return = TREE_THIS_VOLATILE(callee_type);
-    lto_asm_fn_call (asm_out_file, sibcall, no_return,
-		    LTO_ARGS_PPU, insn->lto_info);
-}
-
-void
-ppu_preface_return (void)
-{
-    if( !flag_lto_annotations ) return;
-    lto_asm_noargs (asm_out_file, LTO_RETURN);
-}
-
-void
-ppu_asm_jumptable_end (FILE * file, unsigned labelnum)
-{
-    if( !flag_lto_annotations ) return;
-    lto_asm_jumptable_end (file, labelnum);
-}
-
-void
-ppu_final_prescan_insn (rtx insn, rtx *operands,
-			int noperands ATTRIBUTE_UNUSED)
-{
-annotation_kind_t kind = insn->lto_kind;
-int lto = insn->lto_info;
-rtx label;
-unsigned labelnum;
-    if( !flag_lto_annotations ) return;
-    if( JUMP_P (insn)
-	    && find_reg_note (insn, REG_NON_LOCAL_GOTO, NULL_RTX) ) {
-	lto_asm_noargs (asm_out_file, LTO_NL_GOTO );
-    }
-    switch( kind )
-      {
-	case LTO_NONE:
-	    // no action
-	    break;
-	case LTO_PROLOG:
-	    lto_asm_onearg (asm_out_file, LTO_PROLOG, lto);
-	    break;
-	case LTO_EPILOG:
-	    lto_asm_onearg (asm_out_file, LTO_EPILOG, lto);
-	    break;
-	case LTO_GETLINK:
-	    lto_asm_noargs (asm_out_file, LTO_GETLINK);
-	    break;
-	case LTO_STLINK2:
-	    lto_asm_onearg (asm_out_file, LTO_STLINK2, lto);
-	    break;
-	case LTO_LDLINK2:
-	    lto_asm_onearg (asm_out_file, LTO_LDLINK2, lto);
-	    break;
-	case LTO_PUTLINK:
-	    lto_asm_noargs (asm_out_file, LTO_PUTLINK);
-	    break;
-	case LTO_PUSH:
-	    lto_asm_onearg (asm_out_file, LTO_PUSH, lto);
-	    break;
-	case LTO_PUSHIMM:
-	    lto_asm_onearg (asm_out_file, LTO_PUSHIMM, lto);
-	    break;
-	case LTO_PUSHADD:
-	    lto_asm_noargs (asm_out_file, LTO_PUSHADD);
-	    break;
-	case LTO_POP:
-	    lto_asm_onearg (asm_out_file, LTO_POP, lto);
-	    break;
-	case LTO_POPIMM:
-	    lto_asm_onearg (asm_out_file, LTO_POPIMM, lto);
-	    break;
-	case LTO_POPADD:
-	    lto_asm_noargs (asm_out_file, LTO_POPADD);
-	    break;
-	case LTO_TBLJMP:
-	    label = operands[1];
-	    labelnum = CODE_LABEL_NUMBER(label);
-	    lto_asm_tablejump (asm_out_file, labelnum);
-	    break;
-	default:
-	    lto_asm_noargs (asm_out_file, LTO_ERROR);
-	    break;
-    }
-}
-
-static bool
-lto_print_operand_for_set (FILE *file, rtx x)
-{
-  rtx op0 = XEXP(x, 0);
-  rtx op1 = XEXP(x, 1);
-  if (GET_CODE(op0) == ZERO_EXTEND) op0 = XEXP(op0, 0);
-  if (GET_CODE(op1) == ZERO_EXTEND) op1 = XEXP(op1, 0);
-  if (GET_CODE(op0) == MEM && GET_CODE(op1) != MEM)
-    {
-      lto_asm_alias (file, MEM_VOLATILE_P(op0), MEM_ALIAS_SET(op0));
-      return true;
-    }
-  if (GET_CODE(op1) == MEM && GET_CODE(op0) != MEM)
-    {
-      lto_asm_alias (file, MEM_VOLATILE_P(op1), MEM_ALIAS_SET(op1));
-      return true;
-    }
-  return false;
-}
-
-static bool
-lto_print_operand_for_parallel (FILE *file, rtx x)
-{
-  unsigned n, i;
-  n = XVECLEN(x, 0);
-  for (i = 0; i < n; i++)
-    {
-      rtx elt = XVECEXP(x, 0, i);
-      if (GET_CODE(elt) == SET ) {
-	if (lto_print_operand_for_set(file, elt))
-	  return true;
-      }
-    }
-  return false;
-}
-
-static void
-lto_print_operand (FILE *file, rtx x)
-{
-  if( !flag_lto_annotations ) return;
-  if (GET_CODE(x) == MEM)
-    {
-      lto_asm_alias (file, MEM_VOLATILE_P(x), MEM_ALIAS_SET(x));
-      return;
-    }
-  else
-    {
-      x = current_output_insn;
-      if (GET_CODE(x) == INSN)
-	{
-	  x = PATTERN(x);
-	  if (GET_CODE(x) == SET)
-	    {
-	      if (lto_print_operand_for_set (file, x))
-		return;
-	    }
-	  else if (GET_CODE(x) == PARALLEL)
-	    {
-	      if (lto_print_operand_for_parallel (file, x))
-		return;
-	    }
-	}
-    }
-  lto_asm_noargs_tab (file, LTO_ERROR);
-}
 
 
 
@@ -1718,8 +1429,13 @@ rs6000_override_options (const char *default_cpu)
     {
       rs6000_altivec_abi = 1;
       /* CELL LV2 gcc does not generate vrsave */
-      if (rs6000_cpu != PROCESSOR_CELLPPU)
+      if (rs6000_cpu != PROCESSOR_CELLPPU) {
 	TARGET_ALTIVEC_VRSAVE = 1;
+        /** SCE bugilla #11003 **/
+        /* APPLE LOCAL pragma reverse_bitfields, ms_struct */
+        darwin_reverse_bitfields = false;
+        darwin_ms_struct = false;
+      }
     }
 
   /* Set the Darwin64 ABI as default for 64-bit Darwin.  */
@@ -1793,7 +1509,18 @@ rs6000_override_options (const char *default_cpu)
   if (rs6000_gen_microcode == -1)
     rs6000_gen_microcode = !(rs6000_cpu == PROCESSOR_CELLPPU 
 			       && !optimize_size && TARGET_64BIT);
-  rs6000_testabi = (rs6000_cpu == PROCESSOR_CELLPPU);
+  /* begin sce local bugzilla 41278.
+     Disables CELL PPU string load/store instructions if -mno-gen-microcode
+     is specified. */
+  if (rs6000_cpu == PROCESSOR_CELLPPU
+      && rs6000_gen_microcode == 0)
+    target_flags &= ~MASK_STRING;
+  /* end sce local bugzilla 41278 */
+
+  /* testabi causes the stack pointer to be updated after saves and
+     before restores of non-volatile registers in non-leaf functions.
+     */
+  rs6000_testabi = (rs6000_cpu == PROCESSOR_CELLPPU && rs6000_save_restore_funcs == 0);
 
   /* Handle -mhint={never,always,likely}.  */
   if (rs6000_hint_str)
@@ -2901,7 +2628,7 @@ rs6000_expand_vector_init (rtx target, rtx vals)
 	      gcc_unreachable();
 	  }
 	  x = gen_reg_rtx (mode);
-	  emit_insn (GEN_FCN (icode) (x, XVECEXP (vals, 0, 0), gen_reg_rtx (V16QImode)));
+	  emit_insn (GEN_FCN (icode) (x, XVECEXP (vals, 0, 0), gen_reg_rtx (V16QImode), gen_reg_rtx (Pmode)));
 	  emit_insn (GEN_FCN (icode2) (target, x, const0_rtx));
 	  return;
 	}
@@ -3073,14 +2800,21 @@ rs6000_split_stve(rtx op0, rtx op1, rtx op2, rtx op3, rtx op4)
     }
 }
 
+/* Split a load element vector into either a store and
+   then load or a load and a perm, depending on if OP1 is a mem or not.
+   The first element of the OP0 will contain OP1.  */
 void
-rs6000_split_lve (rtx op0, rtx op1, rtx op2)
+rs6000_split_lve (rtx op0, rtx op1, rtx op2, rtx tmpreg)
 {
   enum machine_mode inner_mode = GET_MODE (op1);
   enum machine_mode mode = GET_MODE (op0);
   rtx mem, x;
+
+  /* This only works before reload has completed.  */
   if (reload_completed)
     abort ();
+
+  /* Create a stack location one if we don't have a memory location already. */
   if (GET_CODE (op1) != MEM)
     {
       mem = assign_stack_local (mode, GET_MODE_SIZE (inner_mode), 0);
@@ -3091,6 +2825,23 @@ rs6000_split_lve (rtx op0, rtx op1, rtx op2)
   else
     mem = adjust_address_nv (op1, mode, 0);
 
+  /* FIXME: This is just a workaround as we cannot produce a
+     new psedu-register after the first flow pass has happened. */
+  gcc_assert (GET_CODE (mem) == MEM);
+  if (!memory_address_p (mode, XEXP (mem, 0)))
+    {
+      rtx addr = XEXP (mem, 0);
+      rtx new;
+      gcc_assert (GET_CODE (addr) == PLUS);
+      gcc_assert (GET_CODE (XEXP (addr, 1)) == CONST_INT);
+      emit_move_insn (tmpreg, XEXP (addr, 1));
+      new = gen_rtx_MEM (mode, gen_rtx_PLUS (GET_MODE (addr), XEXP (addr, 0), tmpreg));
+      MEM_COPY_ATTRIBUTES (new, mem);
+      op1 = mem = new;
+    }
+
+  /* If we know the alignment of OP1 is equal or greater than 128, we can just emit a lve
+     without a perm.  */
   if (MEM_ALIGN (op1) >= 128)
     {
       x = gen_rtx_UNSPEC (VOIDmode, gen_rtvec (1, const0_rtx), UNSPEC_LVE);
@@ -3400,10 +3151,10 @@ rs6000_legitimate_offset_address_p (enum machine_mode mode, rtx x, int strict)
     case V8HImode:
     case V4SFmode:
     case V4SImode:
-      /* AltiVec vector modes.  Only reg+reg addressing is valid and
-	 constant offset zero should not occur due to canonicalization.
-	 Allow any offset when not strict before reload.  */
-      return !strict;
+      /* AltiVec vector modes.  Only reg+reg addressing is valid here,
+	 which leaves the only valid constant offset of zero, which by
+	 canonicalization rules is also invalid.  */
+      return false;
 
     case V4HImode:
     case V2SImode:
@@ -5863,7 +5614,6 @@ function_arg (CUMULATIVE_ARGS *cum, enum machine_mode mode,
      or compiler generated library calls.  */
   if (mode == VOIDmode)
     {
-      lto_current_callee_args = cum;
       if (abi == ABI_V4
 	  && (cum->call_cookie & CALL_LIBCALL) == 0
 	  && (cum->stdarg
@@ -5909,7 +5659,6 @@ function_arg (CUMULATIVE_ARGS *cum, enum machine_mode mode,
 	  {
 	    slot = gen_rtx_REG (mode, GP_ARG_MIN_REG + align_words);
 	  }
-	lto_unused_arg_words( cum, align_words - cum->words, cum->words );
 	return gen_rtx_PARALLEL (mode,
 		 gen_rtvec (2,
 			    gen_rtx_EXPR_LIST (VOIDmode,
@@ -5921,8 +5670,6 @@ function_arg (CUMULATIVE_ARGS *cum, enum machine_mode mode,
     else
       {
 	int align_words = (cum->words + 1) & ~1;
-	lto_unused_arg_words( cum, align_words - cum->words, cum->words );
-	lto_unused_arg_words( cum, 2, align_words );
         return gen_rtx_REG (mode, cum->vregno);
       }
   else if (TARGET_ALTIVEC_ABI
@@ -6010,7 +5757,6 @@ function_arg (CUMULATIVE_ARGS *cum, enum machine_mode mode,
   else
     {
       int align_words = rs6000_parm_start (mode, type, cum->words);
-      lto_unused_arg_words (cum, align_words - cum->words, cum->words);
 
       if (USE_FP_FOR_ARG_P (cum, mode, type))
 	{
@@ -6042,7 +5788,6 @@ function_arg (CUMULATIVE_ARGS *cum, enum machine_mode mode,
 	  if (!needs_psave)
 	    {
 	      int nwords = rs6000_arg_size(mode,type);
-	      lto_unused_arg_words (cum, nwords, align_words);
 	    }
 
 	  if (!needs_psave && mode == fmode)
@@ -7757,7 +7502,7 @@ altivec_generate_compare (enum rtx_code code)
 /* END CELL VECREG */
 
 static rtx
-altivec_expand_lv_builtin (enum insn_code icode, tree arglist, rtx target)
+altivec_expand_lv_builtin (enum insn_code icode, tree arglist, rtx target, bool blk)
 {
   rtx pat, addr;
   tree arg0 = TREE_VALUE (arglist);
@@ -7785,12 +7530,12 @@ altivec_expand_lv_builtin (enum insn_code icode, tree arglist, rtx target)
 
   if (op0 == const0_rtx)
     {
-      addr = gen_rtx_MEM (tmode, op1);
+      addr = gen_rtx_MEM (blk ? BLKmode : tmode, op1);
     }
   else
     {
       op0 = altivec_copy_to_mode_reg (mode0, op0, 1);	/* CELL LOCAL */
-      addr = gen_rtx_MEM (tmode, gen_rtx_PLUS (Pmode, op0, op1));
+      addr = gen_rtx_MEM (blk ? BLKmode : tmode, gen_rtx_PLUS (Pmode, op0, op1));
     }
 
   pat = GEN_FCN (icode) (target, addr);
@@ -8379,38 +8124,38 @@ altivec_expand_builtin (tree exp, rtx target, bool *expandedp)
     {
     case ALTIVEC_BUILTIN_LVSL:
       return altivec_expand_lv_builtin (CODE_FOR_altivec_lvsl,
-					arglist, target);
+					arglist, target, 0);
     case ALTIVEC_BUILTIN_LVSR:
       return altivec_expand_lv_builtin (CODE_FOR_altivec_lvsr,
-					arglist, target);
+					arglist, target, 0);
     case ALTIVEC_BUILTIN_LVEBX:
       return altivec_expand_lv_builtin (CODE_FOR_altivec_lvebx,
-					arglist, target);
+					arglist, target, 0);
     case ALTIVEC_BUILTIN_LVEHX:
       return altivec_expand_lv_builtin (CODE_FOR_altivec_lvehx,
-					arglist, target);
+					arglist, target, 0);
     case ALTIVEC_BUILTIN_LVEWX:
       return altivec_expand_lv_builtin (CODE_FOR_altivec_lvewx,
-					arglist, target);
+					arglist, target, 0);
     case ALTIVEC_BUILTIN_LVXL:
       return altivec_expand_lv_builtin (CODE_FOR_altivec_lvxl,
-					arglist, target);
+					arglist, target, 0);
     case ALTIVEC_BUILTIN_LVX:
       return altivec_expand_lv_builtin (CODE_FOR_altivec_lvx,
-					arglist, target);
+					arglist, target, 0);
       /* begin sce local , bugzilla #8763 */
     case ALTIVEC_BUILTIN_LVLX:
       return altivec_expand_lv_builtin (CODE_FOR_altivec_lvlx,
-					arglist, target);
+					arglist, target, 1);
     case ALTIVEC_BUILTIN_LVLXL:
       return altivec_expand_lv_builtin (CODE_FOR_altivec_lvlxl,
-					arglist, target);
+					arglist, target, 1);
     case ALTIVEC_BUILTIN_LVRX:
       return altivec_expand_lv_builtin (CODE_FOR_altivec_lvrx,
-					arglist, target);
+					arglist, target, 1);
     case ALTIVEC_BUILTIN_LVRXL:
       return altivec_expand_lv_builtin (CODE_FOR_altivec_lvrxl,
-					arglist, target);
+					arglist, target, 1);
       /* end sce local */
     default:
       break;
@@ -9251,9 +8996,6 @@ altivec_init_builtins (void)
   tree opaque_ftype_opaque_int
     = build_function_type_list (opaque_V4SI_type_node,
 				opaque_V4SI_type_node, integer_type_node, NULL_TREE);
-  tree opaque_ftype_int
-    = build_function_type_list (opaque_V4SI_type_node,
-				integer_type_node, NULL_TREE);
   tree opaque_ftype_opaque_opaque_int
     = build_function_type_list (opaque_V4SI_type_node,
 				opaque_V4SI_type_node, opaque_V4SI_type_node,
@@ -11806,9 +11548,6 @@ print_operand (FILE *file, rtx x, int code)
       return;
 
 
-    case 'x':
-      lto_print_operand (file, x);
-      return;
     case 'X':
       if (GET_CODE (x) == MEM
 	  && legitimate_indexed_address_p (XEXP (x, 0), 0))
@@ -13841,6 +13580,26 @@ is_altivec_return_reg (rtx reg, void *xyes)
     *yes = true;
 }
 
+static bool
+call_used_regs_set(int from, int to)
+{
+  int i;
+  for (i = from; i < to ; i++)
+    if (call_used_regs[i])
+      return 1;
+  return 0;
+}
+
+static bool
+num_regs_ever_live(int from, int to)
+{
+  int i, t=0;
+  for (i = from; i < to ; i++)
+    if (regs_ever_live[i])
+      t++;
+  return t;
+}
+
 
 /* Calculate the stack information for the current function.  This is
    complicated by having two separate calling sequences, the AIX calling
@@ -14010,8 +13769,6 @@ rs6000_stack_info (void)
 #ifdef TARGET_RELOCATABLE
       || (TARGET_RELOCATABLE && (get_pool_size () != 0))
 #endif
-      || (info_ptr->first_fp_reg_save != 64
-	  && !FP_SAVE_INLINE (info_ptr->first_fp_reg_save))
       || info_ptr->first_altivec_reg_save <= LAST_ALTIVEC_REGNO
       || (DEFAULT_ABI == ABI_V4 && current_function_calls_alloca)
       || info_ptr->calls_p)
@@ -14077,6 +13834,150 @@ rs6000_stack_info (void)
     info_ptr->vrsave_size  = 0;
 
   compute_save_world_info (info_ptr);
+
+  info_ptr->save_fpr_name = NULL;
+  info_ptr->rest_fpr_name = NULL;
+  info_ptr->save_gpr_name = NULL;
+  info_ptr->rest_gpr_name = NULL;
+  info_ptr->save_vr_name = NULL;
+  info_ptr->rest_vr_name = NULL;
+  info_ptr->lr_save_inline_p = 1;
+  if (!current_function_calls_eh_return
+      && !cfun->machine->ra_need_lr
+      && !TARGET_MULTIPLE && !rs6000_testabi && rs6000_save_restore_funcs > 0
+      && (current_function_decl == NULL_TREE
+          || lookup_attribute ("inlinesrf", DECL_ATTRIBUTES (current_function_decl)) == NULL_TREE))
+    {
+      char rname[30];
+      int live_fprs = num_regs_ever_live (info_ptr->first_fp_reg_save, 64);
+      int live_gprs = num_regs_ever_live (info_ptr->first_gp_reg_save, 32);
+      int live_vrs = num_regs_ever_live (info_ptr->first_altivec_reg_save, LAST_ALTIVEC_REGNO+1);
+      int used_fprs = call_used_regs_set (info_ptr->first_fp_reg_save, 64);
+      int used_gprs = call_used_regs_set (info_ptr->first_gp_reg_save, 32);
+      int used_vrs = call_used_regs_set (info_ptr->first_altivec_reg_save, LAST_ALTIVEC_REGNO+1);
+      /*  mflr
+         std lr
+         save fprs
+         save gprs
+         ...
+         rest gprs
+         rest fprs
+         ld lr
+         mtlr 
+         blr */
+      int min_insns = (info_ptr->lr_save_p ? 5 : 0)
+	+ live_fprs * 2 + live_gprs * 2 - rs6000_save_restore_funcs + 1;
+      enum ep_funcs
+      { EP_NONE, EP_JUST_FPR, EP_JUST_GPR, EP_JUST_GPR_LR,
+	EP_FPR_GPR
+      } which_funcs = EP_NONE;
+
+      /*  mflr
+         call save fprs
+         save gprs (possibly none)
+         ...
+         rest gprs (possibly none)
+         call rest fprs */
+      if (!used_fprs && live_fprs > 0 && 1 + 2 + live_gprs * 2 < min_insns)
+	{
+	  which_funcs = EP_JUST_FPR;
+	  min_insns = 1 + 2 + live_gprs * 2;
+	}
+
+      /*  mflr
+         std lr
+         save fprs
+         addi r12
+         call save gprs
+         ...
+         addi r12
+         call rest gprs
+         rest fprs
+         ld lr
+         mtlr 
+         blr */
+      if (info_ptr->first_fp_reg_save < 64
+	  && !used_gprs && live_gprs > 0 && 5 + live_fprs * 2 + 4 < min_insns)
+	{
+	  which_funcs = EP_JUST_GPR;
+	  min_insns = 5 + live_fprs * 2 + 4;
+	}
+      /*  mflr
+         call save gprs
+         ...
+         cal  rest gprs */
+      if (info_ptr->first_fp_reg_save == 64
+	  && !used_gprs && live_gprs > 0 && 1 + 2 < min_insns)
+	{
+	  which_funcs = EP_JUST_GPR_LR;
+	  min_insns = 1 + 2;
+	}
+      /*  mflr
+         call save fprs
+         addi r12
+         call save gprs
+         ...
+         addi r12
+         call rest gprs
+         call rest fprs */
+      if (!used_fprs && live_fprs > 0
+	  && !used_gprs && live_gprs > 0 && 1 + 2 + 4 < min_insns)
+	{
+	  which_funcs = EP_FPR_GPR;
+	  min_insns = 1 + 2 + 4;
+	}
+      /* We determine VR saving on their own because the don't use the
+         red zone or restore LR.  This doesn't count the extra
+         instructions needed when the stack frame is really large */
+      if (!used_vrs && live_vrs > 0
+	  && (info_ptr->lr_save_p ? 0 : 4) + 4
+	      < live_vrs * 4 + (which_funcs == EP_NONE
+				? -rs6000_save_restore_funcs + 1 : 0))
+	{
+	  sprintf (rname, "_savevr_%d",
+		   info_ptr->first_altivec_reg_save - FIRST_ALTIVEC_REGNO);
+	  info_ptr->save_vr_name = ggc_strdup (rname);
+	  sprintf (rname, "_restvr_%d",
+		   info_ptr->first_altivec_reg_save - FIRST_ALTIVEC_REGNO);
+	  info_ptr->rest_vr_name = ggc_strdup (rname);
+	}
+
+      if (which_funcs != EP_NONE || info_ptr->save_vr_name != NULL)
+	{
+	  info_ptr->lr_save_p = 1;
+	  regs_ever_live[LINK_REGISTER_REGNUM] = 1;
+	}
+      if (which_funcs == EP_JUST_FPR || which_funcs == EP_FPR_GPR)
+	{
+	  sprintf (rname, "%s%d%s", SAVE_FP_PREFIX,
+		   info_ptr->first_fp_reg_save - 32, SAVE_FP_SUFFIX);
+	  info_ptr->save_fpr_name = ggc_strdup (rname);
+	  sprintf (rname, "%s%d%s", RESTORE_FP_PREFIX,
+		   info_ptr->first_fp_reg_save - 32, RESTORE_FP_SUFFIX);
+	  info_ptr->rest_fpr_name = ggc_strdup (rname);
+	  info_ptr->lr_save_inline_p = 0;
+	}
+      if (which_funcs == EP_JUST_GPR || which_funcs == EP_FPR_GPR)
+	{
+	  sprintf (rname, "%s%d%s", SAVE_GP_PREFIX,
+		   info_ptr->first_gp_reg_save, SAVE_GP_SUFFIX);
+	  info_ptr->save_gpr_name = ggc_strdup (rname);
+	  sprintf (rname, "%s%d%s", RESTORE_GP_PREFIX,
+		   info_ptr->first_gp_reg_save, RESTORE_GP_SUFFIX);
+	  info_ptr->rest_gpr_name = ggc_strdup (rname);
+	}
+
+      if (which_funcs == EP_JUST_GPR_LR)
+	{
+	  sprintf (rname, "%s%d%s", SAVE_GP_LR_PREFIX,
+		   info_ptr->first_gp_reg_save, SAVE_GP_LR_SUFFIX);
+	  info_ptr->save_gpr_name = ggc_strdup (rname);
+	  sprintf (rname, "%s%d%s", RESTORE_GP_LR_PREFIX,
+		   info_ptr->first_gp_reg_save, RESTORE_GP_LR_SUFFIX);
+	  info_ptr->rest_gpr_name = ggc_strdup (rname);
+	  info_ptr->lr_save_inline_p = 0;
+	}
+    }
 
   /* Calculate the offsets.  */
   switch (DEFAULT_ABI)
@@ -14483,7 +14384,8 @@ rs6000_function_ok_for_sibcall (tree decl, tree exp ATTRIBUTE_UNUSED)
 	    }
 	}
       if (DEFAULT_ABI == ABI_DARWIN
-	  || (*targetm.binds_local_p) (decl))
+	  || ((*targetm.binds_local_p) (decl)
+	      && (DEFAULT_ABI != ABI_AIX || !DECL_EXTERNAL (decl))))
 	{
 	  tree attr_list = TYPE_ATTRIBUTES (TREE_TYPE (decl));
 
@@ -14926,7 +14828,6 @@ rs6000_emit_allocate_stack (HOST_WIDE_INT size, int copy_r12)
 	    emit_note (NOTE_INSN_DELETED);
 	  insn = emit_move_insn (tmp_reg, todec);
 	  try_split (PATTERN (insn), insn, 0);
-	  lto_info( NULL, LTO_PUSHIMM, size);
 	  todec = tmp_reg;
 	}
 
@@ -14935,14 +14836,12 @@ rs6000_emit_allocate_stack (HOST_WIDE_INT size, int copy_r12)
 					    todec, stack_reg)
 			: gen_movdi_di_update (stack_reg, stack_reg,
 					    todec, stack_reg));
-      lto_info( insn, todec==tmp_reg ? LTO_PUSHADD : LTO_PUSH, size);
     }
   else
     {
       insn = emit_insn (TARGET_32BIT
 			? gen_addsi3 (stack_reg, stack_reg, todec)
 			: gen_adddi3 (stack_reg, stack_reg, todec));
-      lto_info (insn, LTO_PUSH, size);
       emit_move_insn (gen_rtx_MEM (Pmode, stack_reg),
 		      gen_rtx_REG (Pmode, 12));
     }
@@ -15259,7 +15158,6 @@ rs6000_emit_prologue (void)
   rtx frame_reg_rtx = sp_reg_rtx;
   rtx cr_save_rtx = NULL_RTX;
   rtx insn;
-  int saving_FPRs_inline;
   int using_store_multiple;
   HOST_WIDE_INT sp_offset = 0;
 
@@ -15288,10 +15186,6 @@ rs6000_emit_prologue (void)
 			      || info->spe_64bit_regs_used == 0)
 			  && info->first_gp_reg_save < 31
 			  && no_global_regs_above (info->first_gp_reg_save));
-  saving_FPRs_inline = (info->first_fp_reg_save == 64
-			|| FP_SAVE_INLINE (info->first_fp_reg_save)
-			|| current_function_calls_eh_return
-			|| cfun->machine->ra_need_lr);
 
   /* For V.4, update stack before we do any saving and set back pointer.  */
   if (info->push_p
@@ -15439,7 +15333,8 @@ rs6000_emit_prologue (void)
     }
 
   /* Save AltiVec registers if needed.  */
-  if (!WORLD_SAVE_P (info) && TARGET_ALTIVEC_ABI && info->altivec_size != 0)
+  if (!WORLD_SAVE_P (info) && TARGET_ALTIVEC_ABI && info->altivec_size != 0
+      && info->save_vr_name == NULL)
     {
       int i;
 
@@ -15466,7 +15361,6 @@ rs6000_emit_prologue (void)
 	    set_mem_alias_set (mem, rs6000_sr_alias_set);
 
 	    insn = emit_move_insn (mem, savereg);
-	    lto_info (insn, LTO_PROLOG, offset);
 
 	    rs6000_frame_related (insn, frame_ptr_rtx, info->total_size,
 				  areg, GEN_INT (offset));
@@ -15518,8 +15412,63 @@ rs6000_emit_prologue (void)
     {
       insn = emit_move_insn (gen_rtx_REG (Pmode, 0),
 			     gen_rtx_REG (Pmode, LINK_REGISTER_REGNUM));
-      lto_info (insn, LTO_GETLINK, 0);
       RTX_FRAME_RELATED_P (insn) = 1;
+    }
+
+  /* Call a function to save GPRs.  Sometimes this needs r12 so do it
+     before the save of CR. */
+  if (!WORLD_SAVE_P (info) && info->save_gpr_name)
+    {
+      int i;
+      int saving_lr = 1;
+      rtvec p;
+      rtx save_gpr_reg = sp_reg_rtx;
+
+      if (info->first_fp_reg_save < 64)
+	{
+	  /* If there are FPRs being saved we set r12 to point to the
+	     location to save GPRs.  info->save_gpr_name is already set
+	     correctly. */
+	  save_gpr_reg = frame_ptr_rtx;
+	  emit_insn (TARGET_32BIT
+		     ? gen_addsi3 (save_gpr_reg, sp_reg_rtx,
+				   GEN_INT (info->fp_save_offset))
+		     : gen_adddi3 (save_gpr_reg, sp_reg_rtx,
+				   GEN_INT (info->fp_save_offset)));
+	  saving_lr = 0;
+	  gcc_assert (frame_reg_rtx != frame_ptr_rtx);
+	}
+
+      p = rtvec_alloc (saving_lr + 2 + 32 - info->first_gp_reg_save);
+
+      RTVEC_ELT (p, 0) = gen_rtx_CLOBBER (VOIDmode,
+					  gen_rtx_REG (Pmode,
+						       LINK_REGISTER_REGNUM));
+      RTVEC_ELT (p, 1) = gen_rtx_USE (VOIDmode,
+				      gen_rtx_SYMBOL_REF (Pmode,
+							  info->save_gpr_name));
+      for (i = 0; i < 32 - info->first_gp_reg_save; i++)
+	{
+	  rtx addr, reg, mem;
+	  int offset = info->gp_save_offset + sp_offset - info->fp_save_offset + reg_size * i;
+	  reg = gen_rtx_REG (reg_mode, info->first_gp_reg_save + i);
+	  addr = gen_rtx_PLUS (Pmode, save_gpr_reg, GEN_INT (offset));
+	  mem = gen_rtx_MEM (reg_mode, addr);
+	  set_mem_alias_set (mem, rs6000_sr_alias_set);
+
+	  RTVEC_ELT (p, i + 2) = gen_rtx_SET (VOIDmode, mem, reg);
+	}
+      if (saving_lr)
+	{
+	  rtx addr, reg, mem;
+	  reg = gen_rtx_REG (reg_mode, 0);
+	  addr = gen_rtx_PLUS (Pmode, save_gpr_reg, GEN_INT (16));
+	  mem = gen_rtx_MEM (reg_mode, addr);
+	  RTVEC_ELT (p, i + 2) = gen_rtx_SET (VOIDmode, mem, reg);
+	}
+      insn = emit_insn (gen_rtx_PARALLEL (VOIDmode, p));
+      rs6000_frame_related (insn, frame_ptr_rtx, sp_offset + info->fp_save_offset,
+			    NULL_RTX, NULL_RTX);
     }
 
   /* If we need to save CR, put it into r12.  */
@@ -15545,7 +15494,7 @@ rs6000_emit_prologue (void)
 
   /* Do any required saving of fpr's.  If only one or two to save, do
      it ourselves.  Otherwise, call function.  */
-  if (!WORLD_SAVE_P (info) && saving_FPRs_inline)
+  if (!WORLD_SAVE_P (info) && info->save_fpr_name == NULL)
     {
       int i;
       for (i = 0; i < 64 - info->first_fp_reg_save; i++)
@@ -15558,26 +15507,22 @@ rs6000_emit_prologue (void)
 			     info->first_fp_reg_save + i,
 			     offset,
 			     info->total_size);
-	    lto_info (NULL, LTO_PROLOG, offset);
 	  }
     }
-  else if (!WORLD_SAVE_P (info) && info->first_fp_reg_save != 64)
+  else if (!WORLD_SAVE_P (info) && info->save_fpr_name)
     {
       int i;
-      char rname[30];
-      const char *alloc_rname;
       rtvec p;
-      p = rtvec_alloc (2 + 64 - info->first_fp_reg_save);
+      gcc_assert (frame_reg_rtx == sp_reg_rtx);
+
+      p = rtvec_alloc (3 + 64 - info->first_fp_reg_save);
 
       RTVEC_ELT (p, 0) = gen_rtx_CLOBBER (VOIDmode,
 					  gen_rtx_REG (Pmode,
 						       LINK_REGISTER_REGNUM));
-      sprintf (rname, "%s%d%s", SAVE_FP_PREFIX,
-	       info->first_fp_reg_save - 32, SAVE_FP_SUFFIX);
-      alloc_rname = ggc_strdup (rname);
       RTVEC_ELT (p, 1) = gen_rtx_USE (VOIDmode,
 				      gen_rtx_SYMBOL_REF (Pmode,
-							  alloc_rname));
+							  info->save_fpr_name));
       for (i = 0; i < 64 - info->first_fp_reg_save; i++)
 	{
 	  rtx addr, reg, mem;
@@ -15590,6 +15535,13 @@ rs6000_emit_prologue (void)
 
 	  RTVEC_ELT (p, i + 2) = gen_rtx_SET (VOIDmode, mem, reg);
 	}
+      {
+	rtx addr, reg, mem;
+	reg = gen_rtx_REG (reg_mode, 0);
+	addr = gen_rtx_PLUS (Pmode, frame_reg_rtx, GEN_INT (16));
+	mem = gen_rtx_MEM (reg_mode, addr);
+	RTVEC_ELT (p, i + 2) = gen_rtx_SET (VOIDmode, mem, reg);
+      }
       insn = emit_insn (gen_rtx_PARALLEL (VOIDmode, p));
       rs6000_frame_related (insn, frame_ptr_rtx, info->total_size,
 			    NULL_RTX, NULL_RTX);
@@ -15619,7 +15571,7 @@ rs6000_emit_prologue (void)
       rs6000_frame_related (insn, frame_ptr_rtx, info->total_size,
 			    NULL_RTX, NULL_RTX);
     }
-  else if (!WORLD_SAVE_P (info))
+  else if (!WORLD_SAVE_P (info) && info->save_gpr_name == NULL)
     {
       int i;
       for (i = 0; i < 32 - info->first_gp_reg_save; i++)
@@ -15671,7 +15623,6 @@ rs6000_emit_prologue (void)
 		set_mem_alias_set (mem, rs6000_sr_alias_set);
 
 		insn = emit_move_insn (mem, reg);
-		lto_info (insn, LTO_PROLOG, offset);
 		rs6000_frame_related (insn, frame_ptr_rtx, info->total_size,
 				      NULL_RTX, NULL_RTX);
 	      }
@@ -15715,7 +15666,7 @@ rs6000_emit_prologue (void)
     }
 
   /* Save lr if we used it.  */
-  if (!WORLD_SAVE_P (info) && info->lr_save_p)
+  if (!WORLD_SAVE_P (info) && info->lr_save_p && info->lr_save_inline_p)
     {
       int offset = info->lr_save_offset + sp_offset;
       rtx addr = gen_rtx_PLUS (Pmode, frame_reg_rtx,
@@ -15726,7 +15677,6 @@ rs6000_emit_prologue (void)
 	 __builtin_return_address.  */
 
       insn = emit_move_insn (mem, reg);
-      lto_info (insn, LTO_STLINK2, offset);
       rs6000_frame_related (insn, frame_ptr_rtx, info->total_size,
 			    NULL_RTX, NULL_RTX);
     }
@@ -15762,6 +15712,49 @@ rs6000_emit_prologue (void)
       rs6000_frame_related (insn, frame_ptr_rtx, info->total_size,
 			    NULL_RTX, NULL_RTX);
     }
+
+  /* Save AltiVec registers if needed.  */
+  if (!WORLD_SAVE_P (info) && TARGET_ALTIVEC_ABI && info->altivec_size != 0
+      && info->save_vr_name != NULL)
+    {
+      int i;
+      rtvec p;
+      rtx base_reg = gen_rtx_REG (Pmode, 0);
+      int offset = info->altivec_save_offset + info->altivec_size;
+      emit_insn (TARGET_32BIT
+		 ? gen_addsi3 (base_reg, sp_reg_rtx,
+			       GEN_INT (offset))
+		 : gen_adddi3 (base_reg, sp_reg_rtx,
+			       GEN_INT (offset)));
+
+
+      p = rtvec_alloc (3 + LAST_ALTIVEC_REGNO - info->first_altivec_reg_save + 1);
+
+      RTVEC_ELT (p, 0) = gen_rtx_CLOBBER (VOIDmode,
+					  gen_rtx_REG (Pmode,
+						       LINK_REGISTER_REGNUM));
+      RTVEC_ELT (p, 1) = gen_rtx_USE (VOIDmode,
+				      gen_rtx_SYMBOL_REF (Pmode,
+							  info->save_vr_name));
+      for (i = 0; i <= LAST_ALTIVEC_REGNO - info->first_altivec_reg_save; ++i)
+	{
+	  rtx addr, reg, mem;
+	  int offset = -info->altivec_size + 16 * i;
+	  reg = gen_rtx_REG (V4SImode, info->first_altivec_reg_save + i);
+	  addr = gen_rtx_PLUS (Pmode, base_reg, GEN_INT (offset));
+	  mem = gen_rtx_MEM (V4SImode, addr);
+	  set_mem_alias_set (mem, rs6000_sr_alias_set);
+
+	  RTVEC_ELT (p, i + 2) = gen_rtx_SET (VOIDmode, mem, reg);
+	}
+      RTVEC_ELT (p, i + 2) = gen_rtx_CLOBBER (VOIDmode,
+					  gen_rtx_REG (Pmode,
+						       12));
+      insn = emit_insn (gen_rtx_PARALLEL (VOIDmode, p));
+      rs6000_frame_related (insn, base_reg, info->altivec_save_offset + info->altivec_size,
+			    NULL_RTX, NULL_RTX);
+    }
+
 
   /* Update stack and set back pointer unless this is V.4,
      for which it was done previously.  */
@@ -15848,18 +15841,23 @@ rs6000_output_function_prologue (FILE *file,
 {
   rs6000_stack_t *info = rs6000_stack_info ();
 
-  lto_function_prologue (file);
   if (TARGET_DEBUG_STACK)
     debug_stack_info (info);
 
   /* Write .extern for any function we will call to save and restore
      fp values.  */
-  if (info->first_fp_reg_save < 64
-      && !FP_SAVE_INLINE (info->first_fp_reg_save))
-    fprintf (file, "\t.extern %s%d%s\n\t.extern %s%d%s\n",
-	     SAVE_FP_PREFIX, info->first_fp_reg_save - 32, SAVE_FP_SUFFIX,
-	     RESTORE_FP_PREFIX, info->first_fp_reg_save - 32,
-	     RESTORE_FP_SUFFIX);
+  if (info->save_fpr_name)
+    fprintf (file, "\t.extern %s\n", info->save_fpr_name);
+  if (info->rest_fpr_name)
+    fprintf (file, "\t.extern %s\n", info->rest_fpr_name);
+  if (info->save_gpr_name)
+    fprintf (file, "\t.extern %s\n", info->save_gpr_name);
+  if (info->rest_gpr_name)
+    fprintf (file, "\t.extern %s\n", info->rest_gpr_name);
+  if (info->save_vr_name)
+    fprintf (file, "\t.extern %s\n", info->save_vr_name);
+  if (info->rest_vr_name)
+    fprintf (file, "\t.extern %s\n", info->rest_vr_name);
 
   /* Write .extern for AIX common mode routines, if needed.  */
   if (! TARGET_POWER && ! TARGET_POWERPC && ! common_mode_defined)
@@ -15914,7 +15912,6 @@ void
 rs6000_emit_epilogue (int sibcall)
 {
   rs6000_stack_t *info;
-  int restoring_FPRs_inline;
   int using_load_multiple;
   int using_mfcr_multiple;
   int use_backchain_to_restore_sp;
@@ -15938,10 +15935,6 @@ rs6000_emit_epilogue (int sibcall)
 			     || info->spe_64bit_regs_used == 0)
 			 && info->first_gp_reg_save < 31
 			 && no_global_regs_above (info->first_gp_reg_save));
-  restoring_FPRs_inline = (sibcall
-			   || current_function_calls_eh_return
-			   || info->first_fp_reg_save == 64
-			   || FP_SAVE_INLINE (info->first_fp_reg_save));
   use_backchain_to_restore_sp = (frame_pointer_needed
 				 || current_function_calls_alloca
 				 || info->total_size > 32767);
@@ -16085,7 +16078,7 @@ rs6000_emit_epilogue (int sibcall)
     }
 
   /* Restore AltiVec registers if needed.  */
-  if (TARGET_ALTIVEC_ABI && info->altivec_size != 0)
+  if (TARGET_ALTIVEC_ABI && info->altivec_size != 0 && info->rest_vr_name == NULL)
     {
       int i;
 
@@ -16106,8 +16099,44 @@ rs6000_emit_epilogue (int sibcall)
 	    set_mem_alias_set (mem, rs6000_sr_alias_set);
 
 	    emit_move_insn (gen_rtx_REG (V4SImode, i), mem);
-	    lto_info (NULL, LTO_EPILOG, offset);
 	  }
+    }
+  else if (TARGET_ALTIVEC_ABI && info->altivec_size != 0 && info->rest_vr_name != NULL)
+    {
+      int i;
+      rtvec p;
+      rtx base_reg = gen_rtx_REG (Pmode, 0);
+      int offset = info->altivec_save_offset + info->altivec_size;
+      emit_insn (TARGET_32BIT
+		 ? gen_addsi3 (base_reg, sp_reg_rtx,
+			       GEN_INT (offset))
+		 : gen_adddi3 (base_reg, sp_reg_rtx,
+			       GEN_INT (offset)));
+
+
+      p = rtvec_alloc (3 + LAST_ALTIVEC_REGNO - info->first_altivec_reg_save + 1);
+
+      RTVEC_ELT (p, 0) = gen_rtx_CLOBBER (VOIDmode,
+					  gen_rtx_REG (Pmode,
+						       LINK_REGISTER_REGNUM));
+      RTVEC_ELT (p, 1) = gen_rtx_USE (VOIDmode,
+				      gen_rtx_SYMBOL_REF (Pmode,
+							  info->rest_vr_name));
+      for (i = 0; i <= LAST_ALTIVEC_REGNO - info->first_altivec_reg_save; ++i)
+	{
+	  rtx addr, reg, mem;
+	  int offset = -info->altivec_size + 16 * i;
+	  reg = gen_rtx_REG (V4SImode, info->first_altivec_reg_save + i);
+	  addr = gen_rtx_PLUS (Pmode, base_reg, GEN_INT (offset));
+	  mem = gen_rtx_MEM (V4SImode, addr);
+	  set_mem_alias_set (mem, rs6000_sr_alias_set);
+
+	  RTVEC_ELT (p, i + 2) = gen_rtx_SET (VOIDmode, reg, mem);
+	}
+      RTVEC_ELT (p, i + 2) = gen_rtx_CLOBBER (VOIDmode,
+					  gen_rtx_REG (Pmode,
+						       12));
+      emit_insn (gen_rtx_PARALLEL (VOIDmode, p));
     }
 
   /* Restore VRSAVE if needed.  */
@@ -16127,7 +16156,7 @@ rs6000_emit_epilogue (int sibcall)
     }
 
   /* Get the old lr if we saved it.  */
-  if (info->lr_save_p)
+  if (info->lr_save_p && (info->lr_save_inline_p || sibcall))
     {
       int offset = info->lr_save_offset + sp_offset;
       rtx mem = gen_frame_mem_offset (Pmode, frame_reg_rtx, offset);
@@ -16135,7 +16164,6 @@ rs6000_emit_epilogue (int sibcall)
       set_mem_alias_set (mem, rs6000_sr_alias_set);
 
       emit_move_insn (gen_rtx_REG (Pmode, 0), mem);
-      lto_info (NULL, LTO_LDLINK2, offset);
     }
 
   /* Get the old cr if we saved it.  */
@@ -16151,12 +16179,11 @@ rs6000_emit_epilogue (int sibcall)
     }
 
   /* Set LR here to try to overlap restores below.  */
-  if (info->lr_save_p)
+  if (info->lr_save_p && (info->lr_save_inline_p || sibcall))
     {
       emit_move_insn (gen_rtx_REG (Pmode, LINK_REGISTER_REGNUM),
 		      gen_rtx_REG (Pmode, 0));
-      lto_info (NULL, LTO_PUTLINK, 0);
-  }
+    }
 
   /* Load exception handler data registers, if needed.  */
   if (current_function_calls_eh_return)
@@ -16214,7 +16241,7 @@ rs6000_emit_epilogue (int sibcall)
 	}
       emit_insn (gen_rtx_PARALLEL (VOIDmode, p));
     }
-  else
+  else if (info->rest_gpr_name == NULL || sibcall)
     for (i = 0; i < 32 - info->first_gp_reg_save; i++)
       if ((regs_ever_live[info->first_gp_reg_save + i]
 	   && (!call_used_regs[info->first_gp_reg_save + i]
@@ -16251,11 +16278,10 @@ rs6000_emit_epilogue (int sibcall)
 
 	  emit_move_insn (gen_rtx_REG (reg_mode,
 				       info->first_gp_reg_save + i), mem);
-	  lto_info (NULL, LTO_EPILOG, plusoffset); 
 	}
 
   /* Restore fpr's if we need to do it without calling a function.  */
-  if (restoring_FPRs_inline)
+  if (sibcall || info->rest_fpr_name == NULL)
     for (i = 0; i < 64 - info->first_fp_reg_save; i++)
       if ((regs_ever_live[info->first_fp_reg_save+i]
 	   && ! call_used_regs[info->first_fp_reg_save+i]))
@@ -16271,7 +16297,6 @@ rs6000_emit_epilogue (int sibcall)
 	  emit_move_insn (gen_rtx_REG (DFmode,
 				       info->first_fp_reg_save + i),
 			  mem);
-	  lto_info (NULL, LTO_EPILOG, offset);
 	}
 
   /* If we saved cr, restore it here.  Just those that were used.  */
@@ -16340,7 +16365,6 @@ rs6000_emit_epilogue (int sibcall)
       if (use_backchain_to_restore_sp)
 	{
 	  emit_move_insn (sp_reg_rtx, frame_reg_rtx);
-	  lto_info (NULL, LTO_POP, info->total_size);
 	}
       else if (sp_offset != 0)
 	{
@@ -16349,7 +16373,6 @@ rs6000_emit_epilogue (int sibcall)
 				   GEN_INT (sp_offset))
 		     : gen_adddi3 (sp_reg_rtx, sp_reg_rtx,
 				   GEN_INT (sp_offset)));
-	  lto_info (NULL, LTO_POP, info->total_size);
 	}
     }
 
@@ -16361,33 +16384,92 @@ rs6000_emit_epilogue (int sibcall)
 		 : gen_adddi3 (sp_reg_rtx, sp_reg_rtx, sa));
     }
 
+  if (!sibcall && info->rest_gpr_name != NULL)
+    {
+      int i;
+      rtx r12_rtx = gen_rtx_REG (Pmode, 12);
+      rtx save_gpr_reg = sp_reg_rtx;
+      rtvec p;
+      int pi = 0;
+
+      if (info->first_fp_reg_save < 64)
+	{
+	  /* If there are FPRs being restore we set r12 to point to the
+	     location to restore GPRs from.  info->rest_gpr_name is
+	     already set correctly. */
+	  save_gpr_reg = r12_rtx;
+	  emit_insn (TARGET_32BIT
+		     ? gen_addsi3 (save_gpr_reg, sp_reg_rtx,
+				   GEN_INT (info->fp_save_offset))
+		     : gen_adddi3 (save_gpr_reg, sp_reg_rtx,
+				   GEN_INT (info->fp_save_offset)));
+	}
+
+      if (info->first_fp_reg_save == 64)
+	{
+	  p = rtvec_alloc (3 + 32 - info->first_gp_reg_save);
+	  RTVEC_ELT (p, pi++) = gen_rtx_RETURN (VOIDmode);
+	}
+      else
+	p = rtvec_alloc (2 + 32 - info->first_gp_reg_save);
+
+      RTVEC_ELT (p, pi++) = gen_rtx_CLOBBER (VOIDmode,
+					     gen_rtx_REG (Pmode,
+							  LINK_REGISTER_REGNUM));
+      RTVEC_ELT (p, pi++) = gen_rtx_USE (VOIDmode,
+				      gen_rtx_SYMBOL_REF (Pmode,
+							  info->rest_gpr_name));
+
+      for (i = 0; i < 32 - info->first_gp_reg_save; i++)
+	{
+	  rtx addr, mem;
+	  addr = gen_rtx_PLUS (Pmode, r12_rtx,
+			       GEN_INT (info->gp_save_offset + 8*i - info->fp_save_offset));
+	  mem = gen_rtx_MEM (DImode, addr);
+	  set_mem_alias_set (mem, rs6000_sr_alias_set);
+
+	  RTVEC_ELT (p, pi++) =
+	    gen_rtx_SET (VOIDmode,
+			 gen_rtx_REG (DImode, info->first_gp_reg_save + i),
+			 mem);
+	}
+
+      if (info->first_fp_reg_save == 64)
+	{
+	  emit_jump_insn (gen_rtx_PARALLEL (VOIDmode, p));
+	  return;
+	}
+
+      emit_insn (gen_rtx_PARALLEL (VOIDmode, p));
+    }
+
   if (!sibcall)
     {
       rtvec p;
-      if (! restoring_FPRs_inline)
+      if (info->rest_fpr_name != NULL)
 	p = rtvec_alloc (3 + 64 - info->first_fp_reg_save);
       else
 	p = rtvec_alloc (2);
 
       RTVEC_ELT (p, 0) = gen_rtx_RETURN (VOIDmode);
-      RTVEC_ELT (p, 1) = gen_rtx_USE (VOIDmode,
-				      gen_rtx_REG (Pmode,
-						   LINK_REGISTER_REGNUM));
 
+      if (info->rest_fpr_name == NULL)
+	RTVEC_ELT (p, 1) = gen_rtx_USE (VOIDmode,
+					gen_rtx_REG (Pmode,
+						     LINK_REGISTER_REGNUM));
+      else
+	RTVEC_ELT (p, 1) = gen_rtx_CLOBBER (VOIDmode,
+					    gen_rtx_REG (Pmode,
+							 LINK_REGISTER_REGNUM));
       /* If we have to restore more than two FP registers, branch to the
 	 restore function.  It will return to our caller.  */
-      if (! restoring_FPRs_inline)
+      if (info->rest_fpr_name != NULL)
 	{
 	  int i;
-	  char rname[30];
-	  const char *alloc_rname;
 
-	  sprintf (rname, "%s%d%s", RESTORE_FP_PREFIX,
-		   info->first_fp_reg_save - 32, RESTORE_FP_SUFFIX);
-	  alloc_rname = ggc_strdup (rname);
 	  RTVEC_ELT (p, 2) = gen_rtx_USE (VOIDmode,
 					  gen_rtx_SYMBOL_REF (Pmode,
-							      alloc_rname));
+							      info->rest_fpr_name));
 
 	  for (i = 0; i < 64 - info->first_fp_reg_save; i++)
 	    {
@@ -16414,8 +16496,6 @@ static void
 rs6000_output_function_epilogue (FILE *file,
 				 HOST_WIDE_INT size ATTRIBUTE_UNUSED)
 {
-  lto_function_end (file);
-
   if (! HAVE_epilogue)
     {
       rtx insn = get_last_insn ();
@@ -18975,6 +19055,7 @@ const struct attribute_spec rs6000_attribute_table[] =
   { "shortcall", 0, 0, false, true,  true,  rs6000_handle_longcall_attribute },
   { "vecreturn", 0, 0, false, false, false, rs6000_handle_vecreturn_attribute },
   { "extern",    0, 0, true,  false, false, rs6000_handle_extern_attribute },
+  { "inlinesrf", 0, 0, true,  false, false, rs6000_handle_inlinesrf_attribute },
   /* TRANSMETA LOCAL Begin */
   /* For a RECORD_TYPE, Indicates that the fields of this type object should
      be applied with Darwin64-ABI for parameter passing. */
@@ -19243,6 +19324,22 @@ rs6000_handle_extern_attribute (tree * node, tree name,
     }
   /* Just add it to all RECORD_TYPE's.  The tests later on will
      make sure it only works for the classes we care about. */
+  return NULL_TREE;
+}
+
+static tree
+rs6000_handle_inlinesrf_attribute (tree *node, tree name,
+				  tree args ATTRIBUTE_UNUSED,
+				  int flags ATTRIBUTE_UNUSED,
+				  bool *no_add_attrs)
+{
+  if (TREE_CODE (*node) != FUNCTION_DECL)
+    {
+      warning (OPT_Wattributes, "%qE attribute ignored", name);
+      *no_add_attrs = true;
+    }
+
+
   return NULL_TREE;
 }
 
@@ -20795,6 +20892,47 @@ rs6000_emit_swdivsf (rtx res, rtx n, rtx d)
 					gen_rtx_MULT (SFmode, v0, y1), u0)));
 }
 
+/*
+   Reciprocal estimate and 1 Newton-Raphson iteration.
+
+   vec_float4
+   divf4 ( vec_float4 numer, vec_float4 denom )
+   {
+     vec_float4 t0, t1, t2;
+
+     t0 = vec_re( denom );
+     t1 = vec_madd( numer, t0, (vec_float4)(0.0f) );
+     t2 = vec_nmsub( denom, t0, (vec_float4)(1.0f) )
+     return vec_madd( t2, t1, t1 );
+  }
+ */
+void
+rs6000_emit_swdivv4sf (rtx res, rtx numer, rtx denom)
+{
+  rtx t0, t1, t2, one, zero;
+
+  t0 = gen_reg_rtx (V4SFmode);
+  t1 = gen_reg_rtx (V4SFmode);
+  t2 = gen_reg_rtx (V4SFmode);
+  one = gen_reg_rtx (V4SFmode);
+  zero = gen_reg_rtx (V4SFmode);
+
+  one = force_reg (V4SFmode, CONST1_RTX (V4SFmode));
+  zero = force_reg (V4SFmode, CONST0_RTX (V4SFmode));
+
+  /* t0 = 1./d estimate */
+  emit_insn (gen_altivec_vrefp (t0, denom));
+
+  /* t1 = numer * t0 */
+  emit_insn (gen_altivec_vmaddfp (t1, numer, t0, zero));
+
+  /* t2 = - ( denom * t0 - 1.0 ) */
+  emit_insn (gen_altivec_vnmsubfp (t2, denom, t0, one));
+
+  /* res = t2 * t1 + t1 */
+  emit_insn (gen_altivec_vmaddfp (res, t2, t1, t1));
+}
+
 /* Newton-Raphson approximation of double-precision floating point divide n/d.
    Assumes no trapping math and finite arguments.  */
 
@@ -21433,5 +21571,29 @@ rs6000_emit_pgo_info (rtx *operands, rtx insn)
 }
 
 /* TRANSMETA PGO End */
+
+/** SCE bugilla #11003 **/
+/* APPLE LOCAL pragma reverse_bitfields, ms_struct */
+int darwin_reverse_bitfields = false;
+
+/* Pragma reverse_bitfields.  For compatibility with CW.
+   This feature is not well defined by CW, and results in
+   code that does not work in some cases!  Bug compatibility
+   is the requirement, however.  */
+
+static bool
+rs6000_reverse_bitfields_p (tree record_type ATTRIBUTE_UNUSED)
+{
+  return darwin_reverse_bitfields;
+}
+
+/* True if we're setting "#pragma ms_struct on".  */
+int darwin_ms_struct = false;
+
+static bool
+rs6000_ms_bitfield_layout_p (tree record_type)
+{
+  return darwin_ms_struct;
+}
 
 #include "gt-rs6000.h"

@@ -1,9 +1,9 @@
 #! /bin/csh
 # SCE CONFIDENTIAL
-# Copyright(C) 2005 Sony Computer Entertainment Inc.
+# Copyright(C) 2008 Sony Computer Entertainment Inc.
 # All Rights Reserved.
 
-# This script builds and installs mingw->spu-lv2 toolchain for SDK1.9.0-GCC411.  The
+# This script builds and installs mingw->spu-lv2 toolchain for SDK2.2.0-GCC411.  The
 # existing toolchain directory is backed up as "host-win32/spu.~N~" where
 # N is a generated number.
 # If environment variable CELLSDK is set, it should be the directory where

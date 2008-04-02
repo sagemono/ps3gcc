@@ -1330,6 +1330,14 @@ simplify_binary_operation_1 (enum rtx_code code, enum machine_mode mode,
 	  && trueop1 == const1_rtx)
 	return simplify_gen_unary (NEG, mode, XEXP (op0, 0), mode);
 
+      /* (a + a) -> (a << 1) 
+       * This plus might have been generated from a shift by the expand
+       * phase, and we end up undoing that here, but the combine phase
+       * can combine multiple shifts. For SPU/PPU this is fine, but
+       * might not be for targets with very expensive shifts. */
+      if (INTEGRAL_MODE_P (mode) && op0 == op1)
+	return simplify_gen_binary (ASHIFT, mode, op0, CONST1_RTX (mode));
+
       /* Handle both-operands-constant cases.  We can only add
 	 CONST_INTs to constants since the sum of relocatable symbols
 	 can't be handled by most assemblers.  Don't add CONST_INT
@@ -1884,6 +1892,18 @@ simplify_binary_operation_1 (enum rtx_code code, enum machine_mode mode,
 	  tem = simplify_gen_binary (IOR, mode, XEXP (op0, 0), XEXP (op1, 0));
 	  return simplify_gen_unary (NOT, mode, tem, mode);
 	}
+
+      /* (and X (ior (not X) Y) -> (and X Y) */
+      if (GET_CODE (op1) == IOR
+	  && GET_CODE (XEXP (op1, 0)) == NOT
+	  && op0 == XEXP (XEXP (op1, 0), 0))
+	return simplify_gen_binary (AND, mode, op0, XEXP (op1, 1));
+
+      /* (and (ior (not X) Y) X) -> (and X Y) */
+      if (GET_CODE (op0) == IOR
+	  && GET_CODE (XEXP (op0, 0)) == NOT
+	  && op1 == XEXP (XEXP (op0, 0), 0))
+	return simplify_gen_binary (AND, mode, op1, XEXP (op0, 1));
 
       tem = simplify_associative_operation (code, mode, op0, op1);
       if (tem)
@@ -3741,19 +3761,51 @@ simplify_ternary_operation (enum rtx_code code, enum machine_mode mode,
 	}
       else if (GET_CODE(op2) == NOT)
 	return simplify_gen_ternary(BIT_MERGE, mode, op0_mode, op1, op0, XEXP(op2, 0));
-      else if (GET_CODE(op0) == BIT_MERGE && XEXP (op0, 2) == op2)
+      else if (GET_CODE(op0) == BIT_MERGE)
 	{
-	  if (op1 == XEXP (op0, 0))
-	    return op1;
-	  else if (op1 == XEXP (op0, 1))
-	    return op0;
+	  rtx op00 = XEXP (op0, 0);
+	  rtx op01 = XEXP (op0, 1);
+	  rtx op02 = XEXP (op0, 2);
+	  if (op02 == op2)
+	    {
+	      if (op1 == op00)
+		/* (bit_merge (bit_merge a, b, c), a, c) -> a */
+		return op1;
+	      else 
+		/* (bit_merge (bit_merge a, b, d), c, d) -> (bit_merge a, c, d) */
+		return simplify_gen_ternary(BIT_MERGE, mode, op0_mode, op00, op1, op2);
+	    }
+	  else if (CONSTANT_P (op1) && CONSTANT_P (op2) && CONSTANT_P (op02))
+	    {
+	      /* (bit_merge (bit_merge a, b, c), d, e)
+	         -> (bit_merge a, (bit_merge b, d, e), c|e) */
+	      if (CONSTANT_P (op01))
+		return simplify_gen_ternary(BIT_MERGE, mode, op0_mode, op00, 
+			 simplify_gen_ternary(BIT_MERGE, mode, op0_mode, op01, op1, op2),
+			 simplify_gen_binary (IOR, mode, op2, op02));
+	      /* (bit_merge (bit_merge a, b, c), d, e)
+	         -> (bit_merge (bit_merge a, d, e), b, c&~e) */
+	      if (CONSTANT_P (op00))
+		return simplify_gen_ternary(BIT_MERGE, mode, op0_mode, 
+			 simplify_gen_ternary(BIT_MERGE, mode, op0_mode, op01, op1, op2),
+			 op01,
+			 simplify_gen_binary (AND, mode, op02,
+			   simplify_gen_unary (NOT, mode, op2, mode)));
+	    }
 	}
-      else if (GET_CODE(op1) == BIT_MERGE && XEXP (op1, 2) == op2)
+      else if (GET_CODE(op1) == BIT_MERGE)
 	{
-	  if (op0 == XEXP (op1, 0))
-	    return op1;
-	  else if (op0 == XEXP (op1, 1))
-	    return op0;
+	  rtx op11 = XEXP (op1, 1);
+	  rtx op12 = XEXP (op1, 2);
+	  if (op12 == op2)
+	  {
+	    if (op0 == op11)
+	      /* (bit_merge b, (bit_merge a, b, c), c) -> b */
+	      return op0;
+	    else
+	      /* (bit_merge a, (bit_merge b, c, d), d) -> (bit_merge a, c, d) */
+	      return simplify_gen_ternary(BIT_MERGE, mode, op0_mode, op0, op11, op2);
+	  }
 	}
       else if (GET_CODE(op0) == CONST_VECTOR
 	       && GET_CODE(op1) == CONST_VECTOR
@@ -3766,25 +3818,31 @@ simplify_ternary_operation (enum rtx_code code, enum machine_mode mode,
 	  unsigned n_elts = (GET_MODE_SIZE (mode2) / elt_size);
 	  rtvec v;
 	  unsigned int i;
-	  op0 = simplify_subreg(mode2, op0, mode, 0);
-	  op1 = simplify_subreg(mode2, op1, mode, 0);
+	  op0 = simplify_immed_subreg(mode2, op0, mode, 0);
+	  op1 = simplify_immed_subreg(mode2, op1, mode, 0);
 
 	  v = rtvec_alloc (n_elts);
 	  for (i = 0; i < n_elts; i++)
 	    {
-	      HOST_WIDE_INT mask = INTVAL(CONST_VECTOR_ELT (op2, i));
-	      RTVEC_ELT (v, i) = GEN_INT((INTVAL(CONST_VECTOR_ELT (op1, i)) & mask)
-				          | (INTVAL(CONST_VECTOR_ELT (op0, i)) & ~mask));
+	      HOST_WIDE_INT c0 = INTVAL(CONST_VECTOR_ELT (op0, i));
+	      HOST_WIDE_INT c1 = INTVAL(CONST_VECTOR_ELT (op1, i));
+	      HOST_WIDE_INT c2 = INTVAL(CONST_VECTOR_ELT (op2, i));
+	      RTVEC_ELT (v, i) = GEN_INT((c1 & c2) | (c0 & ~c2));
 	    }
 	  return simplify_subreg(mode, gen_rtx_CONST_VECTOR (mode2, v), mode2, 0);
 	}
-      else if (GET_CODE(op0) == CONST_INT
-	       && GET_CODE(op1) == CONST_INT
+      else if ((GET_CODE(op0) == CONST_INT || GET_CODE(op0) == CONST_DOUBLE)
+	       && (GET_CODE(op1) == CONST_INT || GET_CODE(op1) == CONST_DOUBLE)
 	       && GET_CODE(op2) == CONST_INT
 	       && GET_MODE_BITSIZE(mode) <= HOST_BITS_PER_WIDE_INT)
 	{
-	  HOST_WIDE_INT mask = INTVAL(op2);
-	  return GEN_INT((INTVAL(op1) & mask) | (INTVAL(op0) & ~mask));
+	  enum machine_mode mode2 = mode_for_size (GET_MODE_BITSIZE (mode), MODE_INT, 0);
+	  rtx x0 = simplify_immed_subreg (mode2, op0, mode, 0);
+	  rtx x1 = simplify_immed_subreg (mode2, op1, mode, 0);
+	  HOST_WIDE_INT c0 = INTVAL (x0);
+	  HOST_WIDE_INT c1 = INTVAL (x1);
+	  HOST_WIDE_INT c2 = INTVAL (op2);
+	  return GEN_INT((c1 & c2) | (c0 & ~c2));
 	}
       else if (mode == GET_MODE(op2)
 	       && (GET_MODE_CLASS(mode) == MODE_INT

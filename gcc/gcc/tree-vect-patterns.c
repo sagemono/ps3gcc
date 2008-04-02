@@ -107,10 +107,6 @@ widened_name_p (tree name, tree use_stmt, tree *half_type, tree *def_stmt)
   if (!vect_is_simple_use (oprnd0, loop_vinfo, &dummy, &dummy, &dt))
     return false;
 
-  if (dt != vect_invariant_def && dt != vect_constant_def
-      && dt != vect_loop_def)
-    return false;
-
   return true;
 }
 
@@ -151,7 +147,14 @@ widened_name_p (tree name, tree use_stmt, tree *half_type, tree *def_stmt)
    * Return value: A new stmt that will be used to replace the sequence of
    stmts that constitute the pattern. In this case it will be:
         WIDEN_DOT_PRODUCT <x_t, y_t, sum_0>
-*/
+
+   Note: The dot-prod idiom is a widening reduction pattern that is
+         vectorized without preserving all the intermediate results. It
+         produces only N/2 (widened) results (by summing up pairs of
+         intermediate results) rather than all N results.  Therefore, we
+         cannot allow this pattern when we want to get all the results and in
+         the correct order (as is the case when this computation is in an
+         inner-loop nested in an outer-loop that us being vectorized).  */
 
 static tree
 vect_recog_dot_prod_pattern (tree last_stmt, tree *type_in, tree *type_out)
@@ -163,6 +166,11 @@ vect_recog_dot_prod_pattern (tree last_stmt, tree *type_in, tree *type_out)
   tree type, half_type;
   tree pattern_expr;
   tree prod_type;
+  tree name;
+  imm_use_iterator imm_iter;
+  use_operand_p use_p;
+  loop_vec_info loop_info = STMT_VINFO_LOOP_VINFO (stmt_vinfo);
+  struct loop *loop = LOOP_VINFO_LOOP (loop_info);
 
   if (TREE_CODE (last_stmt) != MODIFY_EXPR)
     return NULL;
@@ -196,6 +204,23 @@ vect_recog_dot_prod_pattern (tree last_stmt, tree *type_in, tree *type_out)
 
   if (TREE_CODE (expr) != PLUS_EXPR)
     return NULL;
+
+  /* A DOT_PROD_EXPR can be vectorized only if its ok to change the
+     computation order.  Here we check if the summation has any uses
+     in LOOP, which would require maintaining the same computation order.  */
+  name = TREE_OPERAND (last_stmt, 0);
+  if (TREE_CODE (name) == SSA_NAME)
+    {
+      FOR_EACH_IMM_USE_FAST (use_p, imm_iter, name)
+	{
+	  tree use_stmt = USE_STMT (use_p);
+	  basic_block bb = bb_for_stmt (use_stmt);
+	  if (flow_bb_inside_loop_p (loop, bb)
+	      && (TREE_CODE (use_stmt) != PHI_NODE
+		  || !is_loop_header_bb_p (bb)))
+            return NULL;
+	}
+    }
 
   if (STMT_VINFO_IN_PATTERN_P (stmt_vinfo))
     {
@@ -244,6 +269,10 @@ vect_recog_dot_prod_pattern (tree last_stmt, tree *type_in, tree *type_out)
   stmt_vinfo = vinfo_for_stmt (stmt);
   gcc_assert (stmt_vinfo);
   if (STMT_VINFO_DEF_TYPE (stmt_vinfo) != vect_loop_def)
+    return NULL;
+  /* FORNOW. Can continue analyzing the def-use chain when this stmt in a phi
+     inside the loop (in case we are analyzing an outer-loop).  */
+  if (TREE_CODE (stmt) != MODIFY_EXPR)
     return NULL;
   expr = TREE_OPERAND (stmt, 1);
   if (TREE_CODE (expr) != MULT_EXPR)
@@ -298,6 +327,16 @@ vect_recog_dot_prod_pattern (tree last_stmt, tree *type_in, tree *type_out)
       fprintf (vect_dump, "vect_recog_dot_prod_pattern: detected: ");
       print_generic_expr (vect_dump, pattern_expr, TDF_SLIM);
     }
+
+  /* We don't allow changing the order of the computation in the inner-loop
+     when doing outer-loop vectorization.  */
+  if (nested_in_vect_loop_p (loop, last_stmt))
+    {
+      if (vect_print_dump_info (REPORT_DETAILS))
+        fprintf (vect_dump, "vect_recog_dot_prod_pattern: not allowed.");
+      return NULL;
+    }
+
   return pattern_expr;
 }
 
@@ -384,7 +423,8 @@ vect_recog_widen_mult_pattern (tree last_stmt,
 
   /* Check target support  */
   vectype = get_vectype_for_scalar_type (half_type0);
-  if (!supportable_widening_operation (WIDEN_MULT_EXPR, last_stmt, vectype,
+  if (!vectype
+      || !supportable_widening_operation (WIDEN_MULT_EXPR, last_stmt, vectype,
                                        &dummy, &dummy, &dummy_code,
                                        &dummy_code))
     return NULL;
@@ -430,7 +470,14 @@ vect_recog_widen_mult_pattern (tree last_stmt,
    * Return value: A new stmt that will be used to replace the sequence of
    stmts that constitute the pattern. In this case it will be:
         WIDEN_SUM <x_t, sum_0>
-*/
+
+   Note: The widneing-sum idiom is a widening reduction pattern that is 
+	 vectorized without preserving all the intermediate results. It
+         produces only N/2 (widened) results (by summing up pairs of 
+	 intermediate results) rather than all N results.  Therefore, we 
+	 cannot allow this pattern when we want to get all the results and in 
+	 the correct order (as is the case when this computation is in an 
+	 inner-loop nested in an outer-loop that us being vectorized).  */
 
 static tree
 vect_recog_widen_sum_pattern (tree last_stmt, tree *type_in, tree *type_out)
@@ -440,6 +487,8 @@ vect_recog_widen_sum_pattern (tree last_stmt, tree *type_in, tree *type_out)
   stmt_vec_info stmt_vinfo = vinfo_for_stmt (last_stmt);
   tree type, half_type;
   tree pattern_expr;
+  loop_vec_info loop_info = STMT_VINFO_LOOP_VINFO (stmt_vinfo);
+  struct loop *loop = LOOP_VINFO_LOOP (loop_info);
 
   if (TREE_CODE (last_stmt) != MODIFY_EXPR)
     return NULL;
@@ -489,6 +538,16 @@ vect_recog_widen_sum_pattern (tree last_stmt, tree *type_in, tree *type_out)
       fprintf (vect_dump, "vect_recog_widen_sum_pattern: detected: ");
       print_generic_expr (vect_dump, pattern_expr, TDF_SLIM);
     }
+
+  /* We don't allow changing the order of the computation in the inner-loop
+     when doing outer-loop vectorization.  */
+  if (nested_in_vect_loop_p (loop, last_stmt))
+    {
+      if (vect_print_dump_info (REPORT_DETAILS))
+        fprintf (vect_dump, "vect_recog_widen_sum_pattern: not allowed.");
+      return NULL;
+    }
+
   return pattern_expr;
 }
 
@@ -550,6 +609,9 @@ vect_pattern_recog_1 (
 
       /* Check target support  */
       pattern_vectype = get_vectype_for_scalar_type (type_in);
+      if (!pattern_vectype)
+	return;
+
       optab = optab_for_tree_code (TREE_CODE (pattern_expr), pattern_vectype);
       vec_mode = TYPE_MODE (pattern_vectype);
       if (!optab

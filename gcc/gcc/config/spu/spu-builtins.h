@@ -96,18 +96,18 @@ enum spu_builtin_type {
     B_INTERNAL
 };
 
-typedef enum {
+enum spu_function_code {
 #define DEF_BUILTIN(fcode, icode, name, type, params) fcode,
 #include "spu_builtins.def"
 #undef DEF_BUILTIN
    NUM_SPU_BUILTINS,
    BUILTIN_BRANCH_HINT,
    BUILTIN_EXPECT_CALL
-} spu_function_code;
+};
 
-struct spu_builtin_description {
-    spu_function_code fcode;
-    enum insn_code icode;
+struct spu_builtin_description GTY(()) {
+    enum spu_function_code fcode;
+    int icode;
     const char *name;
     enum spu_builtin_type type;
 
@@ -118,7 +118,7 @@ struct spu_builtin_description {
     tree fndecl;
 };
 
-extern GTY(()) struct spu_builtin_description spu_builtins[];
+extern GTY(()) struct spu_builtin_description spu_builtins[NUM_SPU_BUILTINS];
 
 
 

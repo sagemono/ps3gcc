@@ -194,6 +194,9 @@ static bfd_vma opd_entry_value
 #define MTLR_R0		0x7c0803a6	/* mtlr  %r0		*/
 #define BLR		0x4e800020	/* blr			*/
 
+#define STFD_FR0_0R12	0xd80c0000	/* stfd  %fr0,0(%r12)	*/
+#define LFD_FR0_0R12	0xc80c0000	/* lfd   %fr0,0(%r12)	*/
+
 /* Since .opd is an array of descriptors and each entry will end up
    with identical R_PPC64_RELATIVE relocs, there is really no need to
    propagate .opd relocs;  The dynamic linker should be taught to
@@ -3446,6 +3449,9 @@ struct ppc_link_hash_entry
   /* Set if we twiddled this symbol to weak at some stage.  */
   unsigned int was_undefined:1;
 
+  /* Set when this is a function that doesn't use or change TOC */
+  unsigned int doesnt_use_toc:1;
+
   /* Contexts in which symbol is used in the GOT (or TOC).
      TLS_GD .. TLS_EXPLICIT bits are or'd into the mask as the
      corresponding relocs are encountered during check_relocs.
@@ -5635,6 +5641,7 @@ sfpr_define (struct bfd_link_info *info, const struct sfpr_def_parms *parm)
 	  h->root.u.def.value = htab->sfpr->size;
 	  h->type = STT_FUNC;
 	  h->def_regular = 1;
+	  ((struct ppc_link_hash_entry *)h)->doesnt_use_toc = 1;
 	  _bfd_elf_link_hash_hide_symbol (info, h, TRUE);
 	  writing = TRUE;
 	  if (htab->sfpr->contents == NULL)
@@ -5982,7 +5989,19 @@ ppc64_elf_func_desc_adjust (bfd *obfd ATTRIBUTE_UNUSED,
       { "._savef", 14, 31, savefpr, savefpr1_tail },
       { "._restf", 14, 31, restfpr, restfpr1_tail },
       { "_savevr_", 20, 31, savevr, savevr_tail },
-      { "_restvr_", 20, 31, restvr, restvr_tail }
+      { "_restvr_", 20, 31, restvr, restvr_tail },
+
+      /* For CELL, save and restore gp/fp registers using %r12 as the base */
+      { "._savegpr0_", 14, 31, savegpr0, savegpr0_tail },
+      { "._restgpr0_", 14, 29, restgpr0, restgpr0_tail },
+      { "._restgpr0_", 30, 31, restgpr0, restgpr0_tail },
+      { "._savegpr1_", 14, 31, savegpr1, savegpr1_tail },
+      { "._restgpr1_", 14, 31, restgpr1, restgpr1_tail },
+      { "._savefpr_", 14, 31, savefpr, savefpr0_tail },
+      { "._restfpr_", 14, 29, restfpr, restfpr0_tail },
+      { "._restfpr_", 30, 31, restfpr, restfpr0_tail },
+      { "._savevr_", 20, 31, savevr, savevr_tail },
+      { "._restvr_", 20, 31, restvr, restvr_tail },
     };
 
   htab = ppc_hash_table (info);
@@ -10727,6 +10746,7 @@ ppc64_elf_relocate_section (bfd *output_bfd,
 		   && sec->id <= htab->top_id
 		   && (htab->stub_group[sec->id].toc_off
 		       != htab->stub_group[input_section->id].toc_off)))
+	      && (h == NULL || !h->doesnt_use_toc)
 	      && (stub_entry = ppc_get_stub_entry (input_section, sec, fdh,
 						   rel, htab)) != NULL
 	      && (stub_entry->stub_type == ppc_stub_plt_call

@@ -203,6 +203,16 @@
 /* Define cutoff for using external functions to save floating point.  */
 #define FP_SAVE_INLINE(FIRST_REG) ((FIRST_REG) == 62 || (FIRST_REG) == 63)
 
+/* Macros for using external functions to save general registers.
+   Currently always use inline stores. */
+#define GP_SAVE_INLINE(FIRST_REG) (1)
+#define	SAVE_GP_PREFIX ""
+#define SAVE_GP_SUFFIX ""
+#define	RESTORE_GP_PREFIX ""
+#define RESTORE_GP_SUFFIX ""
+#define	RESTORE_GP_UPDATE_PREFIX ""
+#define RESTORE_GP_UPDATE_SUFFIX ""
+
 /* __throw will restore its own return address to be the same as the
    return address of the function that the throw is being made to.
    This is unfortunate, because we want to check the original

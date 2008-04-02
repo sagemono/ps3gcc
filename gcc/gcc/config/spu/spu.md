@@ -280,7 +280,7 @@
    (set (match_operand:SI 1 "spu_reg_operand" "=r")
 	(unspec:SI [(const_int 0)] 0))]
   "flag_pic"
-  "ila\t%1,.+8\;%x0brsl\t%0,4"
+  "ila\t%1,.+8\;brsl\t%0,4"
   [(set_attr "length" "8")
    (set_attr "type" "multi0")])
 
@@ -297,8 +297,8 @@
    il%s1\t%0,%S1
    fsmbi\t%0,%S1
    c%s1d\t%0,%S1($sp)
-   %x1lq%p1\t%0,%1
-   %x0stq%p0\t%1,%0"
+   lq%p1\t%0,%1
+   stq%p0\t%1,%0"
   [(set_attr "type" "fx2,fx2,shuf,shuf,load,store")])
 
 (define_insn "low_<mode>"
@@ -318,8 +318,8 @@
    il%d1\t%0,%D1
    fsmbi\t%0,%D1
    c%d1d\t%0,%D1($sp)
-   %x1lq%p1\t%0,%1
-   %x0stq%p0\t%1,%0"
+   lq%p1\t%0,%1
+   stq%p0\t%1,%0"
   [(set_attr "type" "fx2,fx2,shuf,shuf,load,store")])
 
 (define_insn "_movti"
@@ -332,8 +332,8 @@
    il%t1\t%0,%T1
    fsmbi\t%0,%T1
    c%t1d\t%0,%T1($sp)
-   %x1lq%p1\t%0,%1
-   %x0stq%p0\t%1,%0"
+   lq%p1\t%0,%1
+   stq%p0\t%1,%0"
   [(set_attr "type" "fx2,fx2,shuf,shuf,load,store")])
 
 (define_split
@@ -1258,6 +1258,18 @@
   "mpyi\t%0,%1,%2"
   [(set_attr "type" "fp7")])
 
+(define_insn "mpyi_v4si"
+  [(set (match_operand:V4SI 0 "spu_reg_operand" "=r")
+        (mult:V4SI
+	  (sign_extend:V4SI
+	    (vec_select:V4HI
+	      (match_operand:V8HI 1 "spu_reg_operand" "r")
+	      (parallel [(const_int 1)(const_int 3)(const_int 5)(const_int 7)])))
+	  (match_operand:V4SI 2 "spu_arith_operand" "B")))]
+  ""
+  "mpyi\t%0,%1,%2"
+  [(set_attr "type" "fp7")])
+
 (define_insn "umulhisi3"
   [(set (match_operand:SI 0 "spu_reg_operand" "=r")
 	(mult:SI (zero_extend:SI (match_operand:HI 1 "spu_reg_operand" "r"))
@@ -1266,12 +1278,26 @@
   "mpyu\t%0,%1,%2"
   [(set_attr "type" "fp7")])
 
+;; In mpyui the immediate is first sign extended to 16 bits then zero extended
+;; to 32.  Which means we accept constants 0000..01ff and fe00..ffff
 (define_insn "umulhisi3_imm"
   [(set (match_operand:SI 0 "spu_reg_operand" "=r")
 	(mult:SI (zero_extend:SI (match_operand:HI 1 "spu_reg_operand" "r"))
-		 (and:SI (match_operand:SI 2 "imm_K_operand" "K") (const_int 65535))))]
+		 (match_operand:SI 2 "imm_t_operand" "t")))]
   ""
-  "mpyui\t%0,%1,%2"
+  "mpyui\t%0,%1,%u2"
+  [(set_attr "type" "fp7")])
+
+(define_insn "mpyui_v4si"
+  [(set (match_operand:V4SI 0 "spu_reg_operand" "=r")
+        (mult:V4SI
+	  (zero_extend:V4SI
+	    (vec_select:V4HI
+	      (match_operand:V8HI 1 "spu_reg_operand" "r")
+	      (parallel [(const_int 1)(const_int 3)(const_int 5)(const_int 7)])))
+	  (match_operand:V4SI 2 "imm_t_operand" "t")))]
+  ""
+  "mpyui\t%0,%1,%u2"
   [(set_attr "type" "fp7")])
 
 (define_insn "mpyu_si"
@@ -1794,6 +1820,21 @@
   ""
   "nand\t%0,%1,%2")
 
+;; This allows some rtx simplifications which generate a large constant.
+(define_insn_and_split "andsi_imm"
+  [(set (match_operand:SI 0 "spu_reg_operand" "=r")
+	(and:SI (match_operand:SI 1 "spu_reg_operand" "r")
+		(match_operand:SI 2 "const_int_operand" "I")))
+   (clobber (match_operand:SI 3 "spu_reg_operand" "=&r"))]
+  ""
+  "#"
+  ""
+  [(set (match_dup:SI 3) (match_dup:SI 2))
+   (set (match_dup:SI 0)
+	(and:SI (match_dup:SI 1)
+		(match_dup:SI 3)))])
+
+
 
 ;; ior
 
@@ -1847,7 +1888,7 @@
 (define_insn "xor<mode>3"
   [(set (match_operand:MOV 0 "spu_reg_operand" "=r,r")
 	(xor:MOV (match_operand:MOV 1 "spu_reg_operand" "r,r")
-		 (match_operand:MOV 2 "spu_logical_operand" "r,B")))]
+		 (match_operand:MOV 2 "spu_logical_operand" "r,C")))]
   ""
   "@
   xor\t%0,%1,%2
@@ -2008,14 +2049,15 @@
 ;; ashl
 
 (define_insn "ashl<mode>3"
-  [(set (match_operand:VHSI 0 "spu_reg_operand" "=r,r")
-	(ashift:VHSI (match_operand:VHSI 1 "spu_reg_operand" "r,r")
-		     (match_operand:VHSI 2 "spu_shift_operand" "r,W")))]
+  [(set (match_operand:VHSI 0 "spu_reg_operand" "=r,r,r")
+	(ashift:VHSI (match_operand:VHSI 1 "spu_reg_operand" "r,r,r")
+		     (match_operand:VHSI 2 "spu_shift_operand" "r,Q,W")))]
   ""
   "@
   shl<bh>\t%0,%1,%2
+  a<bh>\t%0,%1,%1
   shl<bh>i\t%0,%1,%<umask>2"
-  [(set_attr "type" "fx3")])
+  [(set_attr "type" "fx3,fx2,fx3")])
 
 (define_insn_and_split "ashldi3"
   [(set (match_operand:DI 0 "spu_reg_operand" "=r,r")
@@ -2554,7 +2596,6 @@
   [(return)]
   ""
   {
-    spu_preface_return();
     return "bi\t$lr";
   }
   [(set_attr "type" "br")])
@@ -2760,8 +2801,8 @@ selb\t%0,%5,%0,%3"
      rtx to_ti = gen_rtx_REG(TImode, REGNO(operands[0]));
      rtx to_v4 = gen_rtx_REG(V4SImode, REGNO(operands[0]));
      rtx l_v4 = gen_rtx_REG(V4SImode, REGNO(operands[1]));
-     spu_emit_insn(gen_ceq_v4si(s0_v4, l_v4, const0_rtx));
-     spu_emit_insn(gen_cgt_v4si(s1_v4, l_v4, const0_rtx));
+     spu_emit_insn(gen_ceq_v4si(s0_v4, l_v4, CONST0_RTX (V4SImode)));
+     spu_emit_insn(gen_cgt_v4si(s1_v4, l_v4, CONST0_RTX (V4SImode)));
      spu_emit_insn(gen_rotqby_ti(to_ti, s0_ti, GEN_INT(4)));
      spu_emit_insn(gen_andc_v4si(to_v4, s0_v4, to_v4));
      spu_emit_insn(gen_iorv4si3(to_v4, to_v4, s1_v4));
@@ -3127,7 +3168,6 @@ selb\t%0,%4,%0,%3"
    (use (label_ref (match_operand 1 "" "")))]
   ""
   {
-      spu_preface_tablejump (operands[1]);
       return "bi\t%0";
   }
   [(set_attr "type" "br")])
@@ -3155,7 +3195,6 @@ selb\t%0,%4,%0,%3"
      (use (reg:SI 0))])]
   "SIBLING_CALL_P(insn)"
   {
-      spu_preface_call (1);
       return which_alternative==0 ? "bi\t%i0" : "br\t%0";
   }
    [(set_attr "type" "br")])
@@ -3180,7 +3219,6 @@ selb\t%0,%4,%0,%3"
      (use (reg:SI 0))])]
   "SIBLING_CALL_P(insn)"
   {
-      spu_preface_call (1);
       return which_alternative==0 ? "bi\t%i1" : "br\t%1";
   }
    [(set_attr "type" "br")])
@@ -3207,7 +3245,6 @@ selb\t%0,%4,%0,%3"
      (clobber (reg:SI 130))])]
   ""
   {
-      spu_preface_call (0);
       if (GET_CODE (XEXP (operands[0], 0)) == REG)
 	return \"bisl\t$lr,%i0\";
       if (GET_CODE (XEXP (operands[0], 0)) == CONST_INT)
@@ -3238,7 +3275,6 @@ selb\t%0,%4,%0,%3"
      (clobber (reg:SI 130))])]
   ""
   {
-      spu_preface_call (0);
       if (GET_CODE (XEXP (operands[1], 0)) == REG)
 	return \"bisl\t$lr,%i1\";
       if (GET_CODE (XEXP (operands[1], 0)) == CONST_INT)
@@ -3384,6 +3420,12 @@ selb\t%0,%4,%0,%3"
     DONE;
   }")
 
+;; The first 32 bits of the operand register will be -1 at run-time when
+;; the stack overflows.  
+(define_insn "halt_stack"
+  [(unspec [(match_operand:V2DI 0 "spu_reg_operand" "r")] UNSPEC_HEQ)]
+  ""
+  "heqi\t%0,-1")
 
 ;; vector patterns
 
@@ -3499,7 +3541,7 @@ selb\t%0,%4,%0,%3"
   "hbrp\t# %0"
   [(set_attr "type" "iprefetch")])
 
-;; A non-volatile version so it get's scheduled
+;; A non-volatile version so it gets scheduled
 (define_insn "nopn_nv"
   [(unspec [(match_operand:SI 0 "register_operand" "r")] UNSPEC_NOP)]
   ""

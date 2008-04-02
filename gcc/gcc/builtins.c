@@ -5807,9 +5807,6 @@ expand_gimplified_builtin_expect_jump(tree exp, rtx if_false_label,
 /* CELL LOCAL Begin */
 #if defined (HAVE_branch_hint) && defined (HAVE_conditional_move)
           || (HAVE_branch_hint && HAVE_conditional_move
-	      && (TREE_CODE (arg1) == VAR_DECL
-	          || (TREE_CODE (arg1) == NOP_EXPR
-		      && TREE_CODE (TREE_VALUE (arg1)) == VAR_DECL))
               && can_conditionally_move_p(Pmode))
 #endif
 /* CELL LOCAL End */
@@ -9078,7 +9075,7 @@ fold_builtin_classify (tree fndecl, tree arglist, int builtin_index)
     case BUILT_IN_FINITE:
       if (!MODE_HAS_NANS (TYPE_MODE (TREE_TYPE (arg)))
           && !MODE_HAS_INFINITIES (TYPE_MODE (TREE_TYPE (arg))))
-        return omit_one_operand (type, integer_zero_node, arg);
+        return omit_one_operand (type, integer_one_node, arg);
 
       if (TREE_CODE (arg) == REAL_CST)
 	{

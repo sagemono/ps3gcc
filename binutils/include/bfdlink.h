@@ -430,11 +430,6 @@ struct bfd_link_info
   /* Start and end of RELRO region.  */
   bfd_vma relro_start, relro_end;
 
-  /* CELL LOCAL Begin */
-  /* for IBM STI BPA */
-  /* True if SPU file is plugin. */
-  bfd_boolean spuplugin;
-  /* CELL LOCAL End */
   /* begin sce local bugzilla #2878 */
   bfd_boolean spuguid;
   /* end sce local */
@@ -555,6 +550,12 @@ struct bfd_link_callbacks
      bfd *abfd, asection *section, bfd_vma address);
   /* General link info message.  */
   void (*einfo)
+    (const char *fmt, ...);
+  /* General link info message.  */
+  void (*info)
+    (const char *fmt, ...);
+  /* Message to be printed in linker map file.  */
+  void (*minfo)
     (const char *fmt, ...);
 };
 

@@ -1,4 +1,4 @@
-/* Copyright (C) 2006 Sony Computer Entertainment Inc.
+/* Copyright (C) 2006, 2007 Sony Computer Entertainment Inc.
 
    This file is free software; you can redistribute it and/or modify it under
    the terms of the GNU General Public License as published by the Free
@@ -28,7 +28,7 @@
 #ifndef  _PPU_INTRINSICS_GCC_H
 #define _PPU_INTRINSICS_GCC_H
 
-#if !defined(__PPU__) && !defined(__ppc__) && !defined(__ppc64__)
+#if !defined(__PPU__) && !defined(__ppc__) && !defined(__ppc64__) \
     && !defined(__GNUC__)
   #error ppu_intrinsics.h included on wrong platform/compiler
 #endif
@@ -129,37 +129,37 @@ typedef int __V4SI __attribute__((vector_size(16)));
 #define __cntlzd(v) __builtin_clzll(v)
 
 #define __mulhw(a,b) __extension__ \
-  ({int result;			   \
+  ({int __macro_result;			   \
   __asm__ ("mulhw %0,%1,%2"	   \
-	   : "=r" (result)	   \
+	   : "=r" (__macro_result)	   \
 	   : "r" ((int) (a)),	   \
 	     "r" ((int) (b)));	   \
-  result; })
+  __macro_result; })
 
 #define __mulhwu(a,b) __extension__	\
-  ({unsigned int result;		\
+  ({unsigned int __macro_result;		\
   __asm__ ("mulhwu %0,%1,%2"		\
-	   : "=r" (result)		\
+	   : "=r" (__macro_result)		\
 	   : "r" ((unsigned int) (a)),	\
 	     "r" ((unsigned int) (b))); \
-  result; })
+  __macro_result; })
 
 #ifdef __powerpc64__
 #define __mulhd(a,b) __extension__   \
-  ({ long long result;		     \
+  ({ long long __macro_result;		     \
   __asm__ ("mulhd %0,%1,%2"	     \
-	   : "=r" (result)	     \
+	   : "=r" (__macro_result)	     \
 	   : "r" ((long long) (a)),  \
 	     "r" ((long long) (b))); \
-  result; })
+  __macro_result; })
 
 #define __mulhdu(a,b) __extension__	      \
-  ({unsigned long long result;		      \
+  ({unsigned long long __macro_result;		      \
   __asm__ ("mulhdu %0,%1,%2"		      \
-	   : "=r" (result)		      \
+	   : "=r" (__macro_result)		      \
 	   : "r" ((unsigned long long) (a)),  \
 	     "r" ((unsigned long long) (b))); \
-  result; })
+  __macro_result; })
 #endif /* __powerpc64__ */
 
 #define __sync() __asm__ volatile ("sync" : : : "memory")
@@ -181,23 +181,23 @@ typedef int __V4SI __attribute__((vector_size(16)));
   __asm__ volatile ("mtspr %0,%1" : : "n" (spr), "r" (value))
   
 #define __mfspr(spr) __extension__				\
-  ({ unsigned long long result;					\
-  __asm__ volatile ("mfspr %0,%1" : "=r" (result) : "n" (spr)); \
-  result; })
+  ({ unsigned long long __macro_result;					\
+  __asm__ volatile ("mfspr %0,%1" : "=r" (__macro_result) : "n" (spr)); \
+  __macro_result; })
 #endif /* __powerpc64__ */
 
 #ifdef __powerpc64__
 #define __mftb() __extension__					\
-  ({ unsigned long long result;					\
+  ({ unsigned long long __macro_result;					\
   __asm__ volatile ("1: mftb %[current_tb]\n"			\
       "\tcmpwi 7, %[current_tb], 0\n"				\
       "\tbeq-  7, 1b"						\
-      : [current_tb] "=r" (result):				\
+      : [current_tb] "=r" (__macro_result):				\
       :"cr7");							\
-  result; })
+  __macro_result; })
 #else
 #define __mftb() __extension__			\
-  ({ unsigned long long result;			\
+  ({ unsigned long long __macro_result;			\
   unsigned long t;				\
   __asm__ volatile ("1:\n"			\
 		    "\tmftbu %0\n"		\
@@ -205,27 +205,27 @@ typedef int __V4SI __attribute__((vector_size(16)));
 		    "\tmftbu %1\n"		\
 		    "\tcmpw %0,%1\n"		\
 		    "\tbne 1b"			\
-		    : "=r" (result), "=r" (t));	\
-  result; })
+		    : "=r" (__macro_result), "=r" (t));	\
+  __macro_result; })
 #endif /* __powerpc64__ */
 
 #define __dcbf(base) \
-  __asm__ volatile ("dcbf %y0" : "=Z" (*(__V4SI*) (base)) : : "memory")
+  __asm__ volatile ("dcbf %y0" : "=Z" (*(__V4SI*)(void*)(base)) : : "memory")
   
 #define __dcbz(base) \
-  __asm__ volatile ("dcbz %y0" : "=Z" (*(__V4SI*) (base)) : : "memory")
+  __asm__ volatile ("dcbz %y0" : "=Z" (*(__V4SI*)(void*)(base)) : : "memory")
 
 #define __dcbst(base) \
-  __asm__ volatile ("dcbst %y0" : "=Z" (*(__V4SI*) (base)) : : "memory")
+  __asm__ volatile ("dcbst %y0" : "=Z" (*(__V4SI*)(void*)(base)) : : "memory")
 
 #define __dcbtst(base) \
-  __asm__ volatile ("dcbtst %y0" : "=Z" (*(__V4SI*) (base)) : : "memory")
+  __builtin_prefetch (base, 1)
 
 #define __dcbt(base) \
-  __asm__ volatile ("dcbt %y0" : "=Z" (*(__V4SI*) (base)) : : "memory")
+  __builtin_prefetch (base, 0)
 
 #define __icbi(base) \
-  __asm__ volatile ("icbi %y0" : "=Z" (*(__V4SI*) (base)) : : "memory")
+  __asm__ volatile ("icbi %y0" : "=Z" (*(__V4SI*)(void*)(base)) : : "memory")
   
 #define __dcbt_TH1000(EATRUNC, D, UG, ID)				\
   __asm__ volatile ("dcbt %y0,8"					\
@@ -262,43 +262,43 @@ typedef int __V4SI __attribute__((vector_size(16)));
 	__dcbt_TH1010 (1, 0, 0, 0, 0, 0)
 
 #define __lhbrx(base) __extension__		\
-  ({unsigned short result;	       		\
+  ({unsigned short __macro_result;	       		\
     typedef  struct {char a[2];} halfwordsize;	\
     halfwordsize *ptrp = (halfwordsize*)(void*)(base);	\
   __asm__ ("lhbrx %0,%y1"			\
-	   : "=r" (result)			\
+	   : "=r" (__macro_result)			\
 	   : "Z" (*ptrp));			\
-  result; })
+  __macro_result; })
 
 #define __lwbrx(base) __extension__		\
-  ({unsigned int result;	       		\
+  ({unsigned int __macro_result;	       		\
     typedef  struct {char a[4];} wordsize;	\
     wordsize *ptrp = (wordsize*)(void*)(base);		\
   __asm__ ("lwbrx %0,%y1"			\
-	   : "=r" (result)			\
+	   : "=r" (__macro_result)			\
 	   : "Z" (*ptrp));			\
-  result; })
+  __macro_result; })
 
 
 #ifdef __powerpc64__
 #define __ldbrx(base) __extension__			\
-  ({unsigned long long result;	       			\
+  ({unsigned long long __macro_result;	       			\
     typedef  struct {char a[8];} doublewordsize;	\
     doublewordsize *ptrp = (doublewordsize*)(void*)(base);	\
   __asm__ ("ldbrx %0,%y1"				\
-	   : "=r" (result)				\
+	   : "=r" (__macro_result)				\
 	   : "Z" (*ptrp));				\
-  result; })
+  __macro_result; })
 #else
 #define __ldbrx(base) __extension__			\
-  ({unsigned long long result;	       			\
+  ({unsigned long long __macro_result;	       			\
     typedef  struct {char a[8];} doublewordsize;	\
     doublewordsize *ptrp = (doublewordsize*)(void*)(base);	\
   __asm__ ("lwbrx %L0,%y1\n"				\
 	   "\tlwbrx %0,%y2"				\
-	   : "=&r" (result)				\
+	   : "=&r" (__macro_result)				\
 	   : "Z" (*ptrp), "Z" (*((char *) ptrp + 4)));	\
-  result; })
+  __macro_result; })
 #endif /* __powerpc64__ */
 
 
@@ -339,54 +339,54 @@ typedef int __V4SI __attribute__((vector_size(16)));
 
 
 #define __lwarx(base) __extension__		\
-  ({unsigned int result;	       		\
+  ({unsigned int __macro_result;	       		\
     typedef  struct {char a[4];} wordsize;	\
     wordsize *ptrp = (wordsize*)(void*)(base);	\
   __asm__ volatile ("lwarx %0,%y1"		\
-	   : "=r" (result)			\
+	   : "=r" (__macro_result)			\
 	   : "Z" (*ptrp));			\
-  result; })
+  __macro_result; })
 
 #ifdef __powerpc64__
 #define __ldarx(base) __extension__			\
-  ({unsigned long long result;	       			\
+  ({unsigned long long __macro_result;	       			\
     typedef  struct {char a[8];} doublewordsize;	\
     doublewordsize *ptrp = (doublewordsize*)(void*)(base);	\
   __asm__ volatile ("ldarx %0,%y1"			\
-	   : "=r" (result)				\
-	   : "m" (*ptrp));				\
-  result; })
+	   : "=r" (__macro_result)				\
+	   : "Z" (*ptrp));				\
+  __macro_result; })
 #endif /* __powerpc64__ */
 
 #define __stwcx(base, value) __extension__	\
-  ({unsigned int result;			\
+  ({unsigned int __macro_result;			\
     typedef  struct {char a[4];} wordsize;	\
     wordsize *ptrp = (wordsize*)(void*)(base);	\
   __asm__ volatile ("stwcx. %2,%y1\n"		\
 	   "\tmfocrf %0,0x80"			\
-	   : "=r" (result),			\
+	   : "=r" (__macro_result),			\
 	     "=Z" (*ptrp)			\
 	   : "r" (value) : "cr0");		\
-  (result & 0x20000000); })
+  (__macro_result & 0x20000000); })
 
 
 #ifdef __powerpc64__
 #define __stdcx(base, value) __extension__		\
-  ({unsigned long long result;				\
+  ({unsigned long long __macro_result;				\
     typedef  struct {char a[8];} doublewordsize;	\
     doublewordsize *ptrp = (doublewordsize*)(void*)(base);	\
   __asm__ ("stdcx. %2,%y1\n"				\
 	   "\tmfocrf %0,0x80"				\
-	   : "=r" (result),				\
+	   : "=r" (__macro_result),				\
 	     "=Z" (*ptrp)				\
 	   : "r" (value) : "cr0");			\
-  (result & 0x20000000); })
+  (__macro_result & 0x20000000); })
 #endif /* __powerpc64__ */
 
 #define __mffs() __extension__			\
-  ({double result;				\
-  __asm__ volatile ("mffs %0" : "=f" (result)); \
-  result; })
+  ({double __macro_result;				\
+  __asm__ volatile ("mffs %0" : "=f" (__macro_result)); \
+  __macro_result; })
 
 #define __mtfsf(mask,value) \
   __asm__ volatile ("mtfsf %0,%1" : : "n" (mask), "f" ((double) (value)))
@@ -398,11 +398,11 @@ typedef int __V4SI __attribute__((vector_size(16)));
 #define __mtfsb1(bit) __asm__ volatile ("mtfsb1 %0" : : "n" (bit))
 
 #define __setflm(v) __extension__	      \
-  ({double result;			      \
+  ({double __macro_result;			      \
   __asm__ volatile ("mffs %0\n\tmtfsf 255,%1" \
-		    : "=&f" (result)	      \
+		    : "=&f" (__macro_result)	      \
 		    : "f" ((double) (v)));    \
-  result; })
+  __macro_result; })
 
 /* __builtin_fabs may perform unnecessary rounding.  */
 

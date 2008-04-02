@@ -51,7 +51,8 @@ Software Foundation, 51 Franklin Street, Fifth Floor, Boston, MA
         break;                                               \
                                                              \
       case 2:                                                \
-        pp_scalar (PP, "%ll" F, va_arg (ARG, long long T));  \
+        pp_scalar (PP, "%" HOST_LONG_LONG_FORMAT F,          \
+                   va_arg (ARG, long long T));               \
         break;                                               \
                                                              \
       default:                                               \

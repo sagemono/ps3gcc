@@ -981,7 +981,8 @@ find_nodes_on_paths (sbitmap result, ddg_ptr g, sbitmap from, sbitmap to)
 	}
     }
 
-  answer = sbitmap_a_and_b_cg (result, reachable_from, reach_to);
+  sbitmap_a_and_b (result, reachable_from, reach_to);
+  answer = (sbitmap_first_set_bit (result) != -1);
   sbitmap_free (workset);
   sbitmap_free (reachable_from);
   sbitmap_free (reach_to);

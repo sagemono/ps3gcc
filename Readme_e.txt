@@ -1,5 +1,5 @@
 [SCE CONFIDENTIAL DOCUMENT]
-                    Copyright(C) 2006 Sony Computer Entertainment Inc.
+                    Copyright(C) 2008 Sony Computer Entertainment Inc.
                                                    All Rights Reserved.
 ======================================================================
 This package includes the source files of Cell OS Lv-2 toolchain.  When
@@ -13,7 +13,7 @@ install directory and the rebuild working directory by setting
 environment variables.  See comments in script files for details.
 Example:
     mkdir work/src
-    unzip toolchain-src-1.9.0-GCC411.zip -d work/src
+    unzip toolchain-src-2.2.0-GCC411.zip -d work/src
     mkdir work/build
     cd work/build
     ../src/build.sh

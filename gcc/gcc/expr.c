@@ -4172,6 +4172,10 @@ expand_assignment (tree to, tree from)
       return;
     }
 
+  /* Optimize away no-op moves without side-effects.  */
+  if (operand_equal_p (to, from, 0))
+    return;
+
   /* Assignment of a structure component needs special treatment
      if the structure component's rtx is not simply a MEM.
      Assignment of an array element at a constant index, and assignment of

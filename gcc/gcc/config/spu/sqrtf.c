@@ -27,10 +27,10 @@
 
 #include <spu_intrinsics.h>
 
+extern vector float __sqrtv4sf2 (vector float);
 
 #if 1
-/* Single precision accurate version.
- */
+/* Single precision accurate version.  */
 vec_float4 __sqrtv4sf2(vec_float4 in)
 {
   vec_uint4 exp, valid;

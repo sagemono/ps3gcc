@@ -912,4 +912,12 @@ Software Foundation, 51 Franklin Street, Fifth Floor, Boston, MA
 #endif
 /* CELL LOCAL End */
 
+#ifndef TARGET_EXTRA_PRINTF_FLAG_CHARS
+#define TARGET_EXTRA_PRINTF_FLAG_CHARS "I"
+#endif
+
+#ifndef TARGET_EXTRA_SCANF_FLAG_CHARS
+#define TARGET_EXTRA_SCANF_FLAG_CHARS "I"
+#endif
+
 #endif  /* ! GCC_DEFAULTS_H */

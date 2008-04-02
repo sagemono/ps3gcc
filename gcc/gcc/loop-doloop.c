@@ -155,6 +155,97 @@ doloop_condition_get (rtx doloop_pat)
   return 0;
 }
 
+/* Returns the loop termination condition for PATTERN or zero
+   if it is not a decrement and branch jump insn.  */
+
+rtx
+sms_condition_get (rtx doloop_pat)
+{
+  rtx cmp;
+  rtx inc;
+  rtx reg;
+  rtx inc_src;
+  rtx condition;
+  rtx pattern;
+
+  /* The canonical doloop pattern we expect is:
+
+     (parallel [(set (pc) (if_then_else (condition)
+                                        (label_ref (label))
+                                        (pc)))
+                (set (reg) (plus (reg) (const_int -1)))
+                (additional clobbers and uses)])
+
+     Some targets (IA-64) wrap the set of the loop counter in
+     an if_then_else too.
+
+     In summary, the branch must be the first entry of the
+     parallel (also required by jump.c), and the second
+     entry of the parallel must be a set of the loop counter
+h/     register.  */
+
+  pattern = PATTERN (doloop_pat);
+  if (GET_CODE (pattern) != PARALLEL)
+    {
+      cmp = pattern;
+      inc = PATTERN (PREV_INSN (doloop_pat));
+    }
+  else
+    {
+      cmp = XVECEXP (pattern, 0, 0);
+      inc = XVECEXP (pattern, 0, 1);
+    }
+
+  /* Check for (set (reg) (something)).  */
+  if (GET_CODE (inc) != SET)
+    return 0;
+  reg = SET_DEST (inc);
+  if (! REG_P (reg))
+    return 0;
+
+  /* Check if something = (plus (reg) (const_int -1)).
+     On IA-64, this decrement is wrapped in an if_then_else.  */
+  inc_src = SET_SRC (inc);
+  if (GET_CODE (inc_src) == IF_THEN_ELSE)
+    inc_src = XEXP (inc_src, 1);
+  if (GET_CODE (inc_src) != PLUS
+      || XEXP (inc_src, 0) != reg
+      || XEXP (inc_src, 1) != constm1_rtx)
+    return 0;
+
+  /* Check for (set (pc) (if_then_else (condition)
+                                       (label_ref (label))
+                                       (pc))).  */
+  if (GET_CODE (cmp) != SET
+      || SET_DEST (cmp) != pc_rtx
+      || GET_CODE (SET_SRC (cmp)) != IF_THEN_ELSE
+      || GET_CODE (XEXP (SET_SRC (cmp), 1)) != LABEL_REF
+      || XEXP (SET_SRC (cmp), 2) != pc_rtx)
+    return 0;
+
+  /* Extract loop termination condition.  */
+  condition = XEXP (SET_SRC (cmp), 0);
+
+  /* We expect a GE, NE or EQ comparison with 0 or 1.  */
+  if ((GET_CODE (condition) != GE
+       && GET_CODE (condition) != NE
+       && GET_CODE (condition) != EQ)
+       || (XEXP (condition, 1) != const0_rtx
+          && XEXP (condition, 1) != const1_rtx))
+    return 0;
+
+  if ((XEXP (condition, 0) == reg)
+      || (GET_CODE (XEXP (condition, 0)) == PLUS
+                  && XEXP (XEXP (condition, 0), 0) == reg))
+    return condition;
+
+  /* ??? If a machine uses a funny comparison, we could return a
+     canonicalized form here.  */
+
+  return 0;
+}
+
+
 /* Return nonzero if the loop specified by LOOP is suitable for
    the use of special low-overhead looping instructions.  DESC
    describes the number of iterations of the loop.  */

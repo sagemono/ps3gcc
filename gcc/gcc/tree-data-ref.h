@@ -252,6 +252,7 @@ struct data_dependence_relation
 
 
 
+extern void split_constant_offset (tree exp, tree *var, tree *off);
 extern tree find_data_references_in_loop (struct loop *, varray_type *);
 extern struct data_dependence_relation *initialize_data_dependence_relation 
 (struct data_reference *, struct data_reference *);

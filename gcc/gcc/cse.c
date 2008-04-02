@@ -6974,7 +6974,7 @@ pd_is_any_opnd_wider_const (rtx *exp)
   code = GET_CODE (x);
   if (code == CONST_INT &&
       ((unsigned HOST_WIDE_INT) (INTVAL (x)) >= 
-       (unsigned HOST_WIDE_INT) (1 << POINTER_SIZE)))
+       (unsigned HOST_WIDE_INT) (((unsigned HOST_WIDE_INT)1) << POINTER_SIZE)))
     return true;
  
   /* Recursively scan the operands of this expression.  */
@@ -7145,23 +7145,48 @@ pd_dataflow_analysis (pd_insn_info *pdinsns, struct df *df)
  */
 
 static bool
-pd_is_only_used_as_mem_reference (rtx reg, struct df *df)
+pd_is_only_used_as_mem_reference (rtx reg, rtx old, struct df *df)
 {
   struct df_link *use_link;
   rtx    use_ref;
   int    p = REGNO (reg);
+  int    o = REGNO (old);
+  rtx single;
   
-  if (df->regs[p].n_defs == 1 && df->regs[p].n_uses > 0) {
+  if (df->regs[p].n_defs != 1
+      || df->regs[p].n_uses <= 0)
+    return false;
+
+  if (df->regs[o].n_defs == 1)
+    {
+      /* If we have a zero_extend (subreg(reg)) where the subreg is
+	 promoted, then we can use the promoted reg.  If the modes are
+	 equal, then we can always use the old promoted register all
+	 the time even if it is not used as a memory reference. */
+      single = single_set (df->regs[o].defs->ref->insn);
+      if (single
+	  && GET_CODE (SET_SRC (single)) == SUBREG
+	  && SUBREG_PROMOTED_VAR_P (SET_SRC (single))
+	  && SUBREG_PROMOTED_UNSIGNED_P (SET_SRC (single)))
+	{
+	  rtx reg1 = SUBREG_REG (SET_SRC (single));
+	  if (GET_MODE (reg1) == GET_MODE (old))
+	    return true;
+	}
+    }
+
     for (use_link = df->regs[p].uses; use_link; use_link = use_link->next)
       {
-        /* For completeness, we also need to check the PARALLEL case */	
-        if (DF_REF_REG_MEM_STORE_P (use_link->ref) && 
-	    GET_CODE (PATTERN (use_link->ref->insn)) == SET)
-	  use_ref = SET_DEST (PATTERN (use_link->ref->insn));
-	else if (DF_REF_REG_MEM_LOAD_P (use_link->ref) &&
-		 GET_CODE (PATTERN (use_link->ref->insn)) == SET)
-	  use_ref = SET_SRC ( PATTERN(use_link->ref->insn));
-	else 
+	if (DF_REF_REG_MEM_STORE_P (use_link->ref)
+	    && single_set (use_link->ref->insn))
+	  use_ref = SET_DEST (single_set (use_link->ref->insn));
+	else if (DF_REF_REG_MEM_LOAD_P (use_link->ref)
+	         && single_set (use_link->ref->insn))
+	  use_ref = SET_SRC (single_set (use_link->ref->insn));
+	else
+	  return false;
+
+        if (GET_CODE (use_link->ref->insn) == CALL_INSN)
 	  return false;
 
 	if (GET_CODE (use_ref) == UNSPEC
@@ -7172,8 +7197,12 @@ pd_is_only_used_as_mem_reference (rtx reg, struct df *df)
 	while (use_ref && !MEM_P (use_ref)) 
 	  use_ref = XEXP (use_ref, 0);
 
-	if (!use_ref)
-	    return false;
+	if (!use_ref || !MEM_P (use_ref))
+	  return false;
+
+        /* Can't handle BLKmode. */
+        if (GET_MODE (use_ref) == BLKmode)
+	  return false;
 
 	/* direct memory reference: mem (p)  */
 	if (REG_P (XEXP (use_ref, 0)))
@@ -7189,13 +7218,7 @@ pd_is_only_used_as_mem_reference (rtx reg, struct df *df)
 	      continue;
 	  }  
 	return false;
-      }
     }
-  else 
-    {
-      return false;
-    }
-  
   return true;
 }
 
@@ -7211,23 +7234,124 @@ pd_rewrite_use_reg (rtx old, rtx new, struct df *df)
   rtx    use_ref;
   int    a = REGNO (old);
   int    b = REGNO (new);
+  FILE *dump = dump_file;
+
+  /* If we have a zero_extend (subreg(reg)) where the subreg is
+     promoted, then we can use the promoted reg. */
+  if (df->regs[b].n_defs == 1)
+    {
+      rtx single = single_set (df->regs[b].defs->ref->insn);
+      if (single
+	  && GET_CODE (SET_SRC (single)) == SUBREG
+	  && SUBREG_PROMOTED_VAR_P (SET_SRC (single))
+	  && SUBREG_PROMOTED_UNSIGNED_P (SET_SRC (single)))
+	{
+	  new = SUBREG_REG (SET_SRC (single));
+	  b = REGNO (new);
+	}
+    }
 
   for (use_link = df->regs[a].uses; use_link; use_link = use_link->next)
     {
+      if (GET_MODE (new) == GET_MODE (old))
+	{
+	  if (dump)
+	    {
+	      fprintf (dump, "replaced: ");
+	      print_rtl (dump, *use_link->ref->loc);
+	      fprintf (dump, " with ");
+	      print_rtl (dump, regno_reg_rtx[b]);
+	      fprintf (dump, " in ");
+	      print_rtl_single (dump, use_link->ref->insn);
+	      fprintf (dump, ".\n");
+	    }
+          *use_link->ref->loc = regno_reg_rtx[b];
+	  continue;
+	}
+
+      if (GET_CODE (use_link->ref->insn) == CALL_INSN)
+	{
+	  if (dump)
+            {
+	      fprintf (dump, "Call insn: ");
+	      print_rtl_single (dump, use_link->ref->insn);
+	      fprintf (dump, ".\n");
+	    }
+	  continue;
+	}
+
+      if (DF_REF_REG_MEM_STORE_P (use_link->ref)
+	  && single_set (use_link->ref->insn))
+        use_ref = SET_DEST (single_set (use_link->ref->insn));
+      else if (DF_REF_REG_MEM_LOAD_P (use_link->ref)
+	       && single_set (use_link->ref->insn))
+	use_ref = SET_SRC (single_set (use_link->ref->insn));
+      else
+	{
+	  if (dump)
+	    {
+	      fprintf (dump, "Not a store/load: ");
+	      print_rtl_single (dump, use_link->ref->insn);
+	      fprintf (dump, ".\n");
+	    }
+	  continue;
+	}
+
+      if (GET_CODE (use_ref) == UNSPEC
+	  || GET_CODE (use_ref) == UNSPEC_VOLATILE
+	  || GET_CODE (use_ref) == ASM_OPERANDS)
+	{
+	  if (dump)
+	    {
+	      fprintf (dump, "An unspec or an asm: ");
+	      print_rtl_single (dump, use_link->ref->insn);
+	      fprintf (dump, ".\n");
+	    }
+	  continue;
+	}
+
+      while (use_ref && !MEM_P (use_ref)) 
+	use_ref = XEXP (use_ref, 0);
+
+      if (!use_ref || !MEM_P (use_ref))
+ 	continue;
+
+      /* Can't handle BLKmode. */
+      if (GET_MODE (use_ref) == BLKmode)
+	continue;
+
+      /* direct memory reference: mem (p)  */
+      if (REG_P (XEXP (use_ref, 0)))
+	goto ok;
+	  
+      /* index memory reference:  mem (p + const) */
+      else if  (GET_CODE (XEXP (use_ref, 0)) == PLUS)
+	{
+	  use_ref = XEXP (use_ref, 0);
+
+	  if (REG_P (XEXP (use_ref, 0))
+	      && GET_CODE (XEXP (use_ref, 1)) == CONST_INT)
+	      goto ok;
+	}  
+      continue;
+
+ ok:
+      if (dump)
+        {
+	  fprintf (dump, "replaced: ");
+	  print_rtl (dump, *use_link->ref->loc);
+	  fprintf (dump, " with ");
+	  print_rtl (dump, regno_reg_rtx[b]);
+	  fprintf (dump, " in ");
+	  print_rtl_single (dump, use_link->ref->insn);
+	  fprintf (dump, ".\n");
+	}
       *use_link->ref->loc = regno_reg_rtx[b];
 
-      if (DF_REF_REG_MEM_STORE_P (use_link->ref))
-        use_ref = SET_DEST (PATTERN (use_link->ref->insn));
-
-      else if (DF_REF_REG_MEM_LOAD_P (use_link->ref))
-	use_ref = SET_SRC ( PATTERN(use_link->ref->insn));
-
-      while (!MEM_P (use_ref)) use_ref = XEXP (use_ref, 0);
-
       /* index memory reference format: mem (p + const). */
-      if  (GET_CODE  (XEXP (use_ref, 0)) == PLUS && 
-	   GET_MODE (XEXP (use_ref, 0)) == DImode)
-        PUT_MODE ((XEXP (use_ref, 0)), GET_MODE (new));
+      if  (GET_CODE  (use_ref) == PLUS && 
+	   GET_MODE (use_ref) == DImode)
+        PUT_MODE (use_ref, GET_MODE (new));
     }
 }
 
@@ -7241,22 +7365,28 @@ pd_rewrite_use_reg (rtx old, rtx new, struct df *df)
    enough.  This additional check is conserative and fixes the regression.  */
 
 static bool
-pd_def_ok (rtx reg, bool top_one, struct df *df)
+pd_def_ok (pd_insn_info *pdinsns, rtx reg, bool top_one, struct df *df, unsigned oldregn, int limit)
 {
-  int a;
+  unsigned a;
   struct df_link *defs_link;
+  limit --;
+  if (limit <= 0)
+    return false;
 
   /* If aggresive is requested, trust the user.  */
   if (flag_ptr_extension_reduction_really_agg)
     return true;
 
   if (GET_CODE (reg) != REG)
-    return true;
+    return false;
 
   a = REGNO (reg);
 
   if (a < FIRST_PSEUDO_REGISTER)
     return false;
+
+  if (oldregn == a)
+    return true;
 
   if (df->regs[a].n_defs == 0)
     return true;
@@ -7277,7 +7407,7 @@ pd_def_ok (rtx reg, bool top_one, struct df *df)
          to make sure we don't go into an infinite loop. */
       if (top_one
 	  && GET_CODE (r) == REG
-	  && pd_def_ok (r, false, df))
+	  && pd_def_ok (pdinsns, r, false, df, a, limit))
 	continue;
 
       /* For Subregs, check if they are promoted unsigned.  */
@@ -7285,6 +7415,33 @@ pd_def_ok (rtx reg, bool top_one, struct df *df)
 	  && SUBREG_PROMOTED_VAR_P (r)
 	  && SUBREG_PROMOTED_UNSIGNED_P (r))
         continue;
+
+      /* For mem loads, we just have to check if the load is zero
+	 extended. */
+      if (GET_CODE (r) == MEM)
+ 	{
+	  if (LOAD_EXTEND_OP (GET_MODE (r)) == ZERO_EXTEND)
+	    continue;
+	}
+
+     /* Assume that if we have a PLUS with a constant
+ 	operand, that we can do this optimization if the
+	other operand is ok. */
+     if (GET_CODE (r) == PLUS)
+	{
+	  if (GET_CODE (XEXP (r, 1)) == CONST_INT
+	      && GET_CODE (XEXP (r, 0)) == REG
+	      && ((HOST_WIDE_INT)INTVAL (XEXP (r, 1))) > 0)
+	    {
+	      rtx reg1 = XEXP (r, 0);
+	      if (reg1 == reg)
+		continue;
+	      if (REGNO (reg1) == oldregn)
+		continue;
+	      if (pd_def_ok (pdinsns, reg1, true, df, a, limit))
+		continue;
+	    }
+	}
 
 #if 0
       /* For PLUS/MINUS, we would like to handle signed_ext+signed_ext but this needs some more thought, it
@@ -7313,6 +7470,7 @@ pd_ext_insn_reduction (pd_insn_info *pdinsns, struct df *df)
   rtx insn;
   rtx first_insn = get_insns();
   rtx last_insn = get_last_insn();
+  FILE *dump = dump_file;
 
   if (ptr_mode != Pmode) 
     {
@@ -7326,19 +7484,66 @@ pd_ext_insn_reduction (pd_insn_info *pdinsns, struct df *df)
 	      rtx def_reg = SET_DEST (PATTERN (insn));
 	      rtx use_reg = XEXP (SET_SRC (PATTERN (insn)), 0);
 
-	      /* If the source of the ext-insn is clean, and the target is 
+	      /* If the source of the ext-insn is  insn, clean, and the target is 
                  ultimately referenced as mem, then the insn is a candidate 
 		 for reduction */
-	      if (!bitmap_bit_p (pdinsns[INSN_UID(insn)].live_pd, 
-				 REGNO (use_reg))
-		  && pd_is_only_used_as_mem_reference (def_reg, df)
-		  && pd_def_ok (use_reg, true, df))
-		{		    
-		  pd_rewrite_use_reg(def_reg, use_reg, df);
-		  delete_insn (insn);
-		}
-	    }    
 
+	      if (df->regs[REGNO (def_reg)].n_defs != 1
+		  || df->regs[REGNO (def_reg)].n_uses <= 0)
+		{
+		  if (dump)
+		    {
+		      fprintf (dump, "rejected (more than one def or no uses):\n");
+		      print_rtl (dump, def_reg);
+		      print_rtl (dump, use_reg);
+		      fprintf (dump, "\n");
+		    }
+		  goto end;
+		}
+	      if (bitmap_bit_p (pdinsns [INSN_UID (insn)].live_pd, 
+				   REGNO (use_reg)))
+		{
+		  if (dump)
+		    {
+		      fprintf (dump, "\nrejected (not safe):\n");
+		      print_rtl (dump, def_reg);
+		      print_rtl (dump, use_reg);
+		      fprintf (dump, "\n");
+		    }
+		  goto end;
+		}
+	      if (!pd_is_only_used_as_mem_reference (def_reg, use_reg, df))
+		{
+		  if (dump)
+		    {
+		      fprintf (dump, "\nrejected (used in more than mem references):\n");
+		      print_rtl (dump, def_reg);
+		      print_rtl (dump, use_reg);
+		      fprintf (dump, "\n");
+		    }
+		  goto end;
+		}
+	      if (!pd_def_ok (pdinsns, use_reg, true, df, -1, 4))
+		{
+		  if (dump)
+		    {
+		      fprintf (dump, "\nrejected (have issues with being removed):\n");
+		      print_rtl (dump, def_reg);
+		      print_rtl (dump, use_reg);
+		      fprintf (dump, "\n");
+		    }
+		  goto end;
+		}
+	      if (dump)
+		{
+	          fprintf (dump, "\naccepted:\n");
+	          print_rtl (dump, def_reg);
+	          print_rtl (dump, use_reg);
+	          fprintf (dump, "\n");
+		}
+	      pd_rewrite_use_reg (def_reg, use_reg, df);
+	    }    
+end:
           insn = next_insn;
 	}
     }
@@ -8396,6 +8601,9 @@ rest_of_handle_cse (void)
 {
   int tem;
 
+  if (dump_file)
+    dump_flow_info (dump_file);
+
   /* TRANSMETA LOCAL Begin */
   /*
     An optimization to remove 32ILP-ABI overhead. 
@@ -8422,12 +8630,35 @@ rest_of_handle_cse (void)
 #endif
   /* TRANSMETA LOCAL End */
 
-  if (dump_file)
-    dump_flow_info (dump_file);
-
   reg_scan (get_insns (), max_reg_num ());
 
   tem = cse_main (get_insns (), max_reg_num (), dump_file);
+
+  /* TRANSMETA LOCAL Begin */
+  /*
+    An optimization to remove 32ILP-ABI overhead. 
+    zero-extension instructions which are following pointer arithmetic 
+    instructions are removed.
+  */
+
+#ifdef POINTERS_EXTEND_UNSIGNED
+  if (flag_ptr_extension_reduction_agg)
+    {  
+      struct df *df;
+      pd_insn_info *pdinsns;
+
+      df = df_init ();
+      df_analyze (df, 0, DF_ALL | DF_HARD_REGS);
+      pdinsns = pd_insn_table_realloc ();
+
+      pd_dataflow_analysis (pdinsns, df);
+      pd_ext_insn_reduction (pdinsns, df);
+      pd_free_insn_table (pdinsns);
+
+      df_finish (df);
+    }
+#endif
+  /* TRANSMETA LOCAL End */
   if (tem)
     rebuild_jump_labels (get_insns ());
   if (purge_all_dead_edges ())
@@ -8481,6 +8712,35 @@ rest_of_handle_cse2 (void)
     dump_flow_info (dump_file);
 
   tem = cse_main (get_insns (), max_reg_num (), dump_file);
+
+#if 0
+  /* FIXME it is not safe to run removal of zero extend after loop.c. */
+  /* TRANSMETA LOCAL Begin */
+  /*
+    An optimization to remove 32ILP-ABI overhead. 
+    zero-extension instructions which are following pointer arithmetic 
+    instructions are removed.
+  */
+
+#ifdef POINTERS_EXTEND_UNSIGNED
+  if (flag_ptr_extension_reduction_agg)
+    {  
+      struct df *df;
+      pd_insn_info *pdinsns;
+
+      df = df_init ();
+      df_analyze (df, 0, DF_ALL | DF_HARD_REGS);
+      pdinsns = pd_insn_table_realloc ();
+
+      pd_dataflow_analysis (pdinsns, df);
+      pd_ext_insn_reduction (pdinsns, df);
+      pd_free_insn_table (pdinsns);
+
+      df_finish (df);
+    }
+#endif
+  /* TRANSMETA LOCAL End */
+#endif
 
   /* Run a pass to eliminate duplicated assignments to condition code
      registers.  We have to run this after bypass_jumps, because it

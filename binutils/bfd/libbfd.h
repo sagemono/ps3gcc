@@ -549,6 +549,10 @@ extern bfd_reloc_status_type _bfd_final_link_relocate
 extern bfd_reloc_status_type _bfd_relocate_contents
   (reloc_howto_type *, bfd *, bfd_vma, bfd_byte *);
 
+/* Clear a given location using a given howto.  */
+extern void _bfd_clear_contents (reloc_howto_type *howto, bfd *input_bfd,
+				 bfd_byte *location);
+
 /* Link stabs in sections in the first pass.  */
 
 extern bfd_boolean _bfd_link_section_stabs
@@ -928,6 +932,18 @@ static const char *const bfd_reloc_code_real_names[] = { "@@uninitialized@@",
   "BFD_RELOC_SPARC_TLS_DTPOFF64",
   "BFD_RELOC_SPARC_TLS_TPOFF32",
   "BFD_RELOC_SPARC_TLS_TPOFF64",
+  "BFD_RELOC_SPU_IMM7",
+  "BFD_RELOC_SPU_IMM8",
+  "BFD_RELOC_SPU_IMM10",
+  "BFD_RELOC_SPU_IMM10W",
+  "BFD_RELOC_SPU_IMM16",
+  "BFD_RELOC_SPU_IMM16W",
+  "BFD_RELOC_SPU_IMM18",
+  "BFD_RELOC_SPU_PCREL9a",
+  "BFD_RELOC_SPU_PCREL9b",
+  "BFD_RELOC_SPU_PCREL16",
+  "BFD_RELOC_SPU_LO16",
+  "BFD_RELOC_SPU_HI16",
   "BFD_RELOC_ALPHA_GPDISP_HI16",
   "BFD_RELOC_ALPHA_GPDISP_LO16",
   "BFD_RELOC_ALPHA_GPDISP",
@@ -1818,18 +1834,6 @@ static const char *const bfd_reloc_code_real_names[] = { "@@uninitialized@@",
   "BFD_RELOC_860_HIGH",
   "BFD_RELOC_860_HIGOT",
   "BFD_RELOC_860_HIGOTOFF",
-  "BFD_RELOC_SPU_IMM7",
-  "BFD_RELOC_SPU_IMM8",
-  "BFD_RELOC_SPU_IMM10",
-  "BFD_RELOC_SPU_IMM10W",
-  "BFD_RELOC_SPU_IMM16",
-  "BFD_RELOC_SPU_IMM16W",
-  "BFD_RELOC_SPU_IMM18",
-  "BFD_RELOC_SPU_PCREL9a",
-  "BFD_RELOC_SPU_PCREL9b",
-  "BFD_RELOC_SPU_PCREL16",
-  "BFD_RELOC_SPU_LO16",
-  "BFD_RELOC_SPU_HI16",
   "BFD_RELOC_OPENRISC_ABS_26",
   "BFD_RELOC_OPENRISC_REL_26",
   "BFD_RELOC_H8_DIR16A8",

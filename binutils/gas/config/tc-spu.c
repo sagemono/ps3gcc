@@ -21,11 +21,9 @@
    Software Foundation, 51 Franklin Street, Fifth Floor, Boston, MA
    02110-1301, USA.  */
 
-
 #include "as.h"
 #include "safe-ctype.h"
 #include "subsegs.h"
-#include "opcode/spu.h"
 #include "dwarf2dbg.h" 
 
 const struct spu_opcode spu_opcodes[] = {
@@ -52,11 +50,12 @@ struct spu_insn
   enum spu_insns tag;
 };
 
-static const char *get_imm PARAMS ((const char *param, struct spu_insn *insn, int arg));
-static const char *get_reg PARAMS ((const char *param, struct spu_insn *insn, int arg, int accept_expr));
-
-static int calcop PARAMS ((struct spu_opcode *format,
-			   const char *param, struct spu_insn *insn));
+static const char *get_imm (const char *param, struct spu_insn *insn, int arg);
+static const char *get_reg (const char *param, struct spu_insn *insn, int arg,
+			    int accept_expr);
+static int calcop (struct spu_opcode *format, const char *param,
+		   struct spu_insn *insn);
+static void spu_cons (int);
 
 extern char *myname;
 static struct hash_control *op_hash = NULL;
@@ -85,25 +84,30 @@ const char FLT_CHARS[] = "dDfF";
 const pseudo_typeS md_pseudo_table[] =
 {
   {"align", s_align_ptwo, 4},
+  {"bss", s_lcomm_bytes, 1},
   {"def", s_set, 0},
   {"dfloat", float_cons, 'd'},
   {"ffloat", float_cons, 'f'},
   {"global", s_globl, 0},
   {"half", cons, 2},
-  {"bss", s_lcomm_bytes, 1},
+  {"int", spu_cons, 4},
+  {"long", spu_cons, 4},
+  {"quad", spu_cons, 8},
   {"string", stringer, 1},
-  {"word", cons, 4},
-  {"eqv", NULL, 0},
+  {"word", spu_cons, 4},
   /* Force set to be treated as an instruction.  */
   {"set", NULL, 0},
   {".set", s_set, 0},
+  /* Likewise for eqv.  */
+  {"eqv", NULL, 0},
+  {".eqv", s_set, -1},
   {"file", (void (*) PARAMS ((int))) dwarf2_directive_file, 0 }, 
   {"loc", dwarf2_directive_loc, 0}, 
   {0,0,0}
 };
 
 void
-md_begin ()
+md_begin (void)
 {
   const char *retval = NULL;
   int i;
@@ -126,10 +130,12 @@ md_begin ()
     }
 }
 
-CONST char *md_shortopts = "";
+const char *md_shortopts = "";
 struct option md_longopts[] = {
 #define OPTION_APUASM (OPTION_MD_BASE)
   {"apuasm", no_argument, NULL, OPTION_APUASM},
+#define OPTION_WARN_STOP0 (OPTION_MD_BASE+1)
+  {"mwarn-stop0", no_argument, NULL, OPTION_WARN_STOP0},
   { NULL, no_argument, NULL, 0 }
 };
 size_t md_longopts_size = sizeof (md_longopts);
@@ -139,22 +145,24 @@ size_t md_longopts_size = sizeof (md_longopts);
  * immediate values. */
 static int emulate_apuasm;
 
+/* Don't warn when the user uses "stop" or "stop 0".   The architecture
+ * recommends reserving those as */
+static int warn_stop0;
+
 int
-md_parse_option (c, arg)
-     int c;
-     char *arg ATTRIBUTE_UNUSED;
+md_parse_option (int c, char *arg ATTRIBUTE_UNUSED)
 {
   switch(c)
   {
   case OPTION_APUASM:  emulate_apuasm = 1; break;
+  case OPTION_WARN_STOP0:  warn_stop0 = 1; break;
   default: return 0;
   }
   return 1;
 }
 
 void
-md_show_usage (stream)
-     FILE *stream;
+md_show_usage (FILE *stream)
 {
   fputs (_("\
 SPU options:\n\
@@ -171,6 +179,7 @@ struct arg_encode {
   int wlo, whi;
   bfd_reloc_code_real_type reloc;
 };
+
 static struct arg_encode arg_encode[A_MAX] = {
   {  7,  0, 0,       0,    127,    0,   -1,  0 }, /* A_T */
   {  7,  7, 0,       0,    127,    0,   -1,  0 }, /* A_A */
@@ -205,7 +214,7 @@ static struct arg_encode arg_encode[A_MAX] = {
 /* Some flags for handling errors.  This is very hackish and added after
  * the fact. */
 static int syntax_error_arg;
-static char * syntax_error_param;
+static const char *syntax_error_param;
 static int syntax_reg;
 
 static char *
@@ -214,6 +223,7 @@ insn_fmt_string(struct spu_opcode *format)
   static char buf[64];
   int len = 0;
   int i;
+
   len += sprintf (&buf[len], "%s\t", format->mnemonic);
     for (i = 1; i <= format->arg[0]; i++)
       {
@@ -236,8 +246,7 @@ insn_fmt_string(struct spu_opcode *format)
 }
 
 void
-md_assemble (op)
-     char *op;
+md_assemble (char *op)
 {
   char *param, *thisfrag;
   char c;
@@ -268,7 +277,6 @@ md_assemble (op)
   while (1)
     {
       /* try parsing this instruction into insn */
-
       for (i = 0; i < MAX_RELOCS; i++)
       {
 	  insn.exp[i].X_add_symbol = 0;
@@ -293,6 +301,7 @@ md_assemble (op)
       else
 	{
 	  int parg = format[0].arg[syntax_error_arg-1];
+
 	  as_fatal (_("Error in argument %d.  Expecting:  \"%s\""),
 		    syntax_error_arg - (parg == A_P),
 		    insn_fmt_string(format));
@@ -300,6 +309,9 @@ md_assemble (op)
 	}
     }
 
+  if (warn_stop0 && insn.opcode == 0
+      && (insn.tag == M_STOP || insn.tag == M_STOP2))
+    as_warn (_("Recommend using a non-zero argument to 'stop'."));
   if ((syntax_reg & 4)
       && ! (insn.tag == M_RDCH
 	    || insn.tag == M_RCHCNT
@@ -307,7 +319,7 @@ md_assemble (op)
     as_warn (_("Mixing register syntax, with and without '$'."));
   if (syntax_error_param)
     {
-      char *d = syntax_error_param;
+      const char *d = syntax_error_param;
       while (*d != '$')
 	d--;
       as_warn (_("Treating '%-*s' as a symbol."), (int)(syntax_error_param-d), d);
@@ -326,28 +338,29 @@ md_assemble (op)
         fixS *fixP;
         bfd_reloc_code_real_type reloc = arg_encode[insn.reloc_arg[i]].reloc;
 	int pcrel = 0;
-        if (reloc == BFD_RELOC_SPU_PCREL9a
+
+	if (reloc == BFD_RELOC_SPU_PCREL9a
 	    || reloc == BFD_RELOC_SPU_PCREL9b
-            || reloc == BFD_RELOC_SPU_PCREL16)
+	    || reloc == BFD_RELOC_SPU_PCREL16)
 	  pcrel = 1;
-	if (insn.flag[i] & 1) reloc = BFD_RELOC_SPU_HI16;
-	else if (insn.flag[i] & 2) reloc = BFD_RELOC_SPU_LO16;
+	if (insn.flag[i] == 1)
+	  reloc = BFD_RELOC_SPU_HI16;
+	else if (insn.flag[i] == 2)
+	  reloc = BFD_RELOC_SPU_LO16;
 	fixP = fix_new_exp (frag_now,
 			    thisfrag - frag_now->fr_literal,
 			    4,
 			    &insn.exp[i],
 			    pcrel,
 			    reloc);
-	fixP->tc_fix_data = insn.reloc_arg[i];
+	fixP->tc_fix_data.arg_format = insn.reloc_arg[i];
+	fixP->tc_fix_data.insn_tag = insn.tag;
       }
   dwarf2_emit_insn(4);
 }
 
 static int
-calcop (format, param, insn)
-     struct spu_opcode *format;
-     const char *param;
-     struct spu_insn *insn;
+calcop (struct spu_opcode *format, const char *param, struct spu_insn *insn)
 {
   int i;
   int paren = 0;
@@ -365,7 +378,7 @@ calcop (format, param, insn)
       if (arg < A_P)
         param = get_reg (param, insn, arg, 1);
       else if (arg > A_P)
-        param = get_imm (param, insn,  arg);
+        param = get_imm (param, insn, arg);
       else if (arg == A_P)
 	{
 	  paren++;
@@ -402,19 +415,23 @@ calcop (format, param, insn)
 }
 
 struct reg_name {
-    int  regno;
-    int  length;
+    unsigned int regno;
+    unsigned int length;
     char name[32];
 };
+
 #define REG_NAME(NO,NM) { NO, sizeof(NM)-1, NM }
+
 static struct reg_name reg_name[] = {
     REG_NAME(0, "lr"),  /* link register */
     REG_NAME(1, "sp"),  /* stack pointer */
     REG_NAME(0, "rp"),  /* link register */
     REG_NAME(127, "fp"),  /* frame pointer */
 };
+
 static struct reg_name sp_reg_name[] = {
 };
+
 static struct reg_name ch_reg_name[] = {
     REG_NAME(  0, "SPU_RdEventStat"),
     REG_NAME(  1, "SPU_WrEventMask"),
@@ -449,11 +466,7 @@ static struct reg_name ch_reg_name[] = {
 #undef REG_NAME
 
 static const char *
-get_reg (param, insn, arg, accept_expr)
-     const char *param;
-     struct spu_insn *insn;
-     int arg;
-     int accept_expr;
+get_reg (const char *param, struct spu_insn *insn, int arg, int accept_expr)
 {
   unsigned regno;
   int saw_prefix = 0;
@@ -488,7 +501,7 @@ get_reg (param, insn, arg, accept_expr)
   else
     {
       struct reg_name *rn;
-      unsigned int i, n; int l = 0;
+      unsigned int i, n, l = 0;
 
       if (arg == A_H) /* Channel */
 	{
@@ -525,6 +538,7 @@ get_reg (param, insn, arg, accept_expr)
       syntax_reg |= saw_prefix ? 1 : 2;
       return param;
     }
+
   if (accept_expr)
     {
       char *save_ptr;
@@ -544,44 +558,42 @@ get_reg (param, insn, arg, accept_expr)
 }
 
 static const char *
-get_imm (param, insn, arg)
-     const char *param;
-     struct spu_insn *insn;
-     int arg;
+get_imm (const char *param, struct spu_insn *insn, int arg)
 {
   int val;
   char *save_ptr;
   int low = 0, high = 0;
   int reloc_i = insn->reloc_arg[0] >= 0 ? 1 : 0;
 
-  if (strncmp(param, "%lo(", 4) == 0)
+  if (strncasecmp (param, "%lo(", 4) == 0)
   {
       param += 3;
       low = 1;
       as_warn (_("Using old style, %%lo(expr), please change to PPC style, expr@l."));
   }
-  else if (strncmp(param, "%hi(", 4) == 0)
+  else if (strncasecmp (param, "%hi(", 4) == 0)
   {
       param += 3;
       high = 1;
       as_warn (_("Using old style, %%hi(expr), please change to PPC style, expr@h."));
   }
-  else if (strncmp(param, "%pic(", 5) == 0)
+  else if (strncasecmp (param, "%pic(", 5) == 0)
   {
       /* Currently we expect %pic(expr) == expr, so do nothing here.
-       * i.e. for code loaded at address 0 $toc will be 0.  */
+	 i.e. for code loaded at address 0 $toc will be 0.  */
       param += 4;
   }
       
   if (*param == '$')
     {
       /* Symbols can start with $, but if this symbol matches a register
-       * name, it's probably a mistake.   The only way to avoid this
-       * warning is to rename the symbol.  */
+	 name, it's probably a mistake.  The only way to avoid this
+	 warning is to rename the symbol.  */
       struct spu_insn tmp_insn;
-      const char *np;
-      if ((np = get_reg (param, &tmp_insn, arg, 0)))
-	syntax_error_param = (char *)np;
+      const char *np = get_reg (param, &tmp_insn, arg, 0);
+
+      if (np)
+	syntax_error_param = np;
     }
       
   save_ptr = input_line_pointer;
@@ -591,7 +603,7 @@ get_imm (param, insn, arg)
   input_line_pointer = save_ptr;
 
   /* Similar to ppc_elf_suffix in tc-ppc.c.  We have so few cases to
-   * handle we do it inlined here. */
+     handle we do it inlined here. */
   if (param[0] == '@' && !ISALNUM(param[2]) && param[2] != '@')
     {
       if (param[1] == 'h' || param[1] == 'H')
@@ -606,10 +618,10 @@ get_imm (param, insn, arg)
 	}
     }
 
-  val = insn->exp[reloc_i].X_add_number;
-
   if (insn->exp[reloc_i].X_op == O_constant)
     {
+      val = insn->exp[reloc_i].X_add_number;
+
       if (emulate_apuasm)
 	{
 	  /* Convert the value to a format we expect. */ 
@@ -631,10 +643,13 @@ get_imm (param, insn, arg)
 	int lo = arg_encode[arg].lo;
 	int whi = arg_encode[arg].whi;
 	int wlo = arg_encode[arg].wlo;
+
 	if (hi > lo && (val < lo || val > hi))
-	  as_fatal (_("Constant expression %d out of range, [%d, %d]."), val, lo, hi);
+	  as_fatal (_("Constant expression %d out of range, [%d, %d]."),
+		    val, lo, hi);
 	else if (whi > wlo && (val < wlo || val > whi))
-	  as_warn (_("Constant expression %d out of range, [%d, %d]."), val, wlo, whi);
+	  as_warn (_("Constant expression %d out of range, [%d, %d]."),
+		   val, wlo, whi);
 	/* begin sce local bugzilla 17242 */
 	if (arg == A_S14 && (val & 0xf) != 0)
 	  as_warn (_("lqd/stqd offset value is not multiple of 16."));
@@ -650,29 +665,22 @@ get_imm (param, insn, arg)
       if (arg == A_S11 || arg == A_S11I)
 	insn->opcode |= ((val >> 2) & 0x7f);
 
-      insn->opcode |= ((val >> arg_encode[arg].rshift)
+      insn->opcode |= (((val >> arg_encode[arg].rshift)
 	                & ((1<<arg_encode[arg].size)-1))
- 	              << arg_encode[arg].pos;
+		       << arg_encode[arg].pos);
       insn->reloc_arg[reloc_i] = -1;
       insn->flag[reloc_i] = 0;
     }
   else
     {
       insn->reloc_arg[reloc_i] = arg;
-      if (high) insn->flag[reloc_i] |= 1;
-      if (low)  insn->flag[reloc_i] |= 2;
+      if (high)
+	insn->flag[reloc_i] = 1;
+      else if (low)
+	insn->flag[reloc_i] = 2;
     }
 
   return param;
-}
-
-void
-md_number_to_chars (buf, val, nbytes)
-     char *buf;
-     valueT val;
-     int nbytes;
-{
-  number_to_chars_bigendian (buf, val, nbytes);
 }
 
 #define MAX_LITTLENUMS 6
@@ -682,10 +690,7 @@ md_number_to_chars (buf, val, nbytes)
    emitted is stored in *sizeP .  An error message is returned, or NULL on OK.
  */
 char *
-md_atof (type, litP, sizeP)
-     char type;
-     char *litP;
-     int *sizeP;
+md_atof (int type, char *litP, int *sizeP)
 {
   int prec;
   LITTLENUM_TYPE words[MAX_LITTLENUMS];
@@ -735,14 +740,15 @@ md_atof (type, litP, sizeP)
   return 0;
 }
 
+#ifndef WORKING_DOT_WORD
 int md_short_jump_size = 4;
 
 void
-md_create_short_jump (ptr, from_addr, to_addr, frag, to_symbol)
-     char *ptr;
-     addressT from_addr ATTRIBUTE_UNUSED, to_addr ATTRIBUTE_UNUSED;
-     fragS *frag;
-     symbolS *to_symbol;
+md_create_short_jump (char *ptr,
+		      addressT from_addr ATTRIBUTE_UNUSED,
+		      addressT to_addr ATTRIBUTE_UNUSED,
+		      fragS *frag,
+		      symbolS *to_symbol)
 {
   ptr[0] = (char) 0xc0;
   ptr[1] = 0x00;
@@ -760,11 +766,11 @@ md_create_short_jump (ptr, from_addr, to_addr, frag, to_symbol)
 int md_long_jump_size = 4;
 
 void
-md_create_long_jump (ptr, from_addr, to_addr, frag, to_symbol)
-     char *ptr;
-     addressT from_addr ATTRIBUTE_UNUSED, to_addr ATTRIBUTE_UNUSED;
-     fragS *frag;
-     symbolS *to_symbol;
+md_create_long_jump (char *ptr,
+		     addressT from_addr ATTRIBUTE_UNUSED,
+		     addressT to_addr ATTRIBUTE_UNUSED,
+		     fragS *frag,
+		     symbolS *to_symbol)
 {
   ptr[0] = (char) 0xc0;
   ptr[1] = 0x00;
@@ -778,23 +784,68 @@ md_create_long_jump (ptr, from_addr, to_addr, frag, to_symbol)
 	   0,
 	   BFD_RELOC_SPU_PCREL16);
 }
+#endif
+
+/* Support @ppu on symbols referenced in .int/.long/.word/.quad.  */
+static void
+spu_cons (int nbytes)
+{
+  expressionS exp;
+
+  if (is_it_end_of_statement ())
+    {
+      demand_empty_rest_of_line ();
+      return;
+    }
+
+  do
+    {
+      deferred_expression (&exp);
+      if ((exp.X_op == O_symbol
+	   || exp.X_op == O_constant)
+	  && strncasecmp (input_line_pointer, "@ppu", 4) == 0)
+	{
+	  char *p = frag_more (nbytes);
+	  enum bfd_reloc_code_real reloc;
+
+	  /* Check for identifier@suffix+constant.  */
+	  input_line_pointer += 4;
+	  if (*input_line_pointer == '-' || *input_line_pointer == '+')
+	    {
+	      expressionS new_exp;
+
+	      expression (&new_exp);
+	      if (new_exp.X_op == O_constant)
+		exp.X_add_number += new_exp.X_add_number;
+	    }
+
+	  reloc = nbytes == 4 ? BFD_RELOC_SPU_PPU32 : BFD_RELOC_SPU_PPU64;
+	  fix_new_exp (frag_now, p - frag_now->fr_literal, nbytes,
+		       &exp, 0, reloc);
+	}
+      else
+	emit_expr (&exp, nbytes);
+    }
+  while (*input_line_pointer++ == ',');
+
+  /* Put terminator back into stream.  */
+  input_line_pointer--;
+  demand_empty_rest_of_line ();
+}
 
 int
-md_estimate_size_before_relax (fragP, segment_type)
-     fragS *fragP ATTRIBUTE_UNUSED;
-     segT segment_type ATTRIBUTE_UNUSED;
+md_estimate_size_before_relax (fragS *fragP ATTRIBUTE_UNUSED,
+			       segT segment_type ATTRIBUTE_UNUSED)
 {
   as_fatal (_("Relaxation should never occur"));
-  return (-1);
+  return -1;
 }
 
 /* If while processing a fixup, a reloc really needs to be created,
    then it is done here.  */
 
 arelent *
-tc_gen_reloc (seg, fixp)
-     asection *seg ATTRIBUTE_UNUSED;
-     fixS *fixp;
+tc_gen_reloc (asection *seg ATTRIBUTE_UNUSED, fixS *fixp)
 {
   arelent *reloc;
   reloc = (arelent *) xmalloc (sizeof (arelent));
@@ -803,6 +854,8 @@ tc_gen_reloc (seg, fixp)
       *reloc->sym_ptr_ptr = symbol_get_bfdsym (fixp->fx_addsy);
   else if (fixp->fx_subsy)
       *reloc->sym_ptr_ptr = symbol_get_bfdsym (fixp->fx_subsy);
+  else
+    abort ();
   reloc->address = fixp->fx_frag->fr_address + fixp->fx_where;
   reloc->howto = bfd_reloc_type_lookup (stdoutput, fixp->fx_r_type);
   if (reloc->howto == (reloc_howto_type *) NULL)
@@ -819,9 +872,7 @@ tc_gen_reloc (seg, fixp)
 /* Round up a section's size to the appropriate boundary.  */
 
 valueT
-md_section_align (seg, size)
-     segT seg;
-     valueT size;
+md_section_align (segT seg, valueT size)
 {
   int align = bfd_get_section_alignment (stdoutput, seg);
   valueT mask = ((valueT) 1 << align) - 1;
@@ -833,26 +884,15 @@ md_section_align (seg, size)
    are calculated from the beginning of the branch instruction.  */
 
 long
-md_pcrel_from (fixp)
-     fixS *fixp;
+md_pcrel_from (fixS *fixp)
 {
-  switch (fixp->fx_r_type)
-    {
-    case BFD_RELOC_SPU_PCREL9a:
-    case BFD_RELOC_SPU_PCREL9b:
-    case BFD_RELOC_SPU_PCREL16:
       return fixp->fx_frag->fr_address + fixp->fx_where;
-    default:
-      abort ();
-    }
-  /*NOTREACHED*/
 }
 
 /* Fill in rs_align_code fragments.  */
 
 void
-spu_handle_align (fragp)
-     fragS *fragp;
+spu_handle_align (fragS *fragp)
 {
   static const unsigned char nop_pattern[8] = {
       0x40, 0x20, 0x00, 0x00, /* even nop */
@@ -892,72 +932,116 @@ void
 md_apply_fix (fixS *fixP, valueT * valP, segT seg ATTRIBUTE_UNUSED)
 {
   unsigned int res;
-  long val = (long)*valP;
+  valueT val = *valP;
   char *place = fixP->fx_where + fixP->fx_frag->fr_literal;
+
+  if (fixP->fx_subsy != (symbolS *) NULL)
+    {
+      /* We can't actually support subtracting a symbol.  */
+      as_bad_where (fixP->fx_file, fixP->fx_line, _("expression too complex"));
+    }
 
   if (fixP->fx_addsy != NULL)
     {
-      /* Hack around bfd_install_relocation brain damage.  */
       if (fixP->fx_pcrel)
-	val += fixP->fx_frag->fr_address + fixP->fx_where;
+	{
+	  /* Hack around bfd_install_relocation brain damage.  */
+	  val += fixP->fx_frag->fr_address + fixP->fx_where;
+
+	  switch (fixP->fx_r_type)
+	    {
+	    case BFD_RELOC_32:
+	      fixP->fx_r_type = BFD_RELOC_32_PCREL;
+	      break;
+
+	    case BFD_RELOC_SPU_PCREL16:
+	    case BFD_RELOC_SPU_PCREL9a:
+	    case BFD_RELOC_SPU_PCREL9b:
+	    case BFD_RELOC_32_PCREL:
+	      break;
+
+	    default:
+	      as_bad_where (fixP->fx_file, fixP->fx_line,
+			    _("expression too complex"));
+	      break;
+	    }
+	}
     }
 
   fixP->fx_addnumber = val;
+
+  if (fixP->fx_r_type == BFD_RELOC_SPU_PPU32
+      || fixP->fx_r_type == BFD_RELOC_SPU_PPU64)
+    return;
 
   if (fixP->fx_addsy == NULL && fixP->fx_pcrel == 0)
     {
       fixP->fx_done = 1;
       res = 0;
-      if (fixP->tc_fix_data > A_P)
+      if (fixP->tc_fix_data.arg_format > A_P)
 	{
-	  int hi = arg_encode[fixP->tc_fix_data].hi;
-	  int lo = arg_encode[fixP->tc_fix_data].lo;
-	  if (hi > lo && (val < lo || val > hi))
+	  int hi = arg_encode[fixP->tc_fix_data.arg_format].hi;
+	  int lo = arg_encode[fixP->tc_fix_data.arg_format].lo;
+	  if (hi > lo && ((offsetT) val < lo || (offsetT) val > hi))
 	    as_bad_where (fixP->fx_file, fixP->fx_line,
-			  "Relocation doesn't fit. (relocation value = 0x%x)",
-			  (int) val);
+			  "Relocation doesn't fit. (relocation value = 0x%lx)",
+			  (long) val);
 	}
+
       switch (fixP->fx_r_type)
         {
-        case 0:
-          break;
+        case BFD_RELOC_8:
+	  md_number_to_chars (place, val, 1);
+	  return;
+
+        case BFD_RELOC_16:
+	  md_number_to_chars (place, val, 2);
+	  return;
+
+        case BFD_RELOC_32:
+	  md_number_to_chars (place, val, 4);
+	  return;
+
+        case BFD_RELOC_64:
+	  md_number_to_chars (place, val, 8);
+	  return;
+
         case BFD_RELOC_SPU_IMM7:
           res = (val & 0x7f) << 14;
           break;
+
         case BFD_RELOC_SPU_IMM8:
           res = (val & 0xff) << 14;
           break;
+
         case BFD_RELOC_SPU_IMM10:
-	  res = (val & 0x3ff) << 14;  /* Bugzilla 10523, fix bitmask pattern */
+          res = (val & 0x3ff) << 14;
           break;
+
         case BFD_RELOC_SPU_IMM10W:
-	  res = (val & 0x3ff0) << 10; /* Bugzilla 10523, fix bitmask pattern */
+          res = (val & 0x3ff0) << 10;
           break;
+
         case BFD_RELOC_SPU_IMM16:
           res = (val & 0xffff) << 7;
           break;
+
         case BFD_RELOC_SPU_IMM16W:
           res = (val & 0x3fffc) << 5;
           break;
+
         case BFD_RELOC_SPU_IMM18:
           res = (val & 0x3ffff) << 7;
           break;
-        case BFD_RELOC_16:
-#if 0
-          val = fixP->fx_offset;
-          number_to_chars_bigendian (place, val, 2);
-#endif
-          res = val;
-          break;
-        case BFD_RELOC_32:
-          res = val;
-          break;
+
         case BFD_RELOC_SPU_PCREL9a:
           res = ((val & 0x1fc) >> 2) | ((val & 0x600) << 14);
           break;
+
         case BFD_RELOC_SPU_PCREL9b:
           res = ((val & 0x1fc) >> 2) | ((val & 0x600) << 5);
           break;
+
         case BFD_RELOC_SPU_PCREL16:
           res = (val & 0x3fffc) << 5;
           break;
@@ -966,8 +1050,8 @@ md_apply_fix (fixS *fixP, valueT * valP, segT seg ATTRIBUTE_UNUSED)
           as_bad_where (fixP->fx_file, fixP->fx_line,
                         _("reloc %d not supported by object file format"),
                         (int) fixP->fx_r_type);
-          abort ();
         }
+
       if (res != 0)
         {
           place[0] |= (res >> 24) & 0xff;

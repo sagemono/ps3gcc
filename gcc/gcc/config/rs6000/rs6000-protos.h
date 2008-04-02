@@ -26,19 +26,6 @@
 /* Declare functions in rs6000.c */
 
 
-#include "lto/lto-info.h"
-extern void lto_info (rtx insn, annotation_kind_t kind, HOST_WIDE_INT info);
-extern long long unsigned lto_arg_mask (tree funtype);
-#define LTO_ARG_MASK lto_arg_mask
-extern void lto_inline_asm (int on);
-#define LTO_INLINE_ASM lto_inline_asm
-extern void ppu_preface_call (int sibcall);
-extern void ppu_preface_return (void);
-extern void ppu_preface_tablejump (rtx label);
-extern void ppu_asm_jumptable_end (FILE * file, unsigned labelnum);
-extern void ppu_final_prescan_insn (rtx insn, rtx *operands,
-				    int noperands ATTRIBUTE_UNUSED);
-
 #ifdef RTX_CODE
 
 #ifdef TREE_CODE
@@ -68,7 +55,7 @@ extern void rs6000_expand_vector_set (rtx, rtx, int);
 extern void rs6000_expand_vector_extract (rtx, rtx, int);
 /* BEGIN CELL LOCAL */
 extern void rs6000_split_stve (rtx, rtx, rtx, rtx, rtx);
-extern void rs6000_split_lve (rtx, rtx, rtx);
+extern void rs6000_split_lve (rtx, rtx, rtx, rtx);
 /* END CELL LOCAL */
 extern void build_mask64_2_operands (rtx, rtx *);
 extern int expand_block_clear (rtx[]);
@@ -107,6 +94,7 @@ extern void rs6000_emit_sync (enum rtx_code, enum machine_mode,
 extern void rs6000_split_atomic_op (enum rtx_code, rtx, rtx, rtx, rtx, rtx);
 extern void rs6000_split_compare_and_swap (rtx, rtx, rtx, rtx, rtx);
 extern void rs6000_split_lock_test_and_set (rtx, rtx, rtx, rtx);
+extern void rs6000_emit_swdivv4sf (rtx, rtx, rtx);
 extern void rs6000_emit_swdivsf (rtx, rtx, rtx);
 extern void rs6000_emit_swdivdf (rtx, rtx, rtx);
 extern void rs6000_sysv4_toc_section (void);
@@ -197,4 +185,8 @@ char *output_call (rtx, rtx *, int, int);
 extern bool rs6000_hard_regno_mode_ok_p[][FIRST_PSEUDO_REGISTER];
 extern const char* rs6000_emit_pgo_info (rtx *ops, rtx insn);
 
+/** SCE bugilla #11003 **/
+/* APPLE LOCAL pragma reverse_bitfields, ms_struct */
+extern void darwin_pragma_reverse_bitfields (struct cpp_reader *);
+extern void darwin_pragma_ms_struct (struct cpp_reader *);
 #endif  /* rs6000-protos.h */

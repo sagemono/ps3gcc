@@ -195,6 +195,8 @@ tree c_global_trees[CTI_MAX];
 
 /* Switches common to the C front ends.  */
 
+int flag_source_4_0_2 = 0;
+
 /* Nonzero if prepreprocessing only.  */
 
 int flag_preprocess_only;
@@ -451,6 +453,8 @@ int flag_enforce_eh_specs = 1;
 
 int flag_threadsafe_statics = 1;
 
+int flag_resolve_non_dependent_early = 1;
+
 /* Nonzero means warn about implicit declarations.  */
 
 int warn_implicit = 1;
@@ -539,6 +543,7 @@ static tree handle_vector_size_attribute (tree *, tree, tree, int,
 					  bool *);
 static tree handle_nonnull_attribute (tree *, tree, tree, int, bool *);
 static tree handle_nothrow_attribute (tree *, tree, tree, int, bool *);
+static tree handle_may_alias_attribute (tree *, tree, tree, int, bool *);
 static tree handle_cleanup_attribute (tree *, tree, tree, int, bool *);
 static tree handle_warn_unused_result_attribute (tree *, tree, tree, int,
 						 bool *);
@@ -630,7 +635,8 @@ const struct attribute_spec c_common_attribute_table[] =
 			      handle_nonnull_attribute },
   { "nothrow",                0, 0, true,  false, false,
 			      handle_nothrow_attribute },
-  { "may_alias",	      0, 0, false, true, false, NULL },
+  { "may_alias",	      0, 0, false, false, false, 
+  			      handle_may_alias_attribute },
   { "cleanup",		      1, 1, true, false, false,
 			      handle_cleanup_attribute },
   { "warn_unused_result",     0, 0, false, true, true,
@@ -5594,6 +5600,57 @@ handle_nothrow_attribute (tree *node, tree name, tree ARG_UNUSED (args),
     {
       warning (OPT_Wattributes, "%qE attribute ignored", name);
       *no_add_attrs = true;
+    }
+
+  return NULL_TREE;
+}
+
+/* We handle the may_alias specially because the default is to create a
+   distinct new type, when we really want a variant. */
+static tree
+handle_may_alias_attribute (tree *node, tree name,
+			    tree args ATTRIBUTE_UNUSED,
+			    int flags, bool *no_add_attrs)
+{
+  tree decl = NULL_TREE;
+  tree *type = NULL;
+  int is_type = 0;
+
+  if (DECL_P (*node))
+    {
+      decl = *node;
+      type = &TREE_TYPE (decl);
+      is_type = TREE_CODE (*node) == TYPE_DECL;
+    }
+  else if (TYPE_P (*node))
+    type = node, is_type = 1;
+
+  /* We add the attribute ourselves below because the default behavior
+     is not sufficient. */
+  *no_add_attrs = true;
+
+  if (!is_type)
+    warning (OPT_Wattributes, "%qE attribute ignored", name);
+  else if (lookup_attribute ("may_alias", TYPE_ATTRIBUTES (*type)) == NULL_TREE)
+    {
+      tree attrs = tree_cons (name, args, TYPE_ATTRIBUTES (*type));
+      if (!(flags & (int) ATTR_FLAG_TYPE_IN_PLACE))
+	{
+	  tree m = TYPE_MAIN_VARIANT (*type);
+	  *type = build_type_attribute_variant (*type, attrs);
+	  /* build_type_attribute_variant will return either an existing
+	     type that already has the attribute, or a distinct new type
+	     whose main variant points to itself.  In the latter case we
+	     want to make it a real variant, rather than a distinct type. */
+	  if (TYPE_MAIN_VARIANT (*type) == *type)
+	    {
+	      TYPE_NEXT_VARIANT (*type) = TYPE_NEXT_VARIANT (m);
+	      TYPE_NEXT_VARIANT (m) = *type;
+	      TYPE_MAIN_VARIANT (*type) = m;
+	    }
+	}
+      else
+	TYPE_ATTRIBUTES (*type) = attrs;
     }
 
   return NULL_TREE;

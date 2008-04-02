@@ -620,6 +620,11 @@ get_alias_set (tree t)
       t = TREE_TYPE (t);
     }
 
+  /* The may_alias attribute does not create a distinct type, so we need
+     to test for it before we strip it away with TYPE_MAIN_VARIANT. */
+  if (lookup_attribute ("may_alias", TYPE_ATTRIBUTES (t)))
+    return 0;
+
   /* Variant qualifiers don't affect the alias set, so get the main
      variant. If this is a type with a known alias set, return it.  */
   t = TYPE_MAIN_VARIANT (t);

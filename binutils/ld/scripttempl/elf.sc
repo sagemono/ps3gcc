@@ -254,6 +254,9 @@ SECTIONS
 {
   /* Read-only sections, merged into text segment: */
   ${CREATE_SHLIB-${CREATE_PIE-${RELOCATING+PROVIDE (__executable_start = ${TEXT_START_ADDR}); . = ${TEXT_BASE_ADDRESS};}}}
+
+  ${SYMBOL_READONLY_SEGMENT_START}
+
   ${CREATE_SHLIB+${RELOCATING+. = ${SHLIB_TEXT_START_ADDR:-0} + SIZEOF_HEADERS;}}
   ${CREATE_PIE+${RELOCATING+. = ${SHLIB_TEXT_START_ADDR:-0} + SIZEOF_HEADERS;}}
   ${CREATE_SHLIB-${INTERP}}
@@ -368,6 +371,8 @@ cat <<EOF
   .eh_frame     ${RELOCATING-0} : ONLY_IF_RO { KEEP (*(.eh_frame)) }
   .gcc_except_table ${RELOCATING-0} : ONLY_IF_RO { *(.gcc_except_table .gcc_except_table.*) }
 
+  ${SYMBOL_READONLY_SEGMENT_END}
+
   /* Adjust the address for the data segment.  We want to adjust up to
      the same address within the page on the next page up.  */
   ${CREATE_SHLIB-${CREATE_PIE-${RELOCATING+. = ${DATA_ADDR-${DATA_SEGMENT_ALIGN}};}}}
@@ -437,6 +442,8 @@ cat <<EOF
   ${SDATA}
   ${OTHER_SDATA_SECTIONS}
   ${RELOCATING+${DATA_END_SYMBOLS-_edata = .; PROVIDE (edata = .);}}
+  /** SCE local : to make sure the __bss_start has 16byte alignment **/
+  ${RELOCATING+. = ALIGN(${ALIGNMENT});}
   ${RELOCATING+__bss_start = .;}
   ${RELOCATING+${OTHER_BSS_SYMBOLS}}
   ${SBSS}

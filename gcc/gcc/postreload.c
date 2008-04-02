@@ -342,8 +342,13 @@ reload_cse_simplify_set (rtx set, rtx insn)
 	    }
 #endif
 
-	  validate_change (insn, &SET_SRC (set), copy_rtx (this_rtx), 1);
-	  old_cost = this_cost, did_change = 1;
+	  if (GET_MODE (SET_DEST (set)) != GET_MODE (this_rtx))
+	    this_rtx = gen_lowpart_if_possible (GET_MODE (SET_DEST (set)), this_rtx);
+	  if (this_rtx)
+	    {
+	      validate_change (insn, &SET_SRC (set), copy_rtx (this_rtx), 1);
+	      old_cost = this_cost, did_change = 1;
+	    }
 	}
     }
 

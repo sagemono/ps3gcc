@@ -2175,9 +2175,6 @@ final_scan_insn (rtx insn, FILE *file, int optimize ATTRIBUTE_UNUSED,
 		  {
 		    fputs (ASM_APP_ON, file);
 		    app_on = 1;
-		    #ifdef LTO_INLINE_ASM
-		      LTO_INLINE_ASM (1);
-		    #endif
 		  }
 		fprintf (asm_out_file, "\t%s\n", string);
 	      }
@@ -2211,9 +2208,6 @@ final_scan_insn (rtx insn, FILE *file, int optimize ATTRIBUTE_UNUSED,
 		  {
 		    fputs (ASM_APP_ON, file);
 		    app_on = 1;
-		    #ifdef LTO_INLINE_ASM
-		      LTO_INLINE_ASM (1);
-		    #endif
 		  }
 	        output_asm_insn (string, ops);
 	      }
@@ -2224,9 +2218,6 @@ final_scan_insn (rtx insn, FILE *file, int optimize ATTRIBUTE_UNUSED,
 
 	if (app_on)
 	  {
-	    #ifdef LTO_INLINE_ASM
-	      LTO_INLINE_ASM (0);
-	    #endif
 	    fputs (ASM_APP_OFF, file);
 	    app_on = 0;
 	  }

@@ -545,7 +545,10 @@ add_decl_to_level (tree decl, cxx_scope *b)
 	if ((TREE_CODE (decl) == VAR_DECL
 	     && (TREE_STATIC (decl) || DECL_EXTERNAL (decl)))
 	    || (TREE_CODE (decl) == FUNCTION_DECL
-		&& (!TREE_PUBLIC (decl) || DECL_DECLARED_INLINE_P (decl))))
+		&& (!TREE_PUBLIC (decl) || DECL_DECLARED_INLINE_P (decl)))
+	    || (TREE_CODE (decl) == TYPE_DECL
+		&& DECL_CONTEXT (decl)
+		&& TREE_CODE (DECL_CONTEXT (decl)) == NAMESPACE_DECL))
 	  VEC_safe_push (tree, gc, b->static_decls, decl);
     }
 }
@@ -669,14 +672,28 @@ pushdecl_maybe_friend (tree x, bool is_friend)
 	      if (decls_match (x, t))
 		/* The standard only says that the local extern
 		   inherits linkage from the previous decl; in
-		   particular, default args are not shared.  We must
-		   also tell cgraph to treat these decls as the same,
-		   or we may neglect to emit an "unused" static - we
-		   do this by making the DECL_UIDs equal, which should
-		   be viewed as a kludge.  FIXME.  */
+		   particular, default args are not shared.  Add
+		   the decl into a hash table to make sure only
+		   the previous decl in this case is seen by the
+		   middle end.  */
 		{
+		  struct cxx_int_tree_map *h;
+		  void **loc;
+
 		  TREE_PUBLIC (x) = TREE_PUBLIC (t);
-		  DECL_UID (x) = DECL_UID (t);
+
+		  if (cp_function_chain->extern_decl_map == NULL)
+		    cp_function_chain->extern_decl_map
+		      = htab_create_ggc (20, cxx_int_tree_map_hash,
+					 cxx_int_tree_map_eq, NULL);
+
+		  h = GGC_NEW (struct cxx_int_tree_map);
+		  h->uid = DECL_UID (x);
+		  h->to = t;
+		  loc = htab_find_slot_with_hash
+			  (cp_function_chain->extern_decl_map, h,
+			   h->uid, INSERT);
+		  *(struct cxx_int_tree_map **) loc = h;
 		}
 	    }
 	  else if (TREE_CODE (t) == PARM_DECL)
@@ -4660,12 +4677,39 @@ lookup_arg_dependent (tree name, tree fns, tree args)
   k.functions = fns;
   k.classes = NULL_TREE;
 
-  /* We previously performed an optimization here by setting
-     NAMESPACES to the current namespace when it was safe. However, DR
-     164 says that namespaces that were already searched in the first
-     stage of template processing are searched again (potentially
-     picking up later definitions) in the second stage. */
-  k.namespaces = NULL_TREE;
+  if (!flag_argument_lookup)
+    {
+      tree fn = NULL_TREE;
+      /* We've already looked at some namespaces during normal unqualified
+	 lookup -- but we don't know exactly which ones.  If the functions
+	 we found were brought into the current namespace via a using
+	 declaration, we have not really checked the namespace from which
+	 they came.  Therefore, we check all namespaces here -- unless the
+	 function we have is from the current namespace.  Even then, we
+	 must check all namespaces if the function is a local
+	 declaration; any other declarations present at namespace scope
+	 should be visible during argument-dependent lookup.  */
+      if (fns)
+	fn = OVL_CURRENT (fns);
+      if (fn && TREE_CODE (fn) == FUNCTION_DECL
+	  && (CP_DECL_CONTEXT (fn) != current_decl_namespace ()
+	  || DECL_LOCAL_FUNCTION_P (fn)))
+	k.namespaces = NULL_TREE;
+      else
+	/* Setting NAMESPACES is purely an optimization; it prevents
+	   adding functions which are already in FNS.  Adding them would
+	   be safe -- "joust" will eliminate the duplicates -- but
+	   wasteful.  */
+	   k.namespaces = build_tree_list (current_decl_namespace (),
+					   NULL_TREE);
+    }
+  else
+    /* We previously performed an optimization here by setting
+       NAMESPACES to the current namespace when it was safe. However, DR
+       164 says that namespaces that were already searched in the first
+       stage of template processing are searched again (potentially
+       picking up later definitions) in the second stage. */
+    k.namespaces = NULL_TREE;
 
   arg_assoc_args (&k, args);
   POP_TIMEVAR_AND_RETURN (TV_NAME_LOOKUP, k.functions);

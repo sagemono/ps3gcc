@@ -344,11 +344,14 @@ grok_array_decl (tree array_expr, tree index_exp)
       if (TREE_CODE (type) == VECTOR_TYPE)
 	{
 	  tree type = TREE_TYPE (array_expr);
+	  tree type1;
 	  if (!cxx_mark_addressable (array_expr))
 	    return error_mark_node;
 	  type = build_qualified_type (TREE_TYPE (type), TYPE_QUALS (type));
 	  type = build_pointer_type (type);
-	  array_expr = build1 (ADDR_EXPR, type, array_expr);
+	  type1 = build_pointer_type (TREE_TYPE (array_expr));
+	  array_expr = build1 (ADDR_EXPR, type1, array_expr);
+	  array_expr = convert (type, array_expr);
 	}
 
       /* Otherwise, create an ARRAY_REF for a pointer or array type.
@@ -2925,6 +2928,11 @@ cp_finish_file (void)
 
 	  /* Make sure the back end knows about all the variables.  */
 	  write_out_vars (vars);
+
+#ifdef NOTICE_STATIC_STORAGE_VARS
+	  /* Give the target a chance to look at these vars */
+	  NOTICE_STATIC_STORAGE_VARS (vars);
+#endif
 
 	  /* First generate code to do all the initializations.  */
 	  if (vars)

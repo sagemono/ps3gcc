@@ -446,6 +446,10 @@ falt-external-templates
 C++ ObjC++
 Change when template instances are emitted
 
+fkoenig-argument-lookup
+C++ ObjC++
+Change how namelookup works in templates to be based on Koenig lookup (default on)
+
 fasm
 C ObjC C++ ObjC++
 Recognize the \"asm\" keyword
@@ -652,6 +656,10 @@ frepo
 C++ ObjC++
 Enable automatic template instantiation
 
+fresolve-non-dependent-early
+C++ ObjC++
+Resolve non dependent function calls early
+
 frtti
 C++ ObjC++
 Generate run time type descriptor information
@@ -675,6 +683,10 @@ When \"signed\" or \"unsigned\" is not given make the bitfield signed
 fsigned-char
 C ObjC C++ ObjC++
 Make \"char\" signed by default
+
+fsource-402
+C ObjC C++ ObjC++
+Allow for source compatibility with 4.0.2
 
 fsquangle
 C++ ObjC++

@@ -30,11 +30,11 @@ Foundation, 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.  */
 #include "c-incpath.h"
 #include "cppdefault.h"
 
-#ifdef _WIN32 /* SCE local : bz32267 */
-#include <windows.h>
-#define SAME_INODE_CPP_DIR(dir1, dir2) \
-         ((dir1)->ino_high == (dir2)->ino_high \
-         && (dir1)->ino_low == (dir2)->ino_low)
+#ifdef _WIN32 /* SCE local : bz32267, bz39027 */
+#include <stdio.h>
+#include <unistd.h>
+#include <limits.h>
+#include <string.h>
 #endif
 
 /* Windows does not natively support inodes, and neither does MSDOS.
@@ -187,6 +187,15 @@ remove_duplicates (cpp_reader *pfile, struct cpp_dir *head,
   struct cpp_dir **pcur, *tmp, *cur;
   struct stat st;
 
+#ifdef _WIN32 /* SCE local : bz32267, bz39027 */
+  static char save_path[PATH_MAX];
+  static char cur_path[PATH_MAX];
+  static char tmp_path[PATH_MAX];
+
+  /* save the current working directory */
+  getcwd(save_path, PATH_MAX);
+#endif
+
   for (pcur = &head; *pcur; )
     {
       int reason = REASON_QUIET;
@@ -212,64 +221,86 @@ remove_duplicates (cpp_reader *pfile, struct cpp_dir *head,
 			     "%s: not a directory", cur->name);
       else
 	{
-#if _WIN32 /* SCE local : bz32267 */
-          BY_HANDLE_FILE_INFORMATION handle_file_info;
-          HANDLE hHandle;
-          if (INVALID_HANDLE_VALUE == (hHandle = CreateFile (cur->name, 0, 0, NULL, 
-                                                             OPEN_EXISTING, 
-                                                             FILE_FLAG_BACKUP_SEMANTICS
-                                                             , NULL))) {
-            abort();
-          }
-
-          if (0 == GetFileInformationByHandle (hHandle, &handle_file_info)) {
-            abort();
-          }
-
-          CloseHandle (hHandle);
-
-          cur->ino_high = handle_file_info.nFileIndexHigh;
-          cur->ino_low = handle_file_info.nFileIndexLow;
-          cur->dev = handle_file_info.dwVolumeSerialNumber;
-#else /* _WIN32 */
+#ifdef _WIN32 /* SCE local : bz32267, bz39027 */
+          int ret = chdir(cur->name);
+          if (0 != ret) continue; /* cur->name does not exist or invalid */
+          getcwd(cur_path, PATH_MAX);
+          chdir(save_path);
+#else
 	  INO_T_COPY (cur->ino, st.st_ino);
 	  cur->dev  = st.st_dev;
-#endif /* _WIN32 */
+#endif
 
 	  /* Remove this one if it is in the system chain.  */
 	  reason = REASON_DUP_SYS;
-	  for (tmp = system; tmp; tmp = tmp->next)
-#ifdef _WIN32  /* SCE local : bz32267 */
-           if (SAME_INODE_CPP_DIR(tmp, cur)
-#else /* _WIN32 */
-           if (INO_T_EQ (tmp->ino, cur->ino) 
-#endif /* _WIN32 */
-               && tmp->dev == cur->dev
-               && cur->construct == tmp->construct)
-	      break;
+	  for (tmp = system; tmp; tmp = tmp->next) 
+            {
+#ifdef _WIN32 /* SCE local : bz32267, bz39027 */
+              ret = chdir(tmp->name);
+              if (0 != ret) continue; /* tmp->name does not exist or invalid */
+              getcwd(tmp_path, PATH_MAX);
+              chdir(save_path);
+
+              if (0 == strncasecmp(cur_path, tmp_path, PATH_MAX)) /* same directory */
+                break;
+#else
+              if (INO_T_EQ (tmp->ino, cur->ino) 
+                  && tmp->dev == cur->dev
+                  && cur->construct == tmp->construct)
+                break;
+#endif
+            }
 
 	  if (!tmp)
 	    {
 	      /* Duplicate of something earlier in the same chain?  */
 	      reason = REASON_DUP;
-	      for (tmp = head; tmp != cur; tmp = tmp->next)
-#ifdef _WIN32  /* SCE local : bz32267 */
-               if (SAME_INODE_CPP_DIR (cur, tmp)
-#else /* _WIN32 */
-               if (INO_T_EQ (cur->ino, tmp->ino) 
-#endif /* _WIN32 */
-                   && cur->dev == tmp->dev
-                   && cur->construct == tmp->construct)
-		  break;
+	      for (tmp = head; tmp != cur; tmp = tmp->next) 
+                {
+#ifdef _WIN32 /* SCE local : bz32267, bz39027 */
+                  ret = chdir(tmp->name);
+                  if (0 != ret) continue; /* tmp->name does not exist or invalid */
+                  getcwd(tmp_path, PATH_MAX);
+                  chdir(save_path);
 
+                  if (0 == strncasecmp(cur_path, tmp_path, PATH_MAX)) /* same directory */
+                    break;
+#else
+                  if (INO_T_EQ (cur->ino, tmp->ino) 
+                      && cur->dev == tmp->dev
+                      && cur->construct == tmp->construct)
+                    break;
+#endif
+                }
+
+#ifdef _WIN32 /* SCE local : bz32267, bz39027 */
+              int flag = 0;
+              if (!join) /* join is NULL */
+                flag = 0;
+              else /* join exists */
+                {
+                  ret = chdir(join->name);
+                  if (0 != ret) flag = 0; /* join->name does not exist or invalid */
+
+                  getcwd(tmp_path, PATH_MAX);
+                  chdir(save_path);
+
+                  if (0 == strncasecmp(cur_path, tmp_path, PATH_MAX))
+                    /* cur and join point the same directory */
+                    flag = 1;
+                }
+
+              if (tmp == cur && !(cur->next == NULL && flag))
+                {
+		  /* Unique, so keep this directory.  */
+                  pcur = &cur->next;
+                  continue;
+                }
+#else
 	      if (tmp == cur
 		  /* Last in the chain and duplicate of JOIN?  */
 		  && !(cur->next == NULL && join
-#ifdef _WIN32  /* SCE local : bz32267 */
-		       && SAME_INODE_CPP_DIR (cur, join)
-#else /* _WIN32 */
-		       && INO_T_EQ (cur->ino, join->ino)
-#endif /* _WIN32 */
+		      && INO_T_EQ (cur->ino, join->ino)
                       && cur->dev == join->dev
                       && cur->construct == join->construct))
 		{
@@ -277,6 +308,7 @@ remove_duplicates (cpp_reader *pfile, struct cpp_dir *head,
 		  pcur = &cur->next;
 		  continue;
 		}
+#endif
 	    }
 	}
 
@@ -286,6 +318,12 @@ remove_duplicates (cpp_reader *pfile, struct cpp_dir *head,
     }
 
   *pcur = join;
+
+#ifdef _WIN32 /* SCE local : bz32267, bz39027 */
+  /* restore the working directory */
+  /* We don't need it ?? */
+  chdir(save_path);
+#endif
   return head;
 }
 

@@ -161,4 +161,10 @@ END_RELOC_NUMBERS (R_PPC64_max)
 #define DT_PPC64_OPD		(DT_LOPROC + 1)
 #define DT_PPC64_OPDSZ		(DT_LOPROC + 2)
 
+
+/* bugzilla 39026
+   flag to indicate the SN LD that this object has extra 
+   PPC64_REL24 relocations required by the dead code stripper. */
+#define EF_PPC64_REL24 0x01000000
+
 #endif /* _ELF_PPC64_H */

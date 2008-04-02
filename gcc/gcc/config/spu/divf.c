@@ -48,6 +48,9 @@
  * 7) If a non-compliant IEEE result is produced, the
  *    a DIFF exception is generated.
  */
+
+extern vector float __divv4sf3 (vector float, vector float);
+
 vector float __divv4sf3(vector float a, vector float b)
 {
   vector float inv_b, err, q0, q1, q2;

@@ -974,6 +974,8 @@ objcopy [@option{-F} @var{bfdname}|@option{--target=}@var{bfdname}]
         [@option{--change-section-vma} @var{section}@{=,+,-@}@var{val}]
         [@option{--change-warnings}] [@option{--no-change-warnings}]
         [@option{--set-section-flags} @var{section}=@var{flags}]
+        [@option{--set-section-align} @var{section}=@var{alignment}]
+        [@option{--set-section-pad} @var{section}=@var{pad}]
         [@option{--add-section} @var{sectionname}=@var{filename}]
         [@option{--rename-section} @var{oldname}=@var{newname}[,@var{flags}]]
         [@option{--change-leading-char}] [@option{--remove-leading-char}]
@@ -1280,6 +1282,12 @@ does not have contents, but it is not meaningful to clear the
 @samp{contents} flag of a section which does have contents--just remove
 the section instead.  Not all flags are meaningful for all object file
 formats.
+
+@item --set-section-align @var{section}=@var{alignment}
+Set the alignment of the named section to a power of 2 (with exponent @var{alignment}) bytes.
+
+@item --set-section-pad @var{section}=@var{pad}
+Rounds up the size of the named section to an integer multiple of @var{pad} bytes.
 
 @item --add-section @var{sectionname}=@var{filename}
 Add a new section named @var{sectionname} while copying the file.  The

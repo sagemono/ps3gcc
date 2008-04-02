@@ -23,7 +23,7 @@ load_lib gcc-dg.exp
 set DEFAULT_VECTCFLAGS ""
 
 # These flags are used for all targets.
-lappend DEFAULT_VECTCFLAGS "-O2" "-ftree-vectorize"
+lappend DEFAULT_VECTCFLAGS "-O2" "-ftree-vectorize" "-fno-vect-cost-model"
 
 # If the target system supports vector instructions, the default action
 # for a test is 'run', otherwise it's 'compile'.  Save current default.
@@ -50,6 +50,8 @@ if [istarget "powerpc*-*-*"] {
 	}
 	set dg-do-what-default compile
     }
+} elseif { [istarget  "ppu-*-*"] } {
+    set dg-do-what-default run
 } elseif { [istarget  "spu-*-*"] } {
     set dg-do-what-default run
 } elseif { [istarget "i?86-*-*"] || [istarget "x86_64-*-*"] } {
@@ -88,6 +90,8 @@ dg-runtest [lsort [glob -nocomplain $srcdir/$subdir/pr*.\[cS\]]]  \
 	"" $DEFAULT_VECTCFLAGS
 dg-runtest [lsort [glob -nocomplain $srcdir/$subdir/vect-*.\[cS\]]]  \
 	"" $DEFAULT_VECTCFLAGS
+dg-runtest [lsort [glob -nocomplain $srcdir/$subdir/slp-*.\[cS\]]]  \
+	"" $DEFAULT_VECTCFLAGS
 
 #### Tests with special options
 global SAVED_DEFAULT_VECTCFLAGS
@@ -96,13 +100,13 @@ set SAVED_DEFAULT_VECTCFLAGS $DEFAULT_VECTCFLAGS
 # -ffast-math tests
 set DEFAULT_VECTCFLAGS $SAVED_DEFAULT_VECTCFLAGS
 lappend DEFAULT_VECTCFLAGS "-ffast-math"
-dg-runtest [lsort [glob -nocomplain $srcdir/$subdir/fast-math-vect*.\[cS\]]]  \
+dg-runtest [lsort [glob -nocomplain $srcdir/$subdir/fast-math-*.\[cS\]]]  \
 	"" $DEFAULT_VECTCFLAGS
 
 # -fwrapv tests
 set DEFAULT_VECTCFLAGS $SAVED_DEFAULT_VECTCFLAGS
 lappend DEFAULT_VECTCFLAGS "-fwrapv"
-dg-runtest [lsort [glob -nocomplain $srcdir/$subdir/wrapv-vect*.\[cS\]]]  \
+dg-runtest [lsort [glob -nocomplain $srcdir/$subdir/wrapv-*.\[cS\]]]  \
         "" $DEFAULT_VECTCFLAGS
 
 # -ftrapv tests
@@ -123,7 +127,26 @@ lappend DEFAULT_VECTCFLAGS "-fno-section-anchors"
 dg-runtest [lsort [glob -nocomplain $srcdir/$subdir/no-section-anchors-*.\[cS\]]]  \
 	"" $DEFAULT_VECTCFLAGS
 
+# -fno-tree-scev-cprop
+set DEFAULT_VECTCFLAGS $SAVED_DEFAULT_VECTCFLAGS
+lappend DEFAULT_VECTCFLAGS "-fno-tree-scev-cprop"
+dg-runtest [lsort [glob -nocomplain $srcdir/$subdir/no-scevccp-vect-*.\[cS\]]]  \
+        "" $DEFAULT_VECTCFLAGS
+
+# -fno-tree-scev-cprop
+set DEFAULT_VECTCFLAGS $SAVED_DEFAULT_VECTCFLAGS
+lappend DEFAULT_VECTCFLAGS "-fno-tree-scev-cprop"
+dg-runtest [lsort [glob -nocomplain $srcdir/$subdir/no-scevccp-outer-*.\[cS\]]]  \
+        "" $DEFAULT_VECTCFLAGS
+
+# -fno-tree-reassoc
+set DEFAULT_VECTCFLAGS $SAVED_DEFAULT_VECTCFLAGS
+lappend DEFAULT_VECTCFLAGS "-fno-tree-reassoc"
+dg-runtest [lsort [glob -nocomplain $srcdir/$subdir/no-reassoc-*.\[cS\]]]  \
+        "" $DEFAULT_VECTCFLAGS
+
 # With -Os
+set DEFAULT_VECTCFLAGS $SAVED_DEFAULT_VECTCFLAGS
 lappend DEFAULT_VECTCFLAGS "-Os"
 dg-runtest [lsort [glob -nocomplain $srcdir/$subdir/Os-vect-*.\[cS\]]]  \
         "" $DEFAULT_VECTCFLAGS

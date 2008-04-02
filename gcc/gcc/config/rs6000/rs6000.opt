@@ -277,3 +277,16 @@ Specify alignment of structure fields default/natural
 mprioritize-restricted-insns=
 Target RejectNegative Joined UInteger Var(rs6000_sched_restricted_insns_priority)
 Specify scheduling priority for dispatch slot restricted insns
+
+mno-use-save-restore-funcs
+Target RejectNegative Var(rs6000_save_restore_funcs,0)
+Don't call functions to save and restore registers
+
+muse-save-restore-funcs
+Target Report RejectNegative Var(rs6000_save_restore_funcs,2)
+Call functions to save and restore registers when it decreases the size of a function 2 or more instructions
+
+muse-save-restore-funcs=
+Target RejectNegative Joined UInteger Var(rs6000_save_restore_funcs)
+Call functions to save and restore registers when it decreases the size of a function by N or more instructions
+

@@ -290,4 +290,8 @@ extern const char *flag_random_seed;
 /* APPLE LOCAL Altivec */
 extern int flag_disable_opts_for_faltivec;
 
+/* This is the alignment, in bits, guaranteed to be returned by global
+   operator new */
+extern unsigned int global_new_align;
+
 #endif /* ! GCC_FLAGS_H */

@@ -289,7 +289,14 @@ type_after_usual_arithmetic_conversions (tree t1, tree t2)
       && code2 == VECTOR_TYPE) /* CELL VECREG */
     {
       /* When we get here we should have two vectors of the same size.
-	 Just prefer the unsigned one if present.  */
+	 Prefer the non-vecreg one, otherwise prefer the unsigned one if
+	 present.  */
+      /* BEGIN CELL VECREG */
+      if (TYPE_VECREG (t2))
+	return build_type_attribute_variant (t1, attributes);
+      else if (TYPE_VECREG (t1))
+	return build_type_attribute_variant (t2, attributes);
+      else /* END CELL VECREG */
       if (TYPE_UNSIGNED (t1))
 	return build_type_attribute_variant (t1, attributes);
       else
@@ -2088,7 +2095,8 @@ finish_class_member_access_expr (tree object, tree name, bool template_p)
 	{
 	  if (TREE_CODE (orig_name) == SCOPE_REF)
 	    BASELINK_QUALIFIED_P (member) = 1;
-	  orig_name = member;
+	  if (flag_resolve_non_dependent_early)
+	    orig_name = member;
 	}
       return build_min_non_dep (COMPONENT_REF, expr,
 				orig_object, orig_name,
@@ -4765,6 +4773,9 @@ build_static_cast_1 (tree type, tree expr, bool c_cast_p,
 
   intype = TREE_TYPE (expr);
 
+  /* Save casted types in the function's used types hash table.  */
+  used_types_insert (type);
+
   /* Determine what to do when casting away constness.  */
   if (c_cast_p)
     {
@@ -5055,6 +5066,9 @@ build_reinterpret_cast_1 (tree type, tree expr, bool c_cast_p,
 
   intype = TREE_TYPE (expr);
 
+  /* Save casted types in the function's used types hash table.  */
+  used_types_insert (type);
+
   /* [expr.reinterpret.cast]
      An lvalue expression of type T1 can be cast to the type
      "reference to T2" if an expression of type "pointer to T1" can be
@@ -5249,6 +5263,9 @@ build_const_cast_1 (tree dst_type, tree expr, bool complain,
 	       "or reference to a function type", dst_type);
       return error_mark_node;
     }
+
+  /* Save casted types in the function's used types hash table.  */
+  used_types_insert (dst_type);
 
   src_type = TREE_TYPE (expr);
   /* Expressions do not really have reference types.  */

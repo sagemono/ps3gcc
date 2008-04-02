@@ -40,6 +40,8 @@ extern "C" {
 
 #define __GTHREAD_ONCE_INIT 0
 #define __GTHREAD_MUTEX_INIT_FUNCTION(mtx) __gthr_lv2_mutex_init_function(mtx)
+#define __GTHREAD_RECURSIVE_MUTEX_INIT_FUNCTION(mtx) \
+                __gthr_lv2_mutex_init_function(mtx)
 
 typedef int __gthread_key_t;
 typedef long __gthread_once_t;
@@ -58,7 +60,7 @@ extern int __gthr_lv2_mutex_lock(__gthread_mutex_t *);
 extern int __gthr_lv2_mutex_unlock(__gthread_mutex_t *);
 
 static inline int
-__gthread_active_p ()
+__gthread_active_p (void)
 {
   return 1;
 }
@@ -112,7 +114,7 @@ __gthread_mutex_unlock (__gthread_mutex_t *mutex)
 }
 
 static inline int
-__gthread_mutex_trylock (__gthread_mutex_t *mutex)
+__gthread_mutex_trylock (__gthread_mutex_t *mutex __attribute__((unused)))
 {
   return -1;
 }
@@ -120,11 +122,12 @@ __gthread_mutex_trylock (__gthread_mutex_t *mutex)
 static inline int
 __gthread_recursive_mutex_lock (__gthread_recursive_mutex_t *mutex)
 {
-  return -1;
+  return __gthr_lv2_mutex_lock (mutex);
 }
 
 static inline int
-__gthread_recursive_mutex_trylock (__gthread_recursive_mutex_t *mutex)
+__gthread_recursive_mutex_trylock (__gthread_recursive_mutex_t *mutex
+				   __attribute__((unused)))
 {
   return -1;
 }
@@ -132,7 +135,7 @@ __gthread_recursive_mutex_trylock (__gthread_recursive_mutex_t *mutex)
 static inline int
 __gthread_recursive_mutex_unlock (__gthread_recursive_mutex_t *mutex)
 {
-  return -1;
+  return __gthr_lv2_mutex_unlock (mutex);
 }
 
 #ifdef __cplusplus

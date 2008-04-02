@@ -102,6 +102,87 @@ static struct data_reference * init_data_ref (tree, tree, tree, tree, bool,
 					      struct ptr_info_def *,
 					      enum  data_ref_type);
 
+/* Expresses EXP as VAR + OFF, where off is a constant.  The type of OFF
+   will be ssizetype.  */
+
+void
+split_constant_offset (tree exp, tree *var, tree *off)
+{
+  tree type = TREE_TYPE (exp), otype;
+  tree var0, var1;
+  tree off0, off1;
+
+  *var = exp;
+  STRIP_NOPS (exp);
+  otype = TREE_TYPE (exp);
+
+  switch (TREE_CODE (exp))
+    {
+    case INTEGER_CST:
+      *var = build_int_cst (type, 0);
+      *off = fold_convert (ssizetype, exp);
+      return;
+
+    case PLUS_EXPR:
+    case MINUS_EXPR:
+      split_constant_offset (TREE_OPERAND (exp, 0), &var0, &off0);
+      split_constant_offset (TREE_OPERAND (exp, 1), &var1, &off1);
+      *var = fold_convert (type, fold_build2 (TREE_CODE (exp), otype,
+                                              var0, var1));
+      *off = size_binop (TREE_CODE (exp), off0, off1);
+      return;
+
+    case MULT_EXPR:
+      off1 = TREE_OPERAND (exp, 1);
+      if (TREE_CODE (off1) != INTEGER_CST)
+        break;
+
+      split_constant_offset (TREE_OPERAND (exp, 0), &var0, &off0);
+      *var = fold_convert (type, fold_build2 (MULT_EXPR, otype,
+                                              var0, off1));
+      *off = size_binop (MULT_EXPR, off0, fold_convert (ssizetype, off1));
+      return;
+
+    case ADDR_EXPR:
+      {
+        tree op, base, poffset;
+        HOST_WIDE_INT pbitsize, pbitpos;
+        enum machine_mode pmode;
+        int punsignedp, pvolatilep;
+
+        op = TREE_OPERAND (exp, 0);
+        if (!handled_component_p (op))
+          break;
+
+        base = get_inner_reference (op, &pbitsize, &pbitpos, &poffset,
+                                    &pmode, &punsignedp, &pvolatilep, false);
+
+        if (pbitpos % BITS_PER_UNIT != 0)
+          break;
+        base = build_fold_addr_expr (base);
+        off0 = ssize_int (pbitpos / BITS_PER_UNIT);
+
+        if (poffset)
+          {
+            split_constant_offset (poffset, &poffset, &off1);
+            off0 = size_binop (PLUS_EXPR, off0, off1);
+            base = fold_build2 (PLUS_EXPR, TREE_TYPE (base),
+                                base,
+                                fold_convert (TREE_TYPE (base), poffset));
+          }
+
+        *var = fold_convert (type, base);
+        *off = off0;
+        return;
+      }
+
+    default:
+      break;
+    }
+
+  *off = ssize_int (0);
+}
+
 /* Determine if PTR and DECL may alias, the result is put in ALIASED.
    Return FALSE if there is no type memory tag for PTR.
 */
@@ -1136,6 +1217,10 @@ analyze_offset_expr (tree expr,
       if (access_fn == chrec_dont_know)
 	/* No access_fn.  */
 	return false;
+    
+      access_fn = strip_conversion (access_fn);
+      if (!access_fn)
+        return false;
 
       init = initial_condition_in_loop_num (access_fn, loop->num);
       if (!expr_invariant_in_loop_p (loop, init))
@@ -1472,6 +1557,7 @@ object_analysis (tree memref, tree stmt, bool is_read,
   struct loop *loop = loop_containing_stmt (stmt);
   struct data_reference *ptr_dr = NULL;
   tree object_aligned_to = NULL_TREE, address_aligned_to = NULL_TREE;
+  tree comp_ref = NULL_TREE;
 
  *ptr_info = NULL;
 
@@ -1480,11 +1566,12 @@ object_analysis (tree memref, tree stmt, bool is_read,
   if (handled_component_p (memref))
     {
       /* 1.1 build data-reference structure for MEMREF.  */
-      /* TODO: handle COMPONENT_REFs.  */
       if (!(*dr))
 	{ 
 	  if (TREE_CODE (memref) == ARRAY_REF)
 	    *dr = analyze_array (stmt, memref, is_read);	  
+	  else if (TREE_CODE (memref) == COMPONENT_REF)
+	    comp_ref = memref;
 	  else
 	    {
 	      /* FORNOW.  */
@@ -1550,16 +1637,34 @@ object_analysis (tree memref, tree stmt, bool is_read,
   /*  Part 1: Case 2. Declarations.  */ 
   if (DECL_P (memref))
     {
-      /* We expect to get a decl only if we already have a DR.  */
+      /* We expect to get a decl only if we already have a DR, or with 
+	 COMPONENT_REFs of type 'a[i].b'.  */
       if (!(*dr))
 	{
-	  if (dump_file && (dump_flags & TDF_DETAILS))
+	  if (comp_ref && TREE_CODE (TREE_OPERAND (comp_ref, 0)) == ARRAY_REF)
 	    {
-	      fprintf (dump_file, "\nunhandled decl ");
-	      print_generic_expr (dump_file, memref, TDF_SLIM);
-	      fprintf (dump_file, "\n");
+	      *dr = analyze_array (stmt, TREE_OPERAND (comp_ref, 0), is_read);	      	      
+	      if (DR_NUM_DIMENSIONS (*dr) != 1)
+		{
+		  if (dump_file && (dump_flags & TDF_DETAILS))
+		    {
+		      fprintf (dump_file, "\n multidimensional component ref ");
+		      print_generic_expr (dump_file, comp_ref, TDF_SLIM);
+		      fprintf (dump_file, "\n");
+		    }
+		  return NULL_TREE;
+		}
 	    }
-	  return NULL_TREE;
+	  else 
+	    {
+	      if (dump_file && (dump_flags & TDF_DETAILS))
+		{
+		  fprintf (dump_file, "\nunhandled decl ");
+		  print_generic_expr (dump_file, memref, TDF_SLIM);
+		  fprintf (dump_file, "\n");
+		}
+	      return NULL_TREE;
+	    }
 	}
 
       /* TODO: if during the analysis of INDIRECT_REF we get to an object, put 
@@ -1684,6 +1789,9 @@ object_analysis (tree memref, tree stmt, bool is_read,
       return NULL_TREE;
     }
 
+  if (comp_ref)
+    DR_REF (*dr) = comp_ref;
+
   if (SSA_VAR_P (*memtag) && var_can_have_subvars (*memtag))
     *subvars = get_subvars_for_var (*memtag);
 	
@@ -1720,7 +1828,7 @@ object_analysis (tree memref, tree stmt, bool is_read,
    Extract INVARIANT and CONSTANT parts from OFFSET. 
 
 */
-static void 
+static bool 
 analyze_offset (tree offset, tree *invariant, tree *constant)
 {
   tree op0, op1, constant_0, constant_1, invariant_0, invariant_1;
@@ -1736,23 +1844,36 @@ analyze_offset (tree offset, tree *invariant, tree *constant)
 	*constant = offset;
       else
 	*invariant = offset;
-      return;
+      return true;
     }
 
   op0 = TREE_OPERAND (offset, 0);
   op1 = TREE_OPERAND (offset, 1);
 
   /* Recursive call with the operands.  */
-  analyze_offset (op0, &invariant_0, &constant_0);
-  analyze_offset (op1, &invariant_1, &constant_1);
+  if (!analyze_offset (op0, &invariant_0, &constant_0)
+      || !analyze_offset (op1, &invariant_1, &constant_1))
+    return false;
 
-  /* Combine the results.  */
+  /* Combine the results. Add negation to the subtrahend in case of 
+     subtraction.  */
+  if (constant_0 && constant_1)
+    return false;
   *constant = constant_0 ? constant_0 : constant_1;
+  if (code == MINUS_EXPR && constant_1)
+    *constant = fold_build1 (NEGATE_EXPR, TREE_TYPE (*constant), *constant);
+
   if (invariant_0 && invariant_1)
     *invariant = 
       fold_build2 (code, TREE_TYPE (invariant_0), invariant_0, invariant_1);
   else
-    *invariant = invariant_0 ? invariant_0 : invariant_1;
+    {
+      *invariant = invariant_0 ? invariant_0 : invariant_1;
+      if (code == MINUS_EXPR && invariant_1)
+        *invariant = 
+           fold_build1 (NEGATE_EXPR, TREE_TYPE (*invariant), *invariant);
+    }
+  return true;
 }
 
 
@@ -1781,7 +1902,7 @@ create_data_ref (tree memref, tree stmt, bool is_read)
   tree type_size, init_cond;
   struct ptr_info_def *ptr_info;
   subvar_t subvars = NULL;
-  tree aligned_to;
+  tree aligned_to, type = NULL_TREE, orig_offset;
 
   if (!memref)
     return NULL;
@@ -1812,6 +1933,42 @@ create_data_ref (tree memref, tree stmt, bool is_read)
   
   type_size = fold_convert (ssizetype, TYPE_SIZE_UNIT (TREE_TYPE (DR_REF (dr))));
 
+  /* Extract CONSTANT and INVARIANT from OFFSET.  */
+  /* Remove cast from OFFSET and restore it for INVARIANT part.  */
+  orig_offset = offset;
+  STRIP_NOPS (offset);
+  if (offset != orig_offset)
+    type = TREE_TYPE (orig_offset);
+  if (!analyze_offset (offset, &invariant, &constant))
+    {
+      if (dump_file && (dump_flags & TDF_DETAILS))
+        {
+          fprintf (dump_file, "\ncreate_data_ref: failed to analyze dr's");
+          fprintf (dump_file, " offset for ");
+          print_generic_expr (dump_file, memref, TDF_SLIM);
+          fprintf (dump_file, "\n");
+        }
+      return NULL;
+    }
+  if (type && invariant)
+    invariant = fold_convert (type, invariant);
+
+  /* Put CONSTANT part of OFFSET in DR_INIT and INVARIANT in DR_OFFSET field
+     of DR.  */
+  if (constant)
+    {
+      DR_INIT (dr) = fold_convert (ssizetype, constant);
+      init_cond = fold_build2 (TRUNC_DIV_EXPR, TREE_TYPE (constant), 
+			       constant, type_size);
+    }
+  else
+    DR_INIT (dr) = init_cond = ssize_int (0);
+
+  if (invariant)
+    DR_OFFSET (dr) = invariant;
+  else
+    DR_OFFSET (dr) = ssize_int (0);
+
   /* Change the access function for INIDIRECT_REFs, according to 
      DR_BASE_ADDRESS.  Analyze OFFSET calculated in object_analysis. OFFSET is 
      an expression that can contain loop invariant expressions and constants.
@@ -1821,27 +1978,11 @@ create_data_ref (tree memref, tree stmt, bool is_read)
      The evolution part of the access function is STEP calculated in
      object_analysis divided by the size of data type.
   */
-  if (!DR_BASE_OBJECT (dr))
+  if (!DR_BASE_OBJECT (dr) || 
+      (TREE_CODE (memref) == COMPONENT_REF && DR_NUM_DIMENSIONS (dr) == 1))
     {
       tree access_fn;
       tree new_step;
-
-      /* Extract CONSTANT and INVARIANT from OFFSET, and put them in DR_INIT and
-	 DR_OFFSET fields of DR.  */
-      analyze_offset (offset, &invariant, &constant); 
-      if (constant)
-	{
-	  DR_INIT (dr) = fold_convert (ssizetype, constant);
-	  init_cond = fold_build2 (TRUNC_DIV_EXPR, TREE_TYPE (constant), 
-				   constant, type_size);
-	}
-      else
-	DR_INIT (dr) = init_cond = ssize_int (0);;
-
-      if (invariant)
-	DR_OFFSET (dr) = invariant;
-      else
-	DR_OFFSET (dr) = ssize_int (0);
 
       /* Update access function.  */
       access_fn = DR_ACCESS_FN (dr, 0);
@@ -3689,7 +3830,8 @@ find_data_references_in_loop (struct loop *loop, varray_type *datarefs)
 		tree opnd1 = TREE_OPERAND (stmt, 1);
 		
 		if (TREE_CODE (opnd0) == ARRAY_REF 
-		    || TREE_CODE (opnd0) == INDIRECT_REF)
+		    || TREE_CODE (opnd0) == INDIRECT_REF
+		    || TREE_CODE (opnd0) == COMPONENT_REF)
 		  {
 		    dr = create_data_ref (opnd0, stmt, false);
 		    if (dr) 
@@ -3700,7 +3842,8 @@ find_data_references_in_loop (struct loop *loop, varray_type *datarefs)
 		  }
 
 		if (TREE_CODE (opnd1) == ARRAY_REF 
-		    || TREE_CODE (opnd1) == INDIRECT_REF)
+		    || TREE_CODE (opnd1) == INDIRECT_REF
+		    || TREE_CODE (opnd1) == COMPONENT_REF)
 		  {
 		    dr = create_data_ref (opnd1, stmt, true);
 		    if (dr) 
@@ -3724,7 +3867,8 @@ find_data_references_in_loop (struct loop *loop, varray_type *datarefs)
 		for (args = TREE_OPERAND (stmt, 1); args; 
 		     args = TREE_CHAIN (args))
 		  if (TREE_CODE (TREE_VALUE (args)) == ARRAY_REF
-		      || TREE_CODE (TREE_VALUE (args)) == INDIRECT_REF)
+		      || TREE_CODE (TREE_VALUE (args)) == INDIRECT_REF
+		      || TREE_CODE (TREE_VALUE (args)) == COMPONENT_REF)
 		    {
 		      dr = create_data_ref (TREE_VALUE (args), stmt, true);
 		      if (dr)

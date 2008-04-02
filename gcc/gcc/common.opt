@@ -349,6 +349,10 @@ fdebug
 Common Report Var(flag_debug)
 Used only for debugging, normally has no effect
 
+fdebug-prologue-epilogue
+Common Reprot Var(flag_debug_proep) Init(0)
+Emit location ranges for variables based on not being live in prologue/epilogue
+
 ; Nonzero for -fdefer-pop: don't pop args after each function call
 ; instead save them up to pop many calls' args with one insns.
 fdefer-pop
@@ -467,6 +471,10 @@ fgcse-after-reload
 Common Report Var(flag_gcse_after_reload)
 Perform global common subexpression elimination after register allocation
 has finished
+
+fglobal-new-align=
+Common RejectNegative Joined UInteger
+-fglobal-new-align=<number>	Specify the minimum alignment guaranteed by the global operator new
 
 fguess-branch-probability
 Common Report Var(flag_guess_branch_prob)
@@ -988,7 +996,11 @@ Enable loop invariant motion on trees
 
 ftree-loop-linear
 Common Report Var(flag_tree_loop_linear)
-Enable linear loop transforms on trees
+Enable linear loop transforms on trees (EXPERIMENTAL)
+
+Wtree-loop-linear
+Common Report Var(warning_tree_loop_linear) Init(1)
+Turn on the warning that is produced by using the flag -ftree-loop-linear as it is UNSUPPORTED.
 
 ftree-loop-ivcanon
 Common Report Var(flag_tree_loop_ivcanon) Init(1)
@@ -1005,6 +1017,10 @@ Enable SSA-PRE optimization on trees
 ftree-salias
 Common Report Var(flag_tree_salias)
 Perform structural alias analysis
+
+ftree-store-sink
+Common Report Var(flag_tree_store_sink)
+Enable SSA code store sinking on trees
 
 ftree-sink
 Common Report Var(flag_tree_sink)
@@ -1038,6 +1054,10 @@ funroll-all-loops
 Common Report Var(flag_unroll_all_loops)
 Perform loop unrolling for all loops
 
+ftree-reassoc
+Common Report Var(flag_tree_reassoc) Init(1) Optimization
+Perform reassociation on trees
+
 ; Nonzero means that loop optimizer may assume that the induction variables
 ; that control loops do not overflow and that the loops with nontrivial
 ; exit condition are not infinite
@@ -1069,9 +1089,17 @@ ftree-vectorize
 Common Report Var(flag_tree_vectorize)
 Enable loop vectorization on trees
 
+fvect-cost-model
+Common Report Var(flag_vect_cost_model) Optimization Init(1)
+Enable use of cost model in vectorization
+
 ftree-vect-loop-version
 Common Report Var(flag_tree_vect_loop_version) Init(1)
 Enable loop versioning when doing loop vectorization on trees
+
+ftree-scev-cprop
+Common Report Var(flag_tree_scev_cprop) Init(1)
+Enable copy propagation of scalar-evolution information.
 
 ftree-vectorizer-verbose=
 Common RejectNegative Joined

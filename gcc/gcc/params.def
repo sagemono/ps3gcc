@@ -301,7 +301,10 @@ DEFPARAM(PARAM_MAX_SMS_LOOP_NUMBER,
 	 "max-sms-loop-number",
 	 "Maximum number of loops to perform swing modulo scheduling on (mainly for debugging)",
 	 -1, -1, -1)
-  
+DEFPARAM(PARAM_MIN_SMS_LOOP_NUMBER,
+         "min-sms-loop-number",
+         "Minimum number of loops to perform swing modulo scheduling on (mainly for debugging)",
+         -1, -1, -1)
 /* This parameter is used to tune SMS MAX II calculations.  */
 DEFPARAM(PARAM_SMS_MAX_II_FACTOR,
 	 "sms-max-ii-factor",

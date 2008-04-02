@@ -298,6 +298,16 @@ do {									\
 #define	RESTORE_FP_PREFIX "_restfpr_"
 #define RESTORE_FP_SUFFIX "_l"
 
+/* Macros for using external functions to save general registers.
+   Currently always use inline stores. */
+#define GP_SAVE_INLINE(FIRST_REG) (1)
+#define	SAVE_GP_PREFIX ""
+#define SAVE_GP_SUFFIX ""
+#define	RESTORE_GP_PREFIX ""
+#define RESTORE_GP_SUFFIX ""
+#define	RESTORE_GP_UPDATE_PREFIX ""
+#define RESTORE_GP_UPDATE_SUFFIX ""
+
 /* Type used for ptrdiff_t, as a string used in a declaration.  */
 #define PTRDIFF_TYPE "int"
 
@@ -677,7 +687,8 @@ extern int fixuplabelno;
 %{msdata: -msdata=default} \
 %{mno-sdata: -msdata=none} \
 %{!mbss-plt: %{!msecure-plt: %(cc1_secure_plt_default)}} \
-%{profile: -p}" \
+%{profile: -p} \
+%{m32:%{m64:%emay not use both -m32 and -m64}}" \
 SUBTARGET_CC1_SPEC
 
 /* CELL LOCAL Begin */

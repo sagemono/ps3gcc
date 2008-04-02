@@ -21,6 +21,7 @@ hot_function ()
       abort ();
 }
 
+int
 main ()
 {
   if (a)

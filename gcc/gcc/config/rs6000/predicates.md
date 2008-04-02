@@ -734,7 +734,9 @@
 (define_predicate "current_file_function_operand"
   (and (match_code "symbol_ref")
        (match_test "(DEFAULT_ABI != ABI_AIX || SYMBOL_REF_FUNCTION_P (op))
-		    && (SYMBOL_REF_LOCAL_P (op)
+		    && ((SYMBOL_REF_LOCAL_P (op)
+			 && (DEFAULT_ABI != ABI_AIX
+			     || !SYMBOL_REF_EXTERNAL_P (op)))
 		        || (op == XEXP (DECL_RTL (current_function_decl),
 						  0)))")))
 
@@ -1339,3 +1341,60 @@
 
   return 1;
 })
+
+;; Return 1 if OP is valid for a save_world call in prologue, known to be
+;; a PARLLEL.
+(define_predicate "save_vrs_operation"
+  (match_code "parallel")
+{
+  int index;
+  rtx elt;
+  int count = XVECLEN (op, 0);
+
+  if (count < 3)
+    return 0;
+
+  index = 0;
+  if (GET_CODE (XVECEXP (op, 0, index++)) != CLOBBER
+      || GET_CODE (XVECEXP (op, 0, index++)) != USE)
+    return 0;
+
+  /* The rest should all be vector reg saves, just check one. */
+  elt = XVECEXP (op, 0, index++);
+  if (GET_CODE (elt) != SET
+      || GET_CODE (SET_DEST (elt)) != MEM
+      || GET_CODE (SET_SRC (elt)) != REG
+      || GET_MODE (SET_SRC (elt)) != V4SImode)
+    return 0;
+  return 1;
+})
+
+;; Return 1 if OP is valid for a restore_world call in epilogue, known to be
+;; a PARLLEL.
+(define_predicate "restore_vrs_operation"
+  (match_code "parallel")
+{
+  int index;
+  rtx elt;
+  int count = XVECLEN (op, 0);
+
+  if (count < 3)
+    return 0;
+
+  index = 0;
+  if (GET_CODE (XVECEXP (op, 0, index++)) != CLOBBER
+      || GET_CODE (XVECEXP (op, 0, index++)) != USE)
+    return 0;
+
+  /* The rest should all be vector reg restores, just check one.
+     The address doesn't need to be reg+reg. */
+  elt = XVECEXP (op, 0, index++);
+  if (GET_CODE (elt) != SET
+      || GET_CODE (SET_SRC (elt)) != MEM
+      || GET_CODE (SET_DEST (elt)) != REG
+      || GET_MODE (SET_DEST (elt)) != V4SImode)
+    return 0;
+
+  return 1;
+})
+

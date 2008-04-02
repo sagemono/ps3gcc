@@ -360,10 +360,6 @@ emit_call_1 (rtx funexp, tree fntree, tree fndecl ATTRIBUTE_UNUSED,
 
   /* Find the call we just emitted.  */
   call_insn = last_call_insn ();
-  call_insn->lto_tree = funtype;
-  #ifdef LTO_ARG_MASK
-    call_insn->lto_info = LTO_ARG_MASK(funtype);
-  #endif
 
   /* Mark memory as used for "pure" function call.  */
   if (ecf_flags & ECF_PURE)

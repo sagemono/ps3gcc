@@ -5,12 +5,12 @@
 typedef int t;
 typedef t* u;
 typedef u v;
-typedef v* (*w)(t);
+typedef v* (*w)(t); // { dg-error "" } covers message `previously declared here'
 typedef int t;
 typedef t* u;
 typedef u v;
 typedef v* (*w)(t const); // this is ok
-typedef v* (*w)(t); // { dg-error "" } covers message `previously declared here'
+typedef v* (*w)(t);
 typedef v* (*const w)(t); // { dg-error "" } invalid redeclaration
 typedef v const* (*w)(t); // { dg-error "" } invalid redeclaration
 typedef v* const (*w)(t); // { dg-error "" } invalid redeclaration

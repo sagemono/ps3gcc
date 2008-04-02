@@ -260,9 +260,14 @@ proc check_profiling_available { test_what } {
     verbose "Profiling argument is <$test_what>" 1
 
     # CELL LOCAL Begin
-    # Dinkumware libc.a is not supporting profiling.
-    if { [istarget spu-*-lv2] || [istarget ppu-*-lv2] } {
+    # SPU's Dinkumware libc.a is not supporting profiling.
+    if { [istarget spu-*-lv2] } {
       return 0
+    }
+    # PPU's Dinkumware libc.a is not supporting gprof based profiling 
+    if { [istarget ppu-*-lv2]
+    && ([lindex $test_what 1] == "-p" || [lindex $test_what 1] == "-pg") } {
+	return 0
     }
     # CELL LOCAL End
 
@@ -1776,7 +1781,8 @@ proc check_effective_target_vect_int_mult { } {
 	set et_vect_int_mult_saved 0
 	if { [istarget powerpc*-*-*]
 	     || [istarget i?86-*-*]
-	     || [istarget x86_64-*-*] } {
+	     || [istarget x86_64-*-*] 
+             || [istarget spu-*-*] } {
 	   set et_vect_int_mult_saved 1
 	}
     }
@@ -1801,6 +1807,77 @@ proc check_effective_target_section_anchors { } {
 
     verbose "check_effective_target_section_anchors: returning $et_section_anchors_saved" 2
     return $et_section_anchors_saved
+}
+
+# Return 1 if the target supports vector even/odd elements extraction, 0 otherwise.
+
+proc check_effective_target_vect_extract_even_odd { } {
+    global et_vect_extract_even_odd_saved
+    
+    if [info exists et_vect_extract_even_odd_saved] {
+        verbose "check_effective_target_vect_extract_even_odd: using cached result" 2
+    } else {
+        set et_vect_extract_even_odd_saved 0
+    }
+    
+    verbose "check_effective_target_vect_extract_even_odd: returning $et_vect_extract_even_odd_saved" 2
+    return $et_vect_extract_even_odd_saved
+}   
+
+# Return 1 if the target supports vector interleaving, 0 otherwise.
+
+proc check_effective_target_vect_interleave { } {
+    global et_vect_interleave_saved
+    
+    if [info exists et_vect_interleave_saved] {
+        verbose "check_effective_target_vect_interleave: using cached result" 2
+    } else {
+        set et_vect_interleave_saved 0
+        if { [istarget i?86-*-*]
+             || [istarget x86_64-*-*] } {
+           set et_vect_interleave_saved 1
+        }
+    }
+
+    verbose "check_effective_target_vect_interleave: returning $et_vect_interleave_saved" 2
+    return $et_vect_interleave_saved
+}
+
+# Return 1 if the target supports vector interleaving and extract even/odd, 0 otherwise.
+proc check_effective_target_vect_strided { } {
+    global et_vect_strided_saved
+
+    if [info exists et_vect_strided_saved] {
+        verbose "check_effective_target_vect_strided: using cached result" 2
+    } else {
+        set et_vect_strided_saved 0
+        if { [check_effective_target_vect_interleave]
+             && [check_effective_target_vect_extract_even_odd] } {
+           set et_vect_strided_saved 1
+        }
+    }
+
+    verbose "check_effective_target_vect_strided: returning $et_vect_strided_saved" 2
+    return $et_vect_strided_saved
+}
+
+# Return 1 if the target supports vector int to float conversion, 0 otherwise.
+
+proc check_effective_target_vect_int_to_float { } {
+    global et_vect_int_to_float_saved
+
+    if [info exists et_vect_int_to_float_saved] {
+        verbose "check_effective_target_vect_int_to_float: using cached result" 2
+    } else {
+        set et_vect_int_to_float_saved 0
+        if { [istarget i?86-*-*]
+             || [istarget x86_64-*-*]} {
+           set et_vect_int_to_float_saved 1
+        }
+    }
+
+    verbose "check_effective_target_vect_int_to_float: returning $et_vect_int_to_float_saved" 2
+    return $et_vect_int_to_float_saved
 }
 
 # Return 1 if the target supports atomic operations on "int" and "long".

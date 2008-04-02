@@ -338,6 +338,7 @@ static void dwarf2out_stack_adjust (rtx, bool);
 static void flush_queued_reg_saves (void);
 static bool clobbers_queued_reg_save (rtx);
 static void dwarf2out_frame_debug_expr (rtx, const char *);
+static void premark_used_types (void);
 
 /* Support for complex CFA locations.  */
 static void output_cfa_loc (dw_cfi_ref);
@@ -3672,6 +3673,8 @@ typedef struct die_struct GTY(())
   dw_offset die_offset;
   unsigned long die_abbrev;
   int die_mark;
+  /* Die is used and must not be pruned as unused.  */
+  int die_perennial_p;
   unsigned int decl_id;
 }
 die_node;
@@ -11463,6 +11466,7 @@ dwarf2out_abstract_function (tree decl)
 {
   dw_die_ref old_die;
   tree save_fn;
+  struct function *save_cfun;
   tree context;
   int was_abstract = DECL_ABSTRACT (decl);
 
@@ -11486,7 +11490,9 @@ dwarf2out_abstract_function (tree decl)
 
   /* Pretend we've just finished compiling this function.  */
   save_fn = current_function_decl;
+  save_cfun = cfun;
   current_function_decl = decl;
+  cfun = DECL_STRUCT_FUNCTION (decl);
 
   set_decl_abstract_flags (decl, 1);
   dwarf2out_decl (decl);
@@ -11494,6 +11500,45 @@ dwarf2out_abstract_function (tree decl)
     set_decl_abstract_flags (decl, 0);
 
   current_function_decl = save_fn;
+  cfun = save_cfun;
+}
+
+static void
+premark_used_types_subdie (dw_die_ref die, int dokids)
+{
+  dw_die_ref c;
+  die->die_perennial_p = 1;
+  if (die->die_parent)
+    premark_used_types_subdie (die->die_parent, 0);
+  if (dokids)
+    for (c = die->die_child; c; c = c->die_sib)
+      premark_used_types_subdie (c, 1);
+}
+
+/* Helper function of premark_used_types() which gets called through
+   htab_traverse_resize().
+
+   Marks the DIE of a given type in *SLOT as perennial, so it never gets
+   marked as unused by prune_unused_types.  */
+static int
+premark_used_types_helper (void **slot, void *data ATTRIBUTE_UNUSED)
+{
+  tree type;
+  dw_die_ref die;
+
+  type = *slot;
+  die = lookup_type_die (type);
+  if (die != NULL)
+    premark_used_types_subdie (die, 1);
+  return 1;
+}
+
+/* Mark all members of used_types_hash as perennial.  */
+static void
+premark_used_types (void)
+{
+  if (cfun && cfun->used_types_hash)
+    htab_traverse (cfun->used_types_hash, premark_used_types_helper, NULL);
 }
 
 /* Generate a DIE to represent a declared function (either file-scope or
@@ -11510,6 +11555,8 @@ gen_subprogram_die (tree decl, dw_die_ref context_die)
   dw_die_ref old_die = lookup_decl_die (decl);
   int declaration = (current_function_decl != decl
 		     || class_or_namespace_scope_p (context_die));
+
+  premark_used_types ();
 
   /* It is possible to have both DECL_ABSTRACT and DECLARATION be true if we
      started to generate the abstract instance of an inline, decided to output
@@ -11707,7 +11754,20 @@ gen_subprogram_die (tree decl, dw_die_ref context_die)
 	 convert the CFA data into a location list.  */
       {
 	dw_loc_list_ref list = convert_cfa_to_loc_list ();
-	if (list->dw_loc_next)
+	/*  If we have variable tracking, we have already enough information
+	    about the variables, then adding information about progule/epogule is not
+	    going to add any extra infomation.  Also using the stack pointer or the hard
+	    frame pointer here will get the incorrect value as the offset for the cfa is
+ 	    not zero, as it is based on the increment to the stack pointer.  */
+	if (!flag_debug_proep && !flag_var_tracking)
+	  {
+	    rtx fp_reg = frame_pointer_needed ? hard_frame_pointer_rtx : stack_pointer_rtx;
+	    add_AT_loc (subr_die, DW_AT_frame_base,
+			reg_loc_descriptor (fp_reg));
+	  }
+	/* If we don't want good ranges for the frame base,
+	   we can just use loc instead of location lists.  */
+	else if (list->dw_loc_next)
 	  add_AT_loc_list (subr_die, DW_AT_frame_base, list);
 	else
 	  add_AT_loc (subr_die, DW_AT_frame_base, list->expr);
@@ -11717,8 +11777,9 @@ gen_subprogram_die (tree decl, dw_die_ref context_die)
 	 the CFA.  The former is what all stack slots and argument slots
 	 will reference in the rtl; the later is what we've told the 
 	 debugger about.  We'll need to adjust all frame_base references
-	 by this displacement.  */
-      compute_frame_pointer_to_cfa_displacement ();
+	 by this displacement if we going to use the location list.  */
+      if (flag_debug_proep || flag_var_tracking)
+        compute_frame_pointer_to_cfa_displacement ();
 
       if (cfun->static_chain_decl)
 	add_AT_location_description (subr_die, DW_AT_static_link,
@@ -12413,13 +12474,30 @@ static void
 gen_typedef_die (tree decl, dw_die_ref context_die)
 {
   dw_die_ref type_die;
+  dw_die_ref context = context_die;
   tree origin;
 
   if (TREE_ASM_WRITTEN (decl))
     return;
 
   TREE_ASM_WRITTEN (decl) = 1;
-  type_die = new_die (DW_TAG_typedef, context_die, decl);
+
+  if (DECL_CONTEXT (decl)
+      && TREE_CODE (DECL_CONTEXT (decl)) == NAMESPACE_DECL)
+    {
+      if (!lookup_decl_die (DECL_CONTEXT (decl)))
+	declare_in_namespace (decl, context_die);
+
+      if (lookup_decl_die (DECL_CONTEXT (decl))
+	  && context_die != lookup_decl_die (DECL_CONTEXT (decl)))
+	context = lookup_decl_die (DECL_CONTEXT (decl));
+    }
+
+  type_die = new_die (DW_TAG_typedef, context, decl);
+
+  if (type_die && class_or_namespace_scope_p (context))
+    type_die->die_perennial_p = 1;
+
   origin = decl_ultimate_origin (decl);
   if (origin != NULL)
     add_abstract_origin_attribute (type_die, origin);
@@ -12439,7 +12517,7 @@ gen_typedef_die (tree decl, dw_die_ref context_die)
 	type = TREE_TYPE (decl);
 
       add_type_attribute (type_die, type, TREE_READONLY (decl),
-			  TREE_THIS_VOLATILE (decl), context_die);
+			  TREE_THIS_VOLATILE (decl), context);
     }
 
   if (DECL_ABSTRACT (decl))
@@ -13099,6 +13177,14 @@ gen_decl_die (tree decl, dw_die_ref context_die)
 	 variable declarations or definitions.  */
       if (debug_info_level <= DINFO_LEVEL_TERSE)
 	break;
+
+      if (TREE_CODE (decl) == VAR_DECL
+	  && current_function_decl
+	  && DECL_RESULT (current_function_decl)
+	  && DECL_NAME (DECL_RESULT (current_function_decl))
+	  && DECL_NAME (DECL_RESULT (current_function_decl)) == DECL_NAME(decl)
+	  && DECL_RTL_SET_P (DECL_RESULT (current_function_decl)))
+	COPY_DECL_RTL (DECL_RESULT (current_function_decl), decl);
 
       /* Output any DIEs that are needed to specify the type of this data
 	 object.  */
@@ -13989,6 +14075,9 @@ prune_unused_types_walk (dw_die_ref die)
   case DW_TAG_subrange_type:
   case DW_TAG_ptr_to_member_type:
   case DW_TAG_file_type:
+    if (die->die_perennial_p)
+      break;
+
     /* It's a type node --- don't mark it.  */
     return;
 

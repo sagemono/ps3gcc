@@ -1991,7 +1991,7 @@ build_new_1 (tree exp)
 	  if (flag_strict_aligned)
 	    {
 	      /* Insert alignment argument at beginning if needed. */
-	      if (TYPE_ALIGN (elt_type) > BIGGEST_ALIGNMENT)
+	      if (TYPE_ALIGN (elt_type) > global_new_align)
 		  placement = tree_cons (NULL_TREE, size_int (TYPE_ALIGN_UNIT (type)), placement);
 	    }
 	  /* CELL LOCAL End */

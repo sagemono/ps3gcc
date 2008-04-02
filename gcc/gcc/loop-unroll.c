@@ -1095,7 +1095,8 @@ unroll_loop_runtime_iterations (struct loops *loops, struct loop *loop)
 	  n_remove_edges = 0;
 	  wont_exit = sbitmap_alloc (max_unroll + 2);
 
-	  old_niter = desc->niter_expr;
+	  old_niter = simplify_gen_binary (PLUS, desc->mode,
+					   desc->niter_expr, const1_rtx);
 	  goto skip_peel;
 	}
     }

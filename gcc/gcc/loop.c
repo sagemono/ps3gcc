@@ -11012,7 +11012,10 @@ load_mems (const struct loop *loop)
 	      struct elt_loc_list *best_equiv = 0;
 	      for (equiv = e->locs; equiv; equiv = equiv->next)
 		{
-		  if (CONSTANT_P (equiv->loc))
+		  if (CONSTANT_P (equiv->loc)
+		      && (GET_MODE (equiv->loc) == GET_MODE (mem)
+			  || (GET_MODE (equiv->loc) == VOIDmode
+			      && GET_MODE_CLASS (GET_MODE (mem)) == MODE_INT)))
 		    const_equiv = equiv;
 		  else if (REG_P (equiv->loc)
 			   /* Extending hard register lifetimes causes crash
@@ -11020,7 +11023,8 @@ load_mems (const struct loop *loop)
 			      probably also not good idea, since we most
 			      probably have pseudoregister equivalence as
 			      well.  */
-			   && REGNO (equiv->loc) >= FIRST_PSEUDO_REGISTER)
+			   && REGNO (equiv->loc) >= FIRST_PSEUDO_REGISTER
+			   && GET_MODE (equiv->loc) == GET_MODE (mem))
 		    best_equiv = equiv;
 		}
 	      /* Use the constant equivalence if that is cheap enough.  */

@@ -179,10 +179,17 @@ c_build_bind_expr (tree block, tree body)
    decl instead.  */
 
 static enum gimplify_status
-gimplify_compound_literal_expr (tree *expr_p, tree *pre_p)
+gimplify_compound_literal_expr (tree *expr_p, tree *pre_p, fallback_t fallback)
 {
   tree decl_s = COMPOUND_LITERAL_EXPR_DECL_STMT (*expr_p);
   tree decl = DECL_EXPR_DECL (decl_s);
+
+  if (!(fallback & fb_lvalue) && DECL_INITIAL (decl))
+    {
+      *expr_p = DECL_INITIAL (decl);
+      return GS_OK;
+    }
+
   /* Preliminarily mark non-addressed complex variables as eligible
      for promotion to gimple registers.  We'll transform their uses
      as we find them.  */
@@ -207,7 +214,7 @@ gimplify_compound_literal_expr (tree *expr_p, tree *pre_p)
 /* Do C-specific gimplification.  Args are as for gimplify_expr.  */
 
 int
-c_gimplify_expr (tree *expr_p, tree *pre_p, tree *post_p ATTRIBUTE_UNUSED)
+c_gimplify_expr (tree *expr_p, tree *pre_p, tree *post_p ATTRIBUTE_UNUSED, int fallback)
 {
   enum tree_code code = TREE_CODE (*expr_p);
 
@@ -227,7 +234,61 @@ c_gimplify_expr (tree *expr_p, tree *pre_p, tree *post_p ATTRIBUTE_UNUSED)
       return GS_UNHANDLED;
       
     case COMPOUND_LITERAL_EXPR:
-      return gimplify_compound_literal_expr (expr_p, pre_p);
+      return gimplify_compound_literal_expr (expr_p, pre_p, fallback);
+
+    case INIT_EXPR:
+    case MODIFY_EXPR:
+      if (TREE_CODE (TREE_OPERAND (*expr_p, 1)) == COMPOUND_LITERAL_EXPR)
+	{
+	  tree complit = TREE_OPERAND (*expr_p, 1);
+	  tree decl_s = COMPOUND_LITERAL_EXPR_DECL_STMT (complit);
+	  tree decl = DECL_EXPR_DECL (decl_s);
+	  tree init = DECL_INITIAL (decl);
+
+	  /* struct T x = (struct T) { 0, 1, 2 } can be optimized
+	     into struct T x = { 0, 1, 2 } if the address of the
+	     compound literal has never been taken.  */
+	  if (!TREE_ADDRESSABLE (complit)
+	      && !TREE_ADDRESSABLE (decl)
+	      && init)
+	    {
+	      *expr_p = copy_node (*expr_p);
+	      TREE_OPERAND (*expr_p, 1) = init;
+	      return GS_OK;
+	    }
+	}
+      /* Optimize the case where we have a compound literals inside a constructor.  */
+      if (TREE_CODE (TREE_OPERAND (*expr_p, 1)) == CONSTRUCTOR)
+	{
+	  unsigned HOST_WIDE_INT ix;
+	  constructor_elt *ce;
+	  VEC(constructor_elt,gc) *v;
+	  bool changed = false;
+	  *expr_p = copy_node (*expr_p);
+	  v = CONSTRUCTOR_ELTS (TREE_OPERAND (*expr_p, 1));
+
+	  for (ix = 0; VEC_iterate (constructor_elt, v, ix, ce); ix++)
+	    if (TREE_CODE (ce->value) == COMPOUND_LITERAL_EXPR)
+	      {
+		tree complit = ce->value;
+		tree decl_s = COMPOUND_LITERAL_EXPR_DECL_STMT (complit);
+		tree decl = DECL_EXPR_DECL (decl_s);
+		tree init = DECL_INITIAL (decl);
+
+		/* struct T x = (struct T) { 0, 1, 2 } can be optimized
+		   into struct T x = { 0, 1, 2 } if the address of the
+		   compound literal has never been taken.  */
+		if (!TREE_ADDRESSABLE (complit)
+		    && !TREE_ADDRESSABLE (decl)
+		    && init)
+		  {
+		    ce->value = init;
+		    changed = true;
+		  }
+	      }
+	  return changed ? GS_OK : GS_UNHANDLED;
+	}
+      return GS_UNHANDLED;
 
     default:
       return GS_UNHANDLED;

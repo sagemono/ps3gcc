@@ -32,9 +32,9 @@
  * single keyword vector data types for use in mapping VMX code
  * to the SPU.
  */
-#define vec_bchar16	vector unsigned char
-#define vec_bshort8	vector unsigned short
-#define vec_pixel8	vector unsigned short
-#define vec_bint4	vector unsigned int
+#define vec_bchar16	__vector unsigned char
+#define vec_bshort8	__vector unsigned short
+#define vec_pixel8	__vector unsigned short
+#define vec_bint4	__vector unsigned int
 
 #endif /* _VEC_TYPES_H_ */

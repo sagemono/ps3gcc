@@ -2113,6 +2113,12 @@ instantiate_parameters_1 (struct loop *loop, tree chrec, int flags, htab_t cache
       if (op0 == TREE_OPERAND (chrec, 0))
 	return chrec;
 
+      /* If we used chrec_convert_aggressive, we can no longer assume that
+	 signed chrecs do not overflow, as chrec_convert does, so avoid
+         calling it in that case.  */
+      if (flags & FOLD_CONVERSIONS)
+	return fold_convert (TREE_TYPE (chrec), op0);
+
       return chrec_convert (TREE_TYPE (chrec), op0, NULL_TREE);
 
     case SCEV_NOT_KNOWN:
@@ -2602,6 +2608,7 @@ simple_iv (struct loop *loop, tree stmt, tree op, affine_iv *iv,
       && !chrec_contains_symbols_defined_in_loop (ev, loop->num))
     {
       iv->base = ev;
+      iv->step = build_int_cst (TREE_TYPE (ev), 0);
       iv->no_overflow = true;
       return true;
     }

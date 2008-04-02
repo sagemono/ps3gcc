@@ -51,15 +51,18 @@ mprx
 Target Report RejectNegative
 Link objects in PRX mode.
 
+mprx-with-runtime
+Target Report RejectNegative
+Link objects in PRX mode with the PRX runtime.
+
 mlv2-stub
 Target Report RejectNegative
 Link with the lv2_stub.a library (even when using -mno-prxfixup)
 
-mlto-annotations
-Target Report Var(flag_lto_annotations,1) Init(0)
-Add Link-Time-Optimizer annotations to the object (Default off)
+msn-ld
+Target Rerpot
+Invoke SN linker instead of GNU binutils LD. This is default.
 
-
-
-
-
+mforce-prx-fixup
+Target Rerpot RejectNegative
+Invoke ppu-lv2-fixup instead of oneramp linking built in SN LD. This is for debug perpose.

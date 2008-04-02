@@ -30,6 +30,7 @@
 #ifdef OBJ_ELF
 #include "elf/ppc.h"
 #include "dwarf2dbg.h"
+#include "elf/ppc64.h"
 #endif
 
 #ifdef TE_PE
@@ -736,6 +737,15 @@ static bfd_boolean msolaris = SOLARIS_P;
    the macro DWARF2_ADDR_SIZE, which is defined in tc-ppc.h.*/
 bfd_boolean mcelloslv2 = FALSE;
 /* end sce local */
+
+/* begin sce local bugzilla 39026 */
+/* flag for -mleave-branch-reloc/-mno-leave-branch-reloc option.*/
+static bfd_boolean flag_leave_branch_relocs = TRUE;
+
+/* Recording the latest non global label. */
+static symbolS * latest_non_local_label = NULL;
+
+/* end sce local bugzilla 39026 */
 #endif
 
 #ifdef OBJ_XCOFF
@@ -948,6 +958,41 @@ parse_cpu (const char *arg)
   return 1;
 }
 
+/* begin sce local bugzilla 39026 */
+/* A part of intialization. Here I check environment variables. */
+void
+ppc_special_init(argc, argv)
+     int argc ATTRIBUTE_UNUSED;
+     char ** argv ATTRIBUTE_UNUSED;
+{
+  char * envp = getenv("AS_LEAVE_BRANCH_RELOCS");
+  if (envp != NULL)
+    {
+      if (strcasecmp (envp, "yes") == 0)
+	flag_leave_branch_relocs = TRUE;
+      else if (strcasecmp (envp, "no") == 0)
+	flag_leave_branch_relocs = FALSE;
+      else
+	fprintf (stderr, _("Unknown value is specified in environment variable AS_LEAVE_BRANCH_FIXUP.\n"));
+    }
+}
+
+/* Return 1 if given LABEL represents local label. */
+static int
+is_local_label (symbolS * label)
+{
+  assert (label != NULL);
+
+  /* If the label matches m/^.L.*$/, we dont recort it */
+  if (! S_IS_DEBUG(label)
+      && bfd_is_local_label (stdoutput, symbol_get_bfdsym (label)))
+    return 1;
+
+  return 0;
+}
+/* begin sce local bugzilla 39026 */
+
+
 int
 md_parse_option (c, arg)
      int c;
@@ -1080,6 +1125,26 @@ md_parse_option (c, arg)
 	}
       
       /* end sce local */
+      /* begin sce local bugzilla 39026 */
+      else if (strcmp (arg, "local-fixup") == 0)
+	{
+	  flag_leave_branch_relocs = FALSE;
+	}
+      else if (strcmp (arg, "no-local-fixup") == 0)
+	{
+	  flag_leave_branch_relocs = TRUE;
+	}
+#if 0
+      else if (strcmp (arg, "leave-branch-relocs") == 0)
+	{
+	  flag_leave_branch_relocs = TRUE;
+	}
+      else if (strcmp (arg, "no-leave-branch-relocs") == 0)
+	{
+	  flag_leave_branch_relocs = FALSE;
+	}
+#endif
+      /* end sce local bugzilla 39026 */
 #endif
       else
 	{
@@ -1163,7 +1228,9 @@ PowerPC options:\n\
 -msolaris		generate code for Solaris\n\
 -mno-solaris		do not generate code for Solaris\n\
 -V			print assembler version number\n\
--Qy, -Qn		ignored\n"));
+-Qy, -Qn		ignored\n\
+-mlocal-fixup,-mno-localfixup\n\
+                        Leave relocations about calling function even if assemler can resolve them"));
 #endif
 }
 
@@ -2179,6 +2246,7 @@ md_assemble (str)
 #ifdef OBJ_ELF
   bfd_reloc_code_real_type reloc;
 #endif
+  int keep_this_reloc_unresolved = 0;
 
   /* Get the opcode.  */
   for (s = str; *s != '\0' && ! ISSPACE (*s); s++)
@@ -2200,6 +2268,13 @@ md_assemble (str)
 
       return;
     }
+  /* begin sce local bugzilla 39026 */
+  if (strcmp (opcode->name, "b") == 0
+      || strcmp (opcode->name, "bl") == 0
+      || strcmp (opcode->name, "ba") == 0
+      || strcmp (opcode->name, "bla") == 0)
+    keep_this_reloc_unresolved = 1;
+  /* end sce local bugzilla 39026 */
 
   insn = opcode->opcode;
 
@@ -2768,13 +2843,28 @@ md_assemble (str)
 	    }
 	}
       else
-	fix_new_exp (frag_now,
-		     f - frag_now->fr_literal,
-		     4,
-		     &fixups[i].exp,
-		     (operand->flags & PPC_OPERAND_RELATIVE) != 0,
-		     ((bfd_reloc_code_real_type)
-		      (fixups[i].opindex + (int) BFD_RELOC_UNUSED)));
+	{
+	  /* begin sce local bugzilla 39026 */
+	  fixS *fix =  fix_new_exp (frag_now,
+				    f - frag_now->fr_literal,
+				    4,
+				    &fixups[i].exp,
+				    (operand->flags & PPC_OPERAND_RELATIVE) != 0,
+				    ((bfd_reloc_code_real_type)
+				     (fixups[i].opindex + (int) BFD_RELOC_UNUSED )));
+	  if (keep_this_reloc_unresolved
+	      && fix->fx_addsy
+	      && symbol_constant_p (fix->fx_addsy)
+	      && ! is_local_label (fix->fx_addsy))
+	    {
+	      const char * dstname = S_GET_NAME (fix->fx_addsy);
+	      const char * non_local_name
+		= latest_non_local_label != NULL? S_GET_NAME(latest_non_local_label): "";
+	      if (strcmp (dstname, non_local_name) != 0)
+		REMAIN_UNRESOLVED(fix);
+	    }
+	  /* end sce local bugzilla 39026 */
+	}
     }
 }
 
@@ -5588,6 +5678,11 @@ int
 ppc_fix_adjustable (fix)
      fixS *fix;
 {
+  /* begin sce local bugzilla 39026 */
+  if (flag_leave_branch_relocs && REMAIN_UNRESOLVED_P(fix))
+    return 0;
+  /* begin sce local bugzilla 39026 */
+
   return (fix->fx_r_type != BFD_RELOC_16_GOTOFF
 	  && fix->fx_r_type != BFD_RELOC_LO16_GOTOFF
 	  && fix->fx_r_type != BFD_RELOC_HI16_GOTOFF
@@ -6221,3 +6316,31 @@ ppc_dwarf2_addr_size (bfd *abfd)
   return bfd_arch_bits_per_address (abfd) / 8;
 }
 
+
+/* begin sce local bugzilla 39026 */
+int
+ppc_force_relocation_local (fixS *fix)
+{
+  if (flag_leave_branch_relocs && REMAIN_UNRESOLVED_P(fix))
+    return 1;
+
+  return (!fix->fx_pcrel
+	  || fix->fx_plt
+	  || TC_FORCE_RELOCATION (fix));
+}
+
+void
+ppc_check_label (symbolS * label)
+{
+  if (! is_local_label (label))
+    latest_non_local_label = label;
+}
+
+void
+ppc_frob_file_after_relocs()
+{
+  if (flag_leave_branch_relocs)
+    elf_elfheader (stdoutput)->e_flags |= EF_PPC64_REL24;
+}
+
+/* end sce local bugzilla 39026 */

@@ -325,6 +325,7 @@ extern const char *rs6000_hint_str;
 
 #define RS6000_GENERATE_MICROCODE
 #define RS6000_GENERATE_MULTITHREAD_SCHEDULING
+#define RS6000_WARN_LHS
 /* CELL LOCAL End */
 
 /* Alignment options for fields in structures for sub-targets following
@@ -378,6 +379,11 @@ extern const char *rs6000_hint_str;
 /* Target pragma.  */
 #define REGISTER_TARGET_PRAGMAS() do {				\
   c_register_pragma (0, "longcall", rs6000_pragma_longcall);	\
+  /** SCE bugilla #11003 **/ \
+  /* APPLE LOCAL begin pragma reverse_bitfileds, ms_struct */ \
+  c_register_pragma (0, "reverse_bitfields", darwin_pragma_reverse_bitfields);	\
+  c_register_pragma (0, "ms_struct", darwin_pragma_ms_struct);	\
+  /* APPLE LOCAL end pragma reverse_bitfileds, ms_struct */ \
   targetm.resolve_overloaded_builtin = altivec_resolve_overloaded_builtin; \
 } while (0)
 
@@ -527,9 +533,7 @@ extern const char *rs6000_hint_str;
    local store.  TYPE is the data type, and ALIGN is the alignment
    that the object would ordinarily have.  */
 #define LOCAL_ALIGNMENT(TYPE, ALIGN)				\
-  ((TARGET_ALTIVEC && TREE_CODE (TYPE) == VECTOR_TYPE) ? 128 :	\
-    (TARGET_E500_DOUBLE && TYPE_MODE (TYPE) == DFmode) ? 64 : \
-    (TARGET_SPE && TREE_CODE (TYPE) == VECTOR_TYPE) ? 64 : ALIGN)
+  DATA_ALIGNMENT (TYPE, ALIGN)
 
 /* Alignment of field after `int : 0' in a structure.  */
 #define EMPTY_FIELD_BOUNDARY 32
@@ -1876,11 +1880,6 @@ do {								\
 
 /* #define LEGITIMATE_PIC_OPERAND_P (X) */
 
-/* Define this if some processing needs to be done immediately before
-   emitting code for an insn.  */
-
-#define FINAL_PRESCAN_INSN(INSN,OPERANDS,NOPERANDS) \
-   ppu_final_prescan_insn (INSN,OPERANDS,NOPERANDS)
 
 /* Specify the machine mode that this machine uses
    for the index in the tablejump instruction.  */
@@ -1899,12 +1898,6 @@ do {								\
    also convert validly to an unsigned one.  */
 
 /* #define FIXUNS_TRUNC_LIKE_FIX_TRUNC */
-
-/* An integer expression for the size in bits of the largest integer machine
-   mode that should actually be used.  */
-
-/* Allow pairs of registers to be used, which is the intent of the default.  */
-#define MAX_FIXED_MODE_SIZE GET_MODE_BITSIZE (TARGET_POWERPC64 ? TImode : DImode)
 
 /* Max number of bytes we can move from memory to memory
    in one reasonably fast instruction.  */
@@ -2316,11 +2309,6 @@ extern char rs6000_reg_names[][8];	/* register names (0 vs. %r0).  */
 #define ASM_OUTPUT_ALIGN(FILE,LOG)	\
   if ((LOG) != 0)			\
     fprintf (FILE, "\t.align %d\n", (LOG))
-
-/* LTO symbol for end of jump table */
-#define ASM_OUTPUT_CASE_END(STREAM, NUM, TABLE) \
-  ppu_asm_jumptable_end (STREAM, NUM)
-
 
 /* Pick up the return address upon entry to a procedure. Used for
    dwarf2 unwind information.  This also enables the table driven
@@ -3136,3 +3124,10 @@ enum rs6000_builtin_type_index
 extern GTY(()) tree rs6000_builtin_types[RS6000_BTI_MAX];
 extern GTY(()) tree rs6000_builtin_decls[RS6000_BUILTIN_COUNT];
 
+/** SCE bugilla #11003 **/
+/* APPLE LOCAL begin pragma reverse_bitfields, ms_struct */
+/* True if pragma reverse_bitfields is in effect.  */
+extern int darwin_reverse_bitfields;
+/* True if pragma ms_struct is in effect.  */
+extern int darwin_ms_struct;
+/* APPLE LOCAL end pragma reverse_bitfields, ms_struct */

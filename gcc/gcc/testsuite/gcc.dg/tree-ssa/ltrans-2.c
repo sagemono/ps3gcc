@@ -1,5 +1,5 @@
 /* { dg-do compile } */ 
-/* { dg-options "-O2 -ftree-loop-linear -fdump-tree-ltrans-all" } */
+/* { dg-options "-O2 -ftree-loop-linear -Wno-tree-loop-linear -fdump-tree-ltrans-all" } */
 
 double u[1782225];
 int foo(int N, int *res)

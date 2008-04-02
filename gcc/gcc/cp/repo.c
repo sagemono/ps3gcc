@@ -246,8 +246,10 @@ finish_repo (void)
 	 that we chose.  That will ensure that the names of types from
 	 anonymous namespaces will get the same mangling when this
 	 file is recompiled.  */
-      if (!strstr (args, "'-frandom-seed="))
-	fprintf (repo_file, " '-frandom-seed=%s'", flag_random_seed);
+      if (!strstr (args, HOST_QUOTE_STR "-frandom-seed="))
+	fprintf (repo_file,
+                 " " HOST_QUOTE_STR "-frandom-seed=%s" HOST_QUOTE_STR,
+                 flag_random_seed);
       fprintf (repo_file, "\n");
     }
 

@@ -872,14 +872,6 @@ extern struct rtx_def *spu_compare_op1;
 #define ASM_OUTPUT_ADDR_DIFF_ELT(FILE, BODY, VALUE, REL)  \
   fprintf (FILE, "\t.word .L%d-.L%d\n", VALUE, REL)
 
-/* Make sure code is 8 byte aligned after the table. */
-# define ASM_OUTPUT_CASE_END(FILE, NUM, TABLE) \
-    do { \
-	/* LTO symbol for end of jump table */ \
-	lto_asm_jumptable_end(FILE,NUM); \
-    } while (0)
-
-
 /* This is how to output an assembler line
    that says to advance the location counter
    to a multiple of 2**LOG bytes.  */
@@ -888,8 +880,6 @@ extern struct rtx_def *spu_compare_op1;
   do { if (LOG!=0) fprintf (FILE, "\t.align\t%d\n", (LOG)); } while (0)
 
 
-#define FINAL_PRESCAN_INSN(INSN,OPERANDS,NOPERANDS) \
-    spu_final_prescan_insn (INSN, OPERANDS, NOPERANDS)
 
 /* This is how to output an assembler line that says to advance the
    location counter by SIZE bytes.  */
@@ -1078,4 +1068,24 @@ extern int pragma_loop_seen;
    optimizer uses to determing if invariants should be moved out of a
    loop. */
 #define INCREASE_LOOP_THRESHOLD 128
+
+/* Target pragma.  */
+#define REGISTER_TARGET_PRAGMAS() do {				\
+  /** SCE bugilla #11003 **/ \
+  /* APPLE LOCAL begin pragma reverse_bitfileds, ms_struct */ \
+  c_register_pragma (0, "reverse_bitfields", darwin_pragma_reverse_bitfields);	\
+  c_register_pragma (0, "ms_struct", darwin_pragma_ms_struct);	\
+  /* APPLE LOCAL end pragma reverse_bitfileds, ms_struct */ \
+} while (0)
+
+/** SCE bugilla #11003 **/
+/* APPLE LOCAL begin pragma reverse_bitfields, ms_struct */
+/* True if pragma reverse_bitfields is in effect.  */
+extern int darwin_reverse_bitfields;
+/* True if pragma ms_struct is in effect.  */
+extern int darwin_ms_struct;
+/* APPLE LOCAL end pragma reverse_bitfields, ms_struct */
+
+/* We want to generate warnings when in pic code */
+#define NOTICE_STATIC_STORAGE_VARS(VARS)  spu_notice_static_storage_vars(VARS)
 

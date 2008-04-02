@@ -2931,7 +2931,8 @@ try_combine (rtx i3, rtx i2, rtx i1, int *new_direct_jump_p)
     if (i3_subst_into_i2)
       {
 	for (i = 0; i < XVECLEN (PATTERN (i2), 0); i++)
-	  if (GET_CODE (XVECEXP (PATTERN (i2), 0, i)) != USE
+	  if ((GET_CODE (XVECEXP (PATTERN (i2), 0, i)) == SET
+	       || GET_CODE (XVECEXP (PATTERN (i2), 0, i)) == CLOBBER)
 	      && REG_P (SET_DEST (XVECEXP (PATTERN (i2), 0, i)))
 	      && SET_DEST (XVECEXP (PATTERN (i2), 0, i)) != i2dest
 	      && ! find_reg_note (i2, REG_UNUSED,
@@ -4598,6 +4599,13 @@ combine_simplify_rtx (rtx x, enum machine_mode op0_mode, int in_dest)
 	  if (GET_CODE (temp) != CLOBBER && temp != tor)
 	    return temp;
 	}
+
+      /* (a + a) -> (a << 1) */
+      if (GET_MODE_CLASS (mode) == MODE_INT
+	  && GET_CODE (x) == PLUS
+	  && rtx_equal_p (XEXP (x, 0), XEXP (x, 1)))
+	return simplify_shift_const (NULL_RTX, ASHIFT, mode, XEXP (x, 0), 1);
+
       break;
 
     case MINUS:
@@ -9401,6 +9409,14 @@ simplify_shift_const (rtx x, enum rtx_code code,
 	  break;
 
 	case PLUS:
+	  /* (plus A A) -> (ashift A 1) */
+	  if (XEXP (varop, 0) == XEXP (varop, 1))
+	    {
+	      varop = gen_rtx_ASHIFT (GET_MODE (varop), XEXP (varop, 0),
+				      CONST1_RTX (GET_MODE (varop)));
+	      continue;
+	    }
+
 	  /* (lshiftrt (plus A -1) C) where A is either 0 or 1 and C
 	     is one less than the number of bits in the mode is
 	     equivalent to (xor A 1).  */

@@ -30,16 +30,16 @@
 #ifndef  _SPU_INTRINSICS_GCC_H
 #define _SPU_INTRINSICS_GCC_H 
  
-#define vec_uchar16             vector unsigned char
-#define vec_char16              vector   signed char
-#define vec_ushort8             vector unsigned short
-#define vec_short8              vector   signed short
-#define vec_uint4               vector unsigned int
-#define vec_int4                vector   signed int
-#define vec_ullong2             vector unsigned long long
-#define vec_llong2              vector   signed long long
-#define vec_float4              vector          float
-#define vec_double2             vector          double
+#define vec_uchar16             __vector unsigned char
+#define vec_char16              __vector   signed char
+#define vec_ushort8             __vector unsigned short
+#define vec_short8              __vector   signed short
+#define vec_uint4               __vector unsigned int
+#define vec_int4                __vector   signed int
+#define vec_ullong2             __vector unsigned long long
+#define vec_llong2              __vector   signed long long
+#define vec_float4              __vector          float
+#define vec_double2             __vector          double
 
 /* SPU Channel Defines 
  */

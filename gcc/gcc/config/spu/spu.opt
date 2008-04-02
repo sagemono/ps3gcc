@@ -75,6 +75,11 @@ mspurs-job
 Target Report
 Build executable for SPURS job model
 
+mspurs-job-initialize
+Target Report
+Build executable for SPURS job model
+Build executable for SPURS job model with some extensions
+
 mspurs-task
 Target Report
 Build executable for SPURS task model
@@ -127,12 +132,11 @@ mdouble=
 Target RejectNegative Joined Var(spu_double_acc_str)
 Accuracy of double operations: compat, accurate, fast
 
-mlto-annotations
-Target Report Var(flag_lto_annotations,1) Init(0)
-Add Link-Time-Optimizer annotations to the object (Default off)
-
 msafe-hints
 Target Report Mask(SAFE_HINTS)
 Insert hbrp instructions after hinted branch targets to avoid the SPU hang issue
 
+mwarn-stop0
+Target Report Mask(WARN_STOP0)
+Warn when using 0 as an argument to the stop instruction or intrinsics
 

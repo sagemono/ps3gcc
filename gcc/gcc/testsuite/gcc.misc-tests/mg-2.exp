@@ -20,5 +20,5 @@ load_lib mike-gcc.exp
 
 prebase
 set actions none-of-the-above
-set compiler_output "mg-2.o ?: .*mg-2.c \[ \\\\\n\]*nonexist.h"
+set compiler_output "mg-2.o ?: .*mg-2.c \[ \\\\\n\]*nonexist0.h nonexist.h"
 postbase mg-2.c "" "" "-MM -MG"

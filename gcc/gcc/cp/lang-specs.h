@@ -34,24 +34,30 @@ Boston, MA 02110-1301, USA.  */
   {".C",   "@c++", 0, 0, 0},
   {".CPP", "@c++", 0, 0, 0},
   {".H",   "@c++-header", 0, 0, 0},
+  {".hpp", "@c++-header", 0, 0, 0},
+  {".hp",  "@c++-header", 0, 0, 0},
+  {".hxx", "@c++-header", 0, 0, 0},
+  {".h++", "@c++-header", 0, 0, 0},
+  {".HPP", "@c++-header", 0, 0, 0},
+  {".tcc", "@c++-header", 0, 0, 0},
   {".hh",  "@c++-header", 0, 0, 0},
   {"@c++-header",
     "%{E|M|MM:cc1plus -E %(cpp_options) %2 %(cpp_debug_options)}\
      %{!E:%{!M:%{!MM:\
-       %{save-temps|no-integrated-cpp:cc1plus -E\
-		%(cpp_options) %2 -o %{save-temps:%b.ii} %{!save-temps:%g.ii} \n}\
-      cc1plus %{save-temps|no-integrated-cpp:-fpreprocessed %{save-temps:%b.ii} %{!save-temps:%g.ii}}\
-	      %{!save-temps:%{!no-integrated-cpp:%(cpp_unique_options)}}\
+       %{save-temps|save-temps-o|no-integrated-cpp:cc1plus -E\
+		%(cpp_options) %2 -o %{save-temps-o:%{o*:%p}}%g.ii \n}\
+      cc1plus %{save-temps|save-temps-o|no-integrated-cpp:-fpreprocessed %{save-temps-o:%{o*:%p}}%g.ii}\
+	      %{!save-temps:%{!save-temps-o:%{!no-integrated-cpp:%(cpp_unique_options)}}}\
 	%(cc1_options) %2 %{+e1*}\
 	-o %g.s %{!o*:--output-pch=%i.gch} %W{o*:--output-pch=%*}%V}}}",
      CPLUSPLUS_CPP_SPEC, 0, 0},
   {"@c++",
     "%{E|M|MM:cc1plus -E %(cpp_options) %2 %(cpp_debug_options)}\
      %{!E:%{!M:%{!MM:\
-       %{save-temps|no-integrated-cpp:cc1plus -E\
-		%(cpp_options) %2 -o %{save-temps:%b.ii} %{!save-temps:%g.ii} \n}\
-      cc1plus %{save-temps|no-integrated-cpp:-fpreprocessed %{save-temps:%b.ii} %{!save-temps:%g.ii}}\
-	      %{!save-temps:%{!no-integrated-cpp:%(cpp_unique_options)}}\
+       %{save-temps|save-temps-o|no-integrated-cpp:cc1plus -E\
+		%(cpp_options) %2 -o %{save-temps-o:%{o*:%p}}%g.ii \n}\
+      cc1plus %{save-temps|save-temps-o|no-integrated-cpp:-fpreprocessed %{save-temps-o:%{o*:%p}}%g.ii}\
+	      %{!save-temps:%{!save-temps-o:%{!no-integrated-cpp:%(cpp_unique_options)}}}\
 	%(cc1_options) %2 %{+e1*}\
        %{!fsyntax-only:%(invoke_as)}}}}",
      CPLUSPLUS_CPP_SPEC, 0, 0},

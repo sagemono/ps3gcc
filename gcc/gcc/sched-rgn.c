@@ -91,6 +91,11 @@ static int nr_inter, nr_spec;
 static int is_cfg_nonregular (void);
 static bool sched_is_disabled_for_current_region_p (void);
 
+/* Prototype this backend function to avoid compilation warnings.  */
+#ifdef RS6000_GENERATE_MULTITHREAD_SCHEDULING
+void rs6000_sched_fixup_cell (FILE *, int);
+#endif
+
 /* A region is the main entity for interblock scheduling: insns
    are allowed to move between blocks in the same region, along
    control flow graph edges, in the 'up' direction.  */

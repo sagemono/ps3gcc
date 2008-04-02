@@ -269,3 +269,26 @@ extern int ppc_cie_data_alignment;
 
 extern int ppc_dwarf2_addr_size (bfd *);
 #define DWARF2_ADDR_SIZE(bfd) ppc_dwarf2_addr_size (bfd)
+
+/* begin sce local bugzilla 39026 */
+void ppc_check_label(symbolS *);
+#define tc_check_label(x)  ppc_check_label(x)
+
+void ppc_special_init(int argc, char ** argv);
+#define HOST_SPECIAL_INIT(c,v)  ppc_special_init((c),(v))
+
+void ppc_frob_file_after_relocs (void);
+#define tc_frob_file_after_relocs() ppc_frob_file_after_relocs()
+
+#define EXTERN_FORCE_RELOC 1
+#define TC_FIX_TYPE  struct { int  remain_unresolved; }
+#define TC_INIT_FIX_DATA(FIX)  ((FIX)->tc_fix_data.remain_unresolved = 0)
+
+#define REMAIN_UNRESOLVED(FIX) ((FIX)->tc_fix_data.remain_unresolved = 1)
+#define REMAIN_UNRESOLVED_P(FIX) ((FIX)->tc_fix_data.remain_unresolved == 1)
+
+#include "write.h"
+extern int ppc_force_relocation_local (fixS *);
+#define TC_FORCE_RELOCATION_LOCAL(FIX)	ppc_force_relocation_local((FIX))
+
+/* end sce local bugzilla 39026 */

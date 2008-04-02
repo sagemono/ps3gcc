@@ -1570,12 +1570,19 @@ check_replaceable (temp_expr_table_p tab, tree stmt)
   if (flag_float_store && FLOAT_TYPE_P (TREE_TYPE (TREE_OPERAND (stmt, 1))))
     return false;
 
-  /* Calls to functions with side-effects cannot be replaced.  */
+  /* An assignment with a register variable on the RHS is not
+     replaceable.  */
+  if (TREE_CODE (TREE_OPERAND (stmt, 1)) == VAR_DECL
+      && DECL_HARD_REGISTER (TREE_OPERAND (stmt, 1)))
+    return false;
+
+  /* Calls to functions cannot be replaced (hard registers assigned will get moved
+     with saying calls with no side effects can be replaced except for __builtin_expect).  */
   if ((call_expr = get_call_expr_in (stmt)) != NULL_TREE)
     {
-      int call_flags = call_expr_flags (call_expr);
-      if (TREE_SIDE_EFFECTS (call_expr)
-	  && !(call_flags & (ECF_PURE | ECF_CONST | ECF_NORETURN)))
+      tree decl = get_callee_fndecl (call_expr);
+      if (!decl || DECL_BUILT_IN_CLASS (decl) != BUILT_IN_NORMAL
+	  || DECL_FUNCTION_CODE (decl) != BUILT_IN_EXPECT)
 	return false;
     }
 

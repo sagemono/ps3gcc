@@ -275,6 +275,7 @@ Objective-C and Objective-C++ Dialects}.
 -fdump-tree-copyrename@r{[}-@var{n}@r{]} @gol
 -fdump-tree-nrv -fdump-tree-vect @gol
 -fdump-tree-sink @gol
+-fdump-tree-store-sink @gol
 -fdump-tree-sra@r{[}-@var{n}@r{]} @gol
 -fdump-tree-salias @gol
 -fdump-tree-fre@r{[}-@var{n}@r{]} @gol
@@ -335,7 +336,8 @@ Objective-C and Objective-C++ Dialects}.
 -fvariable-expansion-in-unroller @gol
 -ftree-pre  -ftree-ccp  -ftree-dce -ftree-loop-optimize @gol
 -ftree-loop-linear -ftree-loop-im -ftree-loop-ivcanon -fivopts @gol
--ftree-dominator-opts -ftree-dse -ftree-copyrename -ftree-sink @gol
+-ftree-dominator-opts -ftree-dse -ftree-copyrename @gol
+-ftree-store-sink -ftree-sink @gol
 -ftree-ch -ftree-sra -ftree-ter -ftree-lrs -ftree-fre -ftree-vectorize @gol
 -ftree-vect-loop-version -ftree-salias -fweb @gol
 -ftree-copy-prop -ftree-store-ccp -ftree-store-copy-prop -fwhole-program @gol
@@ -849,6 +851,12 @@ Objective-C++ source code which should not be preprocessed.
 
 @item @var{file}.hh
 @itemx @var{file}.H
+@itemx @var{file}.hp
+@itemx @var{file}.hxx
+@itemx @var{file}.hpp
+@itemx @var{file}.HPP
+@itemx @var{file}.h++
+@itemx @var{file}.tcc
 C++ header file to be turned into a precompiled header.
 
 @item @var{file}.f
@@ -1057,7 +1065,8 @@ Display the version number and copyrights of the invoked GCC@.
 @cindex C++ source file suffixes
 C++ source files conventionally use one of the suffixes @samp{.C},
 @samp{.cc}, @samp{.cpp}, @samp{.CPP}, @samp{.c++}, @samp{.cp}, or
-@samp{.cxx}; C++ header files often use @samp{.hh} or @samp{.H}; and
+@samp{.cxx}; C++ header files often use @samp{.hh}, @samp{.hpp},
+@samp{.H}, or (for shared template code) @samp{.tcc}; and
 preprocessed C++ files use the suffix @samp{.ii}.  GCC recognizes
 files with these names and compiles them as C++ programs even if you
 call the compiler the same way as for compiling C programs (usually
@@ -4990,6 +4999,9 @@ is enabled by default at @option{-O} and higher.
 Perform forward store motion  on trees.  This flag is
 enabled by default at @option{-O} and higher.
 
+@item -ftree-store-sink
+Perform store sinking on trees. 
+
 @item -ftree-ccp
 Perform sparse conditional constant propagation (CCP) on trees.  This
 pass only operates on local scalar variables and is enabled by default
@@ -5078,6 +5090,9 @@ be determined at compile time then vectorized and non-vectorized versions of
 the loop are generated along with runtime checks for alignment or dependence
 to control which version is executed.  This option is enabled by default
 except at level @option{-Os} where it is disabled.
+
+@item -fvect-cost-model
+Enable cost model for vectorization.
 
 @item -ftree-vrp
 Perform Value Range Propagation on trees.  This is similar to the

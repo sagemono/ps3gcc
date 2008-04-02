@@ -1545,6 +1545,72 @@ _bfd_relocate_contents (reloc_howto_type *howto,
   return flag;
 }
 
+/* Clear a given location using a given howto, by applying a relocation value
+   of zero and discarding any in-place addend.  This is used for fixed-up
+   relocations against discarded symbols, to make ignorable debug or unwind
+   information more obvious.  */
+
+void
+_bfd_clear_contents (reloc_howto_type *howto,
+		     bfd *input_bfd,
+		     bfd_byte *location)
+{
+  int size;
+  bfd_vma x = 0;
+
+  /* Get the value we are going to relocate.  */
+  size = bfd_get_reloc_size (howto);
+  switch (size)
+    {
+    default:
+    case 0:
+      abort ();
+    case 1:
+      x = bfd_get_8 (input_bfd, location);
+      break;
+    case 2:
+      x = bfd_get_16 (input_bfd, location);
+      break;
+    case 4:
+      x = bfd_get_32 (input_bfd, location);
+      break;
+    case 8:
+#ifdef BFD64
+      x = bfd_get_64 (input_bfd, location);
+#else
+      abort ();
+#endif
+      break;
+    }
+
+  /* Zero out the unwanted bits of X.  */
+  x &= ~howto->dst_mask;
+
+  /* Put the relocated value back in the object file.  */
+  switch (size)
+    {
+    default:
+    case 0:
+      abort ();
+    case 1:
+      bfd_put_8 (input_bfd, x, location);
+      break;
+    case 2:
+      bfd_put_16 (input_bfd, x, location);
+      break;
+    case 4:
+      bfd_put_32 (input_bfd, x, location);
+      break;
+    case 8:
+#ifdef BFD64
+      bfd_put_64 (input_bfd, x, location);
+#else
+      abort ();
+#endif
+      break;
+    }
+}
+
 /*
 DOCDD
 INODE
@@ -1882,6 +1948,33 @@ ENUMX
   BFD_RELOC_SPARC_TLS_TPOFF64
 ENUMDOC
   SPARC TLS relocations
+
+ENUM
+  BFD_RELOC_SPU_IMM7
+ENUMX
+  BFD_RELOC_SPU_IMM8
+ENUMX
+  BFD_RELOC_SPU_IMM10
+ENUMX
+  BFD_RELOC_SPU_IMM10W
+ENUMX
+  BFD_RELOC_SPU_IMM16
+ENUMX
+  BFD_RELOC_SPU_IMM16W
+ENUMX
+  BFD_RELOC_SPU_IMM18
+ENUMX
+  BFD_RELOC_SPU_PCREL9a
+ENUMX
+  BFD_RELOC_SPU_PCREL9b
+ENUMX
+  BFD_RELOC_SPU_PCREL16
+ENUMX
+  BFD_RELOC_SPU_LO16
+ENUMX
+  BFD_RELOC_SPU_HI16
+ENUMDOC
+  SPU Relocations.
 
 ENUM
   BFD_RELOC_ALPHA_GPDISP_HI16
@@ -4427,33 +4520,6 @@ ENUMX
   BFD_RELOC_860_HIGOTOFF
 ENUMDOC
   Intel i860 Relocations.
-
-ENUM
-  BFD_RELOC_SPU_IMM7
-ENUMX
-  BFD_RELOC_SPU_IMM8
-ENUMX
-  BFD_RELOC_SPU_IMM10
-ENUMX
-  BFD_RELOC_SPU_IMM10W
-ENUMX
-  BFD_RELOC_SPU_IMM16
-ENUMX
-  BFD_RELOC_SPU_IMM16W
-ENUMX
-  BFD_RELOC_SPU_IMM18
-ENUMX
-  BFD_RELOC_SPU_PCREL9a
-ENUMX
-  BFD_RELOC_SPU_PCREL9b
-ENUMX
-  BFD_RELOC_SPU_PCREL16
-ENUMX
-  BFD_RELOC_SPU_LO16
-ENUMX
-  BFD_RELOC_SPU_HI16
-ENUMDOC
-  SPU Relocations.
 
 ENUM
   BFD_RELOC_OPENRISC_ABS_26

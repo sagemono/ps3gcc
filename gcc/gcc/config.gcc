@@ -2218,7 +2218,7 @@ sparc64-*-netbsd*)
 	tmake_file="${tmake_file} sparc/t-netbsd64"
 	;;
 spu-*-elf*)
-	tm_file="dbxelf.h elfos.h spu/spu-elf.h spu/spu.h"
+	tm_file="dbxelf.h elfos.h spu/spu-elf.h spu/spu.h spu/spu-builtins.h"
 	tmake_file="spu/t-spu-elf"
 	extra_headers="spu_intrinsics.h spu_intrinsics_gcc.h spu_internals.h vmx2spu.h vmx2spu_gcc.h spu_mfcio.h spu_mfcio_gcc.h vec_types.h"
 	extra_modes=spu/spu-modes.def
@@ -2227,7 +2227,7 @@ spu-*-elf*)
 	cxx_target_objs="${cxx_target_objs} spu-c.o"
 	;;
 spu-*-lv2)
-	tm_file="dbxelf.h elfos.h spu/spu-elf.h spu/spu.h spu/spu-lv2.h"
+	tm_file="dbxelf.h elfos.h spu/spu-elf.h spu/spu.h spu/spu-lv2.h spu/spu-builtins.h"
 	tmake_file="spu/t-spu-lv2"
 	extra_headers="spu_intrinsics.h spu_intrinsics_gcc.h spu_internals.h vmx2spu.h vmx2spu_gcc.h spu_mfcio.h spu_mfcio_gcc.h vec_types.h"
 	extra_modes=spu/spu-modes.def
@@ -2236,7 +2236,7 @@ spu-*-lv2)
 	cxx_target_objs="${cxx_target_objs} spu-c.o"
 	;;
 spu-*-tb)
-	tm_file="dbxelf.h elfos.h spu/spu-elf.h spu/spu.h spu/spu-lv2.h spu/spu-tb.h"
+	tm_file="dbxelf.h elfos.h spu/spu-elf.h spu/spu.h spu/spu-lv2.h spu/spu-tb.h spu/spu-builtins.h"
 	tmake_file="spu/t-spu-lv2"
 	extra_headers="spu_intrinsics.h spu_intrinsics_gcc.h spu_internals.h vmx2spu.h vmx2spu_gcc.h spu_mfcio.h spu_mfcio_gcc.h vec_types.h"
 	extra_modes=spu/spu-modes.def

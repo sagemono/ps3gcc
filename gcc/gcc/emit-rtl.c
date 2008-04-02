@@ -1516,9 +1516,10 @@ set_mem_attributes_minus_bitpos (rtx ref, tree t, int objectp,
     MEM_SCALAR_P (ref) = 1;
 
   /* We can set the alignment from the type if we are making an object,
-     this is an INDIRECT_REF, or if TYPE_ALIGN_OK.  */
+     this is an INDIRECT_REF or ARRAY_REF, or if TYPE_ALIGN_OK.  */
   if (objectp || TREE_CODE (t) == INDIRECT_REF 
       || TREE_CODE (t) == ALIGN_INDIRECT_REF 
+      || TREE_CODE (t) == ARRAY_REF
       || TYPE_ALIGN_OK (type))
     align = MAX (align, TYPE_ALIGN (type));
   else 
@@ -3151,7 +3152,7 @@ try_split (rtx pat, rtx trial, int last)
   rtx before = PREV_INSN (trial);
   rtx after = NEXT_INSN (trial);
   int has_barrier = 0;
-  rtx tem;
+  rtx tem, note_retval;
   rtx note, seq;
   int probability;
   rtx insn_last, insn;
@@ -3226,8 +3227,6 @@ try_split (rtx pat, rtx trial, int last)
 	      p = &XEXP (*p, 1);
 	    *p = CALL_INSN_FUNCTION_USAGE (trial);
 	    SIBLING_CALL_P (insn) = SIBLING_CALL_P (trial);
-	    insn->lto_info = trial->lto_info;
-	    trial->lto_info = 0;
 	  }
     }
 
@@ -3276,6 +3275,17 @@ try_split (rtx pat, rtx trial, int last)
 				       REG_NOTES (insn));
 	      insn = PREV_INSN (insn);
 	    }
+	  break;
+
+	case REG_LIBCALL:
+	  /* Relink the insns with REG_LIBCALL note and with REG_RETVAL note 
+	     after split.  */
+	    REG_NOTES (insn_last) 
+		= gen_rtx_INSN_LIST (REG_LIBCALL,
+                     	             XEXP (note, 0),
+                                     REG_NOTES (insn_last));	
+	    note_retval = find_reg_note (XEXP (note, 0), REG_RETVAL, NULL);
+	    XEXP (note_retval, 0) = insn_last;
 	  break;
 
 	default:
@@ -5461,11 +5471,6 @@ emit_copy_of_insn_after (rtx insn, rtx after)
     default:
       gcc_unreachable ();
     }
-
-  new->lto_kind = insn->lto_kind;
-  new->lto_info = insn->lto_info;
-  new->lto_tree = insn->lto_tree;
-
 
   /* Update LABEL_NUSES.  */
   mark_jump_label (PATTERN (new), new, 0);

@@ -1,5 +1,6 @@
 /* SPU ELF support for BFD.
-   Copyright 1999, 2000 Free Software Foundation, Inc.
+
+   Copyright 2006, 2007 Free Software Foundation, Inc.
 
    This file is part of BFD, the Binary File Descriptor library.
 
@@ -15,7 +16,7 @@
 
    You should have received a copy of the GNU General Public License
    along with this program; if not, write to the Free Software Foundation,
-   Inc., 59 Temple Place - Suite 330, Boston, MA 02111-1307, USA.  */
+   Inc., 51 Franklin Street - Fifth Floor, Boston, MA 02110-1301, USA.  */
 
 #ifndef _ELF_SPU_H
 #define _ELF_SPU_H
@@ -37,51 +38,19 @@ START_RELOC_NUMBERS (elf_spu_reloc_type)
      RELOC_NUMBER (R_SPU_REL9I,		10)
      RELOC_NUMBER (R_SPU_ADDR10I,	11)
      RELOC_NUMBER (R_SPU_ADDR16I,	12)
+     RELOC_NUMBER (R_SPU_REL32,		13)
+     RELOC_NUMBER (R_SPU_ADDR16X,	14)
+     RELOC_NUMBER (R_SPU_PPU32,		15)
+     RELOC_NUMBER (R_SPU_PPU64,		16)
 END_RELOC_NUMBERS (R_SPU_max)
 
 
-/* Processor specific flags for the ELF header e_flags field.  */
 
-#define	EF_PPC_EMB		0x80000000	/* PowerPC embedded flag  */
-
-						/* CYGNUS local bits below */
-#define	EF_PPC_RELOCATABLE	0x00010000	/* PowerPC -mrelocatable flag */
-#define	EF_PPC_RELOCATABLE_LIB	0x00008000	/* PowerPC -mrelocatable-lib flag */
-
-/* Processor specific section headers, sh_type field */
-
-#define SHT_ORDERED		SHT_HIPROC	/* Link editor is to sort the \
-						   entries in this section \
-						   based on the address \
-						   specified in the associated \
-						   symbol table entry.  */
-
-/* Processor specific section flags, sh_flags field */
-
-#define SHF_EXCLUDE		0x80000000	/* Link editor is to exclude \
-						   this section from executable \
-						   and shared objects that it \
-						   builds when those objects \
-						   are not to be furhter \
-						   relocated.  */
-
-#if (defined(BPA))
-/* Program header extensions */
-#define PT_SPU_INFO             0x70000000      /* SPU Dynamic Object Information */
-#endif
+/* SPU Dynamic Object Information.  */
+#define PT_SPU_INFO             0x70000000
 
 /* SPU plugin information */
-#define SPU_PLUGIN_NAMESZ               8
 #define SPU_PLUGIN_NAME         "SPUNAME"
 #define SPU_PTNOTE_SPUNAME	".note.spu_name"
-#define SPU_PLUGIN_LOOKUPNAMESZ        32
-
-typedef struct {
-  unsigned long namesz;
-  unsigned long descsz;
-  unsigned long type;
-  char          name[SPU_PLUGIN_NAMESZ];
-  char          lookupname[SPU_PLUGIN_LOOKUPNAMESZ];
-} SPUPLUGIN_INFO;
 
 #endif /* _ELF_SPU_H */

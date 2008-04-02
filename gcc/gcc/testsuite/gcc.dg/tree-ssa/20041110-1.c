@@ -1,5 +1,5 @@
 /* { dg-do compile } */
-/* { dg-options "-O2 -ftree-loop-linear" } */
+/* { dg-options "-O2 -ftree-loop-linear -Wno-tree-loop-linear" } */
 
 /* This testcase was causing an ICE in building distance vectors because
    we weren't ignoring the fact that one of the induction variables

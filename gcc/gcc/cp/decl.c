@@ -1412,6 +1412,9 @@ duplicate_decls (tree newdecl, tree olddecl, bool newdecl_is_friend)
 		     DECL_LANGUAGE (newdecl));
 	    }
 	}
+      else if (TREE_CODE (newdecl) == TYPE_DECL
+              && same_type_p (TREE_TYPE (newdecl), TREE_TYPE (olddecl)))
+       return NULL_TREE;
 
       if (DECL_LANG_SPECIFIC (olddecl) && DECL_USE_TEMPLATE (olddecl))
 	;
@@ -1535,6 +1538,9 @@ duplicate_decls (tree newdecl, tree olddecl, bool newdecl_is_friend)
       DECL_TEMPLATE_SPECIALIZATIONS (olddecl)
 	= chainon (DECL_TEMPLATE_SPECIALIZATIONS (olddecl),
 		   DECL_TEMPLATE_SPECIALIZATIONS (newdecl));
+
+      DECL_ATTRIBUTES (old_result)
+	= (*targetm.merge_decl_attributes) (old_result, new_result);
 
       if (DECL_FUNCTION_TEMPLATE_P (newdecl))
 	{
@@ -2176,7 +2182,8 @@ declare_local_label (tree id)
 }
 
 /* Returns nonzero if it is ill-formed to jump past the declaration of
-   DECL.  Returns 2 if it's also a real problem.  */
+   DECL.  Returns 3 if it's also a real problem.  Return 2 if the issue
+   is that a pod is initialized.   */
 
 static int
 decl_jump_unsafe (tree decl)
@@ -2185,8 +2192,10 @@ decl_jump_unsafe (tree decl)
       || TREE_TYPE (decl) == error_mark_node)
     return 0;
 
-  if (TYPE_NEEDS_CONSTRUCTING (TREE_TYPE (decl))
-      || DECL_NONTRIVIALLY_INITIALIZED_P (decl))
+  if (TYPE_NEEDS_CONSTRUCTING (TREE_TYPE (decl)))
+    return 3;
+
+  if (DECL_NONTRIVIALLY_INITIALIZED_P (decl))
     return 2;
 
   if (pod_type_p (TREE_TYPE (decl)))
@@ -2220,6 +2229,8 @@ check_previous_goto_1 (tree decl,
 	  int problem = decl_jump_unsafe (new_decls);
 	  if (! problem)
 	    continue;
+	  if (flag_source_4_0_2 && problem == 2)
+	    continue;
 
 	  if (! identified)
 	    {
@@ -2233,8 +2244,10 @@ check_previous_goto_1 (tree decl,
 	      identified = 1;
 	    }
 
-	  if (problem > 1)
+	  if (problem > 2)
 	    error ("  crosses initialization of %q+#D", new_decls);
+	  else if (problem > 1)
+	    pedwarn ("  crosses initialization of %q+#D", new_decls);
 	  else
 	    pedwarn ("  enters scope of non-POD %q+#D", new_decls);
 	}
@@ -4500,8 +4513,9 @@ reshape_init_r (tree type, reshape_iter *d, bool first_initializer_p)
 	    gcc_assert (!BRACE_ENCLOSED_INITIALIZER_P (init));
 	}
 
-      warning (OPT_Wmissing_braces, "missing braces around initializer for %qT",
-	       type);
+      if (TREE_CODE (type) != VECTOR_TYPE)
+	warning (OPT_Wmissing_braces, "missing braces around initializer for %qT",
+		 type);
     }
 
   /* Dispatch to specialized routines.  */
@@ -5155,7 +5169,16 @@ cp_finish_decl (tree decl, tree init, bool init_const_expr_p,
 	     initializer.  It is not legal to redeclare a static data
 	     member, so this issue does not arise in that case.  */
 	  if (var_definition_p && TREE_STATIC (decl))
-	    expand_static_init (decl, init);
+	    {
+	      /* begin sce local bugzilla 33905 */ 
+	      /* If a TREE_READONLY variable needs initialization
+		 at runtime, it is no longer readonly and we need to
+		 avoid MEM_READONLY_P being set on RTL created for it.  */
+	      if (init && TREE_READONLY (decl))
+		TREE_READONLY (decl) = 0;
+	      expand_static_init (decl, init);
+	      /* end sce local bugzilla 33905 */
+	    }
 	}
     }
 
@@ -5710,7 +5733,7 @@ check_class_member_definition_namespace (tree decl)
 
      The definition for a static data member shall appear in a
      namespace scope enclosing the member's class definition.  */
-  if (!is_ancestor (current_namespace, DECL_CONTEXT (decl)))
+  if (!flag_source_4_0_2 && !is_ancestor (current_namespace, DECL_CONTEXT (decl)))
     pedwarn ("definition of %qD is not in namespace enclosing %qT",
 	     decl, DECL_CONTEXT (decl));
 }
@@ -7621,7 +7644,7 @@ grokdeclarator (const cp_declarator *declarator,
 	{
 	  if (friendp)
 	    pedwarn ("member functions are implicitly friends of their class");
-	  else
+	  else if (!flag_source_4_0_2)
 	    pedwarn ("extra qualification %<%T::%> on member %qs",
 		     ctype, name);
 	}
@@ -11025,6 +11048,7 @@ finish_function (int flags)
       f->x_vtt_parm = NULL;
       f->x_return_value = NULL;
       f->bindings = NULL;
+      f->extern_decl_map = NULL;
 
       /* Handle attribute((warn_unused_result)).  Relies on gimple input.  */
       c_warn_unused_result (&DECL_SAVED_TREE (fndecl));

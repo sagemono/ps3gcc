@@ -79,7 +79,7 @@ void _start(unsigned long long arg0,
 	    unsigned long long arg19) __attribute__((naked));
 #elif defined(_SPURS_TASK)
 #include <stdint.h>
-void _start (qword arg0, uint64_t arg1);
+void _start (qword arg0, uint64_t arg1) __attribute__ ((naked));
 int cellSpursTaskMain(qword, uint64_t);
 void cellSpursTaskExit(int) __attribute__ ((noreturn));
 #else
@@ -186,7 +186,7 @@ _start(int spu_id NOT_USED_IN_STD_MAIN,
    * information register.  Default to everything up to _end. */
   end = (qword)spu_splats((unsigned int)(_end));
   stack_size = si_sf(end, chain);
-#if !defined (_RAW_SPU) && !defined (_SPU_THREAD)
+#if !defined (_RAW_SPU) && !defined (_SPU_THREAD) && !defined(_SPURS_TASK)
   /* The BE Linux ABI passes the stack size in $2, or use
      the default if $2 == 0. */
   {
@@ -223,7 +223,7 @@ _start(int spu_id NOT_USED_IN_STD_MAIN,
 	    arg10, arg11, arg12, arg13, arg14,
 	    arg15, arg16, arg17, arg18, arg19));
 #elif defined(_SPURS_TASK)
-  cellSpursTaskExit(cellSpursTaskMain(arg0, arg1));
+  exit(cellSpursTaskMain(arg0, arg1));
 #else
   exit(main(spu_id, param, env));
 #endif
@@ -248,6 +248,8 @@ _exit(int rc)
   }
 #if defined (_SPU_THREAD)
   sys_spu_thread_exit(rc);
+#elif defined (_SPURS_TASK)
+  cellSpursTaskExit(rc);
 #else
   /* Some self modifying code to return 'rc' in the 'stop' insn. */
   asm volatile (

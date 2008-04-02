@@ -26,6 +26,7 @@ Foundation, 51 Franklin Street, Fifth Floor, Boston, MA 02110-1301, USA.  */
 #include "internal.h"
 #include "mkdeps.h"
 #include "obstack.h"
+#include "hashtab.h"
 
 /* Stack of conditionals currently in progress
    (including both successful and failing conditionals).  */
@@ -122,6 +123,8 @@ static void do_pragma_poison (cpp_reader *);
 static void do_pragma_system_header (cpp_reader *);
 static void do_pragma_dependency (cpp_reader *);
 static void do_linemarker (cpp_reader *);
+static void do_pragma_push_macro (cpp_reader *);
+static void do_pragma_pop_macro (cpp_reader *);
 static const cpp_token *get_token_no_padding (cpp_reader *);
 static const cpp_token *get__Pragma_string (cpp_reader *);
 static void destringize_and_run (cpp_reader *, const cpp_string *);
@@ -1147,6 +1150,11 @@ _cpp_init_internal_pragmas (cpp_reader *pfile)
 		   false, true);
   register_pragma (pfile, "GCC", "dependency", do_pragma_dependency, 
 		   false, true);
+
+  /* sce local bugzilla#36665 */
+  register_pragma (pfile, 0, "push_macro", do_pragma_push_macro, false, true);
+  register_pragma (pfile, 0, "pop_macro", do_pragma_pop_macro, false, true);
+  /* sce local end */
 }
 
 /* Return the number of registered pragmas in PE.  */
@@ -1450,6 +1458,201 @@ do_pragma_dependency (cpp_reader *pfile)
 
   free ((void *) fname);
 }
+
+/* sce local bugzilla#36665 */
+struct def_pragma_macro_value GTY(())
+{
+  struct def_pragma_macro_value *prev;
+  cpp_macro *value;
+};
+
+struct def_pragma_macro GTY(())
+{
+  hashval_t hash;
+  const char *name;
+  struct def_pragma_macro_value value;
+};
+
+static GTY((param_is (struct def_pragma_macro))) htab_t pushed_macro_table;
+
+/* Hash table control functions for pushed_macro_table.  */
+static hashval_t
+dpm_hash (const void *p)
+{
+  return ((const struct def_pragma_macro *)p)->hash;
+}
+
+static int
+dpm_eq (const void *pa, const void *pb)
+{
+  const struct def_pragma_macro *a = pa, *b = pb;
+  return a->hash == b->hash && strcmp (a->name, b->name) == 0;
+}
+
+static char *
+alloc_string (const char *contents, int length)
+{
+  char *tmp;
+  tmp = XNEWVEC (char, length);
+  return memcpy (tmp, contents, length);
+}
+
+/* #pragma push_macro("MACRO_NAME")
+   #pragma pop_macro("MACRO_NAME") */
+
+static void
+do_pragma_push_macro (cpp_reader *pfile)
+{
+  const cpp_token *token;
+  struct def_pragma_macro dummy, *c;
+  char *macroname;
+  void **slot;
+
+  if (cpp_get_token (pfile)->type != CPP_OPEN_PAREN)
+    {
+      cpp_error (pfile, CPP_DL_WARNING,
+		 "missing '(' after '#pragma push_macro' - ignored");
+      return;
+    }
+
+  token = cpp_get_token (pfile);
+
+  /* Silently ignore */
+  if (token->type == CPP_CLOSE_PAREN)
+    return;
+  if (token->type != CPP_STRING)
+    {
+      cpp_error (pfile, CPP_DL_WARNING,
+		 "invalid constant in '#pragma push_macro' - ignored");
+      return;
+    }
+
+  if (cpp_get_token (pfile)->type != CPP_CLOSE_PAREN)
+    {
+      cpp_error (pfile, CPP_DL_WARNING,
+		 "missing ')' after '#pragma push_macro' - ignored");
+      return;
+    }
+  if (cpp_get_token (pfile)->type != CPP_EOF)
+    cpp_error (pfile, CPP_DL_WARNING, "junk at end of '#pragma push_macro'");
+
+  /* Check for empty string, and silently ignore.  */
+  if (token->val.str.len <= 2)
+    {
+      cpp_error (pfile, CPP_DL_WARNING, "macro name is empty string");
+      return;
+    }
+
+  macroname = (char *) alloca (token->val.str.len - 1);
+  memset (macroname, 0, token->val.str.len - 1);
+  memcpy (macroname, &token->val.str.text[1], token->val.str.len - 2);
+
+  if (pushed_macro_table == NULL)
+    pushed_macro_table = htab_create_alloc (15, dpm_hash, dpm_eq, 0,
+					    xcalloc, NULL);
+
+  dummy.hash = htab_hash_string (macroname);
+  dummy.name = alloc_string (macroname, token->val.str.len - 1);
+  slot = htab_find_slot_with_hash (pushed_macro_table, &dummy,
+                                   dummy.hash, INSERT);
+  c = *slot;
+  if (c == NULL)
+    {
+      *slot = c = XNEW (struct def_pragma_macro);
+      c->hash = dummy.hash;
+      c->name = (const char *)alloc_string (macroname, token->val.str.len - 1);
+      c->value.prev = NULL;
+    }
+  else
+    {
+      struct def_pragma_macro_value *v;
+      v = XNEW (struct def_pragma_macro_value);
+      *v = c->value;
+      c->value.prev = v;
+    }
+  pfile->state.in_directive = 0;
+  c->value.value = cpp_push_definition (pfile, macroname);
+  pfile->state.in_directive = 1;
+}
+
+static void
+do_pragma_pop_macro (cpp_reader *pfile)
+{
+  const cpp_token *token;
+  struct def_pragma_macro dummy, *c;
+  char *macroname;
+  void **slot;
+
+  if (cpp_get_token (pfile)->type != CPP_OPEN_PAREN)
+    {
+      cpp_error (pfile, CPP_DL_WARNING,
+		 "missing '(' after '#pragma pop_macro' - ignored");
+      return;
+    }
+
+  token = cpp_get_token (pfile);
+
+  /* Silently ignore */
+  if (token->type == CPP_CLOSE_PAREN)
+    return;
+  if (token->type != CPP_STRING)
+    {
+      cpp_error (pfile, CPP_DL_WARNING,
+		 "invalid constant in '#pragma pop_macro' - ignored");
+      return;
+    }
+
+  if (cpp_get_token (pfile)->type != CPP_CLOSE_PAREN)
+    {
+      cpp_error (pfile, CPP_DL_WARNING,
+		 "missing ')' after '#pragma pop_macro' - ignored");
+      return;
+    }
+
+  if (cpp_get_token (pfile)->type != CPP_EOF)
+    cpp_error (pfile, CPP_DL_WARNING, "junk at end of '#pragma pop_macro'");
+
+  /* Check for empty string, and silently ignore.  */
+  if (token->val.str.len <= 2)
+    {
+      cpp_error (pfile, CPP_DL_WARNING, "macro name is empty string");
+      return;
+    }
+
+  macroname = (char *) alloca (token->val.str.len - 1);
+  memset (macroname, 0, token->val.str.len - 1);
+  memcpy (macroname, &token->val.str.text[1], token->val.str.len - 2);
+
+  dummy.hash = htab_hash_string (macroname);
+  dummy.name = macroname;
+
+  if (pushed_macro_table == NULL)
+    {
+      cpp_error (pfile, CPP_DL_WARNING,
+		 "there is not #pragma push_macro making a pair");
+      return;
+    }
+  slot = htab_find_slot_with_hash (pushed_macro_table, &dummy,
+                                   dummy.hash, NO_INSERT);
+
+  if (slot == NULL)
+    {
+      cpp_error (pfile, CPP_DL_WARNING,
+		 "there is not #pragma push_macro making a pair");
+      return;
+    }
+  c = *slot;
+
+  pfile->state.in_directive = 0;
+  cpp_pop_definition (pfile, c->name, c->value.value);
+  pfile->state.in_directive = 1;
+
+  if (c->value.prev)
+    c->value = *c->value.prev;
+  else
+    htab_clear_slot (pushed_macro_table, slot);
+}
+/* sce local end */
 
 /* Get a token but skip padding.  */
 static const cpp_token *
@@ -2062,6 +2265,65 @@ cpp_undef (cpp_reader *pfile, const char *macro)
   memcpy (buf, macro, len);
   buf[len] = '\n';
   run_directive (pfile, T_UNDEF, buf, len);
+}
+
+/* Like lex_macro_node, but read the input from STR.  */
+static cpp_hashnode *
+lex_macro_node_from_str (cpp_reader *pfile, const char *str)
+{
+  size_t len = strlen (str);
+  uchar *buf = (uchar *) alloca (len + 1);
+  cpp_hashnode *node;
+
+  memcpy (buf, str, len);
+  buf[len] = '\n';
+  cpp_push_buffer (pfile, buf, len, true);
+  node = lex_macro_node (pfile);
+  _cpp_pop_buffer (pfile);
+
+  return node;
+}
+
+/* If STR is a defined macro, return its definition node, else return NULL.  */
+cpp_macro *
+cpp_push_definition (cpp_reader *pfile, const char *str)
+{
+  cpp_hashnode *node = lex_macro_node_from_str (pfile, str);
+  if (node && node->type == NT_MACRO)
+    return node->value.macro;
+  else
+    return NULL;
+}
+
+/* Replace a previous definition DFN of the macro STR.  If DFN is NULL,
+   then the macro should be undefined.  */
+void
+cpp_pop_definition (cpp_reader *pfile, const char *str, cpp_macro *dfn)
+{
+  cpp_hashnode *node = lex_macro_node_from_str (pfile, str);
+  if (node == NULL)
+    return;
+
+  if (node->type == NT_MACRO)
+    {
+      if (pfile->cb.undef)
+	pfile->cb.undef (pfile, pfile->directive_line, node);
+      if (CPP_OPTION (pfile, warn_unused_macros))
+	_cpp_warn_if_unused_macro (pfile, node, NULL);
+    }
+  if (node->type != NT_VOID)
+    _cpp_free_definition (node);
+
+  if (dfn)
+    {
+      node->type = NT_MACRO;
+      node->value.macro = dfn;
+      if (! ustrncmp (NODE_NAME (node), DSC ("__STDC_")))
+	node->flags |= NODE_WARN;
+
+      if (pfile->cb.define)
+	pfile->cb.define (pfile, pfile->directive_line, node);
+    }
 }
 
 /* Process the string STR as if it appeared as the body of a #assert.  */

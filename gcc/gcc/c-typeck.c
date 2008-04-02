@@ -1889,11 +1889,14 @@ build_array_ref (tree array, tree index)
   if (TREE_CODE (TREE_TYPE (array)) == VECTOR_TYPE)
     {
       tree type = TREE_TYPE (array);
+      tree type1;
       if (!c_mark_addressable (array))
 	return error_mark_node;
       type = build_qualified_type (TREE_TYPE (type), TYPE_QUALS (type));
       type = build_pointer_type (type);
-      array = build1 (ADDR_EXPR, type, array);
+      type1 = build_pointer_type (TREE_TYPE (array));
+      array = build1 (ADDR_EXPR, type1, array);
+      array = convert (type, array);
     }
 
   if (TREE_CODE (TREE_TYPE (array)) == ARRAY_TYPE)
@@ -2020,6 +2023,7 @@ build_external_ref (tree id, int fun, location_t loc)
 
   if (TREE_CODE (ref) == CONST_DECL)
     {
+      used_types_insert (TREE_TYPE (ref));
       ref = DECL_INITIAL (ref);
       TREE_CONSTANT (ref) = 1;
       TREE_INVARIANT (ref) = 1;

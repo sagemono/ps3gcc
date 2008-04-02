@@ -156,7 +156,6 @@ enum option_values
   OPTION_REDUCE_MEMORY_OVERHEADS
 /* CELL LOCAL Begin */
 #if defined(BPA)
-  , OPTION_SPUPLUGIN
   /* sce local bugzilla #2878 */
   , OPTION_SPUGUID
   , OPTION_NO_SPUGUID
@@ -533,8 +532,6 @@ static const struct ld_option ld_options[] =
   { {"wrap", required_argument, NULL, OPTION_WRAP},
     '\0', N_("SYMBOL"), N_("Use wrapper functions for SYMBOL"), TWO_DASHES },
 #if defined(BPA)
-  { {"plugin", no_argument, NULL, OPTION_SPUPLUGIN},
-      '\0', NULL, N_("Make SPU Plugin"), ONE_DASH },
   /* begin sce local bugzilla #2878 */
   { {"spuguid", no_argument, NULL, OPTION_SPUGUID},
       '\0', NULL, N_("embedded .SpuGUID section"), ONE_DASH },
@@ -1363,10 +1360,6 @@ parse_args (unsigned argc, char **argv)
 	  break;
 
 #if defined(BPA)
-        case OPTION_SPUPLUGIN:
-          link_info.spuplugin = TRUE;
-          break;
-
 	  /* begin sce local, bugzilla #2878 */
         case OPTION_SPUGUID:
           link_info.spuguid = TRUE;

@@ -4006,6 +4006,13 @@ process_section_headers (FILE *file)
 	  && find_section (".gcc_compiled_long32") == NULL)
 	eh_addr_size = 8;
       break;
+    /* begin sce local , Bz #20822 */
+    case EM_PPC64:
+      if (elf_header.e_ident[EI_OSABI] == ELFOSABI_CELLOSLV2
+	  && elf_header.e_ident[EI_ABIVERSION] == 0x0)
+	eh_addr_size = 4;
+      break;
+    /* end sce local , Bz #20822 */
     }
 
 #define CHECK_ENTSIZE_VALUES(section, i, size32, size64) \

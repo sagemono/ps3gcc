@@ -1,6 +1,6 @@
 /* Test case for PR23625 */
 /* { dg-do compile } */
-/* { dg-options "-O2 -ftree-vectorize -ftree-loop-linear" } */
+/* { dg-options "-O2 -ftree-vectorize -ftree-loop-linear -Wno-tree-loop-linear" } */
 
 typedef long INT32;
 void find_best_colors ()

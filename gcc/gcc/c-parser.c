@@ -4616,6 +4616,10 @@ c_parser_cast_expression (c_parser *parser, struct c_expr *after)
 	  ret.original_code = ERROR_MARK;
 	  return ret;
 	}
+
+      /* Save casted types in the function's used types hash table.  */
+      used_types_insert (type_name->specs->type);
+
       if (c_parser_next_token_is (parser, CPP_OPEN_BRACE))
 	return c_parser_postfix_expression_after_paren_type (parser,
 							     type_name);
@@ -5379,7 +5383,8 @@ convert_tree_list_compound_expr(tree list)
 	if (!expr)
 	  expr = TREE_VALUE (list);
 	else
-	  expr = build_compound_expr (expr, TREE_VALUE (list));
+	  expr = build2 (COMPOUND_EXPR, TREE_TYPE (TREE_VALUE (list)),
+			 expr, TREE_VALUE (list));
 	list = TREE_CHAIN (list);
     }
   return expr;

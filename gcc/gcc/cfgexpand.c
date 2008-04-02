@@ -368,7 +368,8 @@ has_common_area (struct stack_var *stack_var1,
       return true; /* have common part */
   }
   else { /* type_i is not an array */
-    if (AGGREGATE_TYPE_P (type_i)) { /* type_i is an aggregate */
+    /* bz44006 : check union */
+    if (AGGREGATE_TYPE_P (type_i) && TREE_CODE (type_i) != UNION_TYPE) { /* type_i is an aggregate */
       tree field;
       HOST_WIDE_INT offset = 0; /* offset for included var */
 
@@ -489,7 +490,7 @@ stack_var_size_cmp (const void *a, const void *b)
    the stack frame.  */
 
 static void
-union_stack_vars (size_t a, size_t b, HOST_WIDE_INT offset)
+union_stack_vars (size_t a, size_t b, HOST_WIDE_INT offset, bool *inside_offset)
 {
   size_t i, last;
 
@@ -498,7 +499,8 @@ union_stack_vars (size_t a, size_t b, HOST_WIDE_INT offset)
   for (last = i = b; i != EOC; last = i, i = stack_vars[i].next)
     {
 #if 1 /* CELL local Bz30821 */
-      has_common_area (&stack_vars[a], &stack_vars[i], true);
+      if (!(*inside_offset))
+        *inside_offset = has_common_area (&stack_vars[a], &stack_vars[i], true);
       stack_vars[i].offset += offset;
 #else /* original code */
       stack_vars[i].offset += offset;
@@ -559,6 +561,7 @@ partition_stack_vars (void)
   if (memchr (stack_vars_conflict, false, stack_vars_conflict_alloc) == NULL)
     return;
 
+  bool inside_offset = false;
   for (si = 0; si < n; ++si)
     {
       size_t i = stack_vars_sorted[si];
@@ -597,7 +600,7 @@ partition_stack_vars (void)
 	    }
 
 	  /* UNION the objects, placing J at OFFSET.  */
-	  union_stack_vars (i, j, offset);
+	  union_stack_vars (i, j, offset, &inside_offset);
 
 	  isize -= jsize;
 	  if (isize == 0)
@@ -630,7 +633,7 @@ dump_stack_var_partition (void)
 	  fputc ('\t', dump_file);
 	  print_generic_expr (dump_file, stack_vars[j].decl, dump_flags);
 	  fprintf (dump_file, ", offset " HOST_WIDE_INT_PRINT_DEC "\n",
-		   stack_vars[i].offset);
+		   stack_vars[j].offset);
 	}
     }
 }
@@ -718,8 +721,11 @@ expand_stack_vars (bool (*pred) (tree))
       /* Create rtl for each variable based on their location within the
 	 partition.  */
       for (j = i; j != EOC; j = stack_vars[j].next)
-	expand_one_stack_var_at (stack_vars[j].decl,
-				 stack_vars[j].offset + offset);
+	{
+	  gcc_assert (stack_vars[j].offset <= stack_vars[i].size);
+	  expand_one_stack_var_at (stack_vars[j].decl,
+				   stack_vars[j].offset + offset);
+	}
     }
 }
 

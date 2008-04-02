@@ -497,12 +497,12 @@ recompile_files (void)
 	{
 	  /* Arguments are delimited by single-quotes.  Find the
 	     opening quote.  */
-	  p = strchr (p, '\'');
+	  p = strchr (p, HOST_QUOTE_CHAR);
 	  if (!p)
 	    goto done;
 
 	  /* Find the closing quote.  */
-	  q = strchr (p + 1, '\'');
+	  q = strchr (p + 1, HOST_QUOTE_CHAR);
 	  if (!q)
 	    goto done;
 
@@ -510,11 +510,12 @@ recompile_files (void)
 
 	  /* Replace '\'' with '.  This is how set_collect_gcc_options
 	     encodes a single-quote.  */
-	  while (q[1] == '\\' && q[2] == '\'' && q[3] == '\'')
+	  while (q[1] == '\\'
+                 && q[2] == HOST_QUOTE_CHAR && q[3] == HOST_QUOTE_CHAR)
 	    {
 	      const char *r;
 
-	      r = strchr (q + 4, '\'');
+	      r = strchr (q + 4, HOST_QUOTE_CHAR);
 	      if (!r)
 		goto done;
 

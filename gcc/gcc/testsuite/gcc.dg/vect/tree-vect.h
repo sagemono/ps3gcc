@@ -1,6 +1,8 @@
 /* Check if system supports SIMD */
+#ifndef __CELLOS_LV2__
 #ifndef __SPU__
 #include <signal.h>
+#endif
 #endif
 
 extern void abort (void);
@@ -14,6 +16,8 @@ sig_ill_handler (int sig)
 
 void check_vect (void)
 {
+/* Cell Game OS LV2 always have vector support. */
+#ifndef __CELLOS_LV2__
 /* SPU always have vector support.  */
 #ifndef __SPU__
   signal(SIGILL, sig_ill_handler);
@@ -27,5 +31,6 @@ void check_vect (void)
   asm volatile (".word\t0x81b007c0");
 #endif
   signal (SIGILL, SIG_DFL);
+#endif
 #endif
 }

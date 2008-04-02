@@ -1,7 +1,7 @@
 /* Collect static initialization info into data structures that can be
    traversed by C++ initialization and finalization routines.
    Copyright (C) 1992, 1993, 1994, 1995, 1996, 1997, 1998,
-   1999, 2000, 2001, 2002, 2003, 2004, 2005 Free Software Foundation, Inc.
+   1999, 2000, 2001, 2002, 2003, 2004, 2005, 2007 Free Software Foundation, Inc.
    Contributed by Chris Smith (csmith@convex.com).
    Heavily modified by Michael Meissner (meissner@cygnus.com),
    Per Bothner (bothner@cygnus.com), and John Gilmore (gnu@cygnus.com).
@@ -135,6 +135,10 @@ int do_collecting = 1;
 #else
 int do_collecting = 0;
 #endif
+
+
+/* sce bugzilla 37796 */
+#define ALT_LD_OPTSTR "--alternative-ld="
 
 /* Nonzero if we should suppress the automatic demangling of identifiers
    in linker error messages.  Set from COLLECT_NO_DEMANGLE.  */
@@ -435,7 +439,7 @@ extract_string (const char **pp)
 	break;
       else if (! inside && c == '\\')
 	backquote = 1;
-      else if (c == '\'')
+      else if (c == HOST_QUOTE_CHAR)
 	inside = !inside;
       else
 	obstack_1grow (&temporary_obstack, c);
@@ -762,7 +766,7 @@ main (int argc, char **argv)
      But it we look for a program in the system directories, we need to
      qualify the program name with the target machine.  */
 
-  const char *const full_ld_suffix =
+  const char * full_ld_suffix =
     concat(target_machine, "-", ld_suffix, NULL);
   const char *const full_nm_suffix =
     concat (target_machine, "-", nm_suffix, NULL);
@@ -777,7 +781,7 @@ main (int argc, char **argv)
   const char *const full_gstrip_suffix =
     concat (target_machine, "-", gstrip_suffix, NULL);
 #else
-  const char *const full_ld_suffix	= ld_suffix;
+  const char * full_ld_suffix	= ld_suffix;
   const char *const full_nm_suffix	= nm_suffix;
   const char *const full_gnm_suffix	= gnm_suffix;
 #ifdef LDD_SUFFIX
@@ -786,6 +790,7 @@ main (int argc, char **argv)
   const char *const full_strip_suffix	= strip_suffix;
   const char *const full_gstrip_suffix	= gstrip_suffix;
 #endif /* CROSS_COMPILE */
+  const char * alt_ld_suffix = NULL;	/* sce local bugzilla 37796 */
 
   const char *arg;
   FILE *outf;
@@ -846,16 +851,26 @@ main (int argc, char **argv)
   /* Parse command line early for instances of -debug.  This allows
      the debug flag to be set before functions like find_a_file()
      are called.  */
+  /* begin sce local bugzilla 37796 */
   {
     int i;
 
     for (i = 1; argv[i] != NULL; i ++)
       {
 	if (! strcmp (argv[i], "-debug"))
-	  debug = 1;
+	  {
+	    debug = 1;
+	    continue;
+	  }
+	else if (! strncmp (argv[i], ALT_LD_OPTSTR, sizeof (ALT_LD_OPTSTR) - 1))
+	  {
+	    alt_ld_suffix = (const char *)xstrdup(&argv[i][sizeof(ALT_LD_OPTSTR) - 1]);
+	    continue;
+	  }
       }
     vflag = debug;
   }
+  /* end sce local bugzilla 37796 */
 
 #ifndef DEFAULT_A_OUT_NAME
   output_file = "a.out";
@@ -916,28 +931,42 @@ main (int argc, char **argv)
 
   /* Maybe we know the right file to use (if not cross).  */
   ld_file_name = 0;
+  /* begin sce local bugzilla 37796 
+     If --alternative-ld option is specified, don't search default ld */
+  if (alt_ld_suffix == NULL)
+    {
 #ifdef DEFAULT_LINKER
-  if (access (DEFAULT_LINKER, X_OK) == 0)
-    ld_file_name = DEFAULT_LINKER;
-  if (ld_file_name == 0)
+      if (access (DEFAULT_LINKER, X_OK) == 0)
+	ld_file_name = DEFAULT_LINKER;
+      if (ld_file_name == 0)
 #endif
 #ifdef REAL_LD_FILE_NAME
-  ld_file_name = find_a_file (&path, REAL_LD_FILE_NAME);
-  if (ld_file_name == 0)
+	ld_file_name = find_a_file (&path, REAL_LD_FILE_NAME);
+      if (ld_file_name == 0)
 #endif
-  /* Search the (target-specific) compiler dirs for ld'.  */
-  ld_file_name = find_a_file (&cpath, real_ld_suffix);
-  /* Likewise for `collect-ld'.  */
-  if (ld_file_name == 0)
-    ld_file_name = find_a_file (&cpath, collect_ld_suffix);
-  /* Search the compiler directories for `ld'.  We have protection against
-     recursive calls in find_a_file.  */
-  if (ld_file_name == 0)
-    ld_file_name = find_a_file (&cpath, ld_suffix);
-  /* Search the ordinary system bin directories
-     for `ld' (if native linking) or `TARGET-ld' (if cross).  */
-  if (ld_file_name == 0)
-    ld_file_name = find_a_file (&path, full_ld_suffix);
+	/* Search the (target-specific) compiler dirs for ld'.  */
+	ld_file_name = find_a_file (&cpath, real_ld_suffix);
+      /* Likewise for `collect-ld'.  */
+      if (ld_file_name == 0)
+	ld_file_name = find_a_file (&cpath, collect_ld_suffix);
+      /* Search the compiler directories for `ld'.  We have protection against
+	 recursive calls in find_a_file.  */
+      if (ld_file_name == 0)
+	ld_file_name = find_a_file (&cpath, ld_suffix);
+      /* Search the ordinary system bin directories
+	 for `ld' (if native linking) or `TARGET-ld' (if cross).  */
+      if (ld_file_name == 0)
+	ld_file_name = find_a_file (&path, full_ld_suffix);
+    }
+  else
+    {
+      full_ld_suffix = alt_ld_suffix;
+      ld_file_name = find_a_file (&cpath, full_ld_suffix);
+      if (ld_file_name == 0)
+	ld_file_name = find_a_file (&path, full_ld_suffix);      
+    }
+  /* end sce local bugzilla 37796 */
+
 
 #ifdef REAL_NM_FILE_NAME
   nm_file_name = find_a_file (&path, REAL_NM_FILE_NAME);
@@ -1199,6 +1228,14 @@ main (int argc, char **argv)
 		  use_response_flag = 1;
 		}
 	      /* end sce local */
+	      /* begin sce local bugzilla 37796 */
+	      else if (strncmp (arg, ALT_LD_OPTSTR, sizeof (ALT_LD_OPTSTR) - 1) == 0)
+		{
+		  /* dont path --alternative-ld options to the linker */
+		  ld1 --;
+		  ld2 --;
+		}
+	      /* end sce local bugzilla 37796 */
 	      break;
 	    }
 	}

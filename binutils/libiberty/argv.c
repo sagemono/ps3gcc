@@ -218,19 +218,19 @@ char **buildargv (const char *input)
 		}
 	      else
 		{
-#if 0
 		  if (bsquote)
 		    {
 		      bsquote = 0;
 		      *arg++ = *input;
 		    }
+/* Under windows treat backslash as a normal character.  */
+#ifndef _WIN32
 		  else if (*input == '\\')
 		    {
 		      bsquote = 1;
 		    }
-		  else
 #endif
-		    if (squote)
+		  else if (squote)
 		    {
 		      if (*input == '\'')
 			{
@@ -293,7 +293,7 @@ char **buildargv (const char *input)
 
 /*
 
-@deftypefn Extension const char* expandargv (int *@var{argcp}, char ***@var{argvp})
+@deftypefn Extension void expandargv (int *@var{argcp}, char ***@var{argvp})
 
 The @var{argcp} and @code{argvp} arguments are pointers to the usual
 @code{argc} and @code{argv} arguments to @code{main}.  This function
@@ -305,21 +305,23 @@ each such string is taken as a command-line option.  The new options
 are inserted in place of the option naming the response file, and
 @code{*argcp} and @code{*argvp} will be updated.  If the value of
 @code{*argvp} is modified by this function, then the new value has
-been dynamically allocated and should be deallocated by the caller
-with @code{freeargv}.
+been dynamically allocated and can be deallocated by the caller with
+@code{freeargv}.  However, most callers will simply call
+@code{expandargv} near the beginning of @code{main} and allow the
+operating system to free the memory when the program exits.
 
 The int var pointed by @var{expanded} is set to 1 if any substutuion
 occurs in @var{argvp}. Otherwise, it keeps original value.
 
-If the value returned is not @code{NULL}, then it is the name of a
-response file that could not be read.
-
+ If the value returned is not @code{NULL}, then it is the name of a
 @end deftypefn
 
 */
 
 #define HUGE_BUF_UNIT BUFSIZ
 
+/* CELL LOCAL Begin */
+#if 0
 static char *
 read_huge_line (FILE *fp)
 {
@@ -356,111 +358,161 @@ read_huge_line (FILE *fp)
 
   return buf;
 }
+#endif
+/* CELL LOCAL End */
 
+/* CELL LOCAL Begin */
+/* CELL gcc version returns the name of the file that cannot be
+   expanded */
+#if 1
 const char *
-expandargv (argcp, argvp, expanded)
+#else
+/* CELL LOCAL End */
+void
+#endif /* CELL LOCAL */
+expandargv (argcp, argvp
+	    ,expanded /* CELL LOCAL */
+	   )
      int *argcp;
      char ***argvp;
-     int *expanded;
+     int *expanded; /* CELL LOCAL */
 {
+  /* CELL LOCAL Begin */
   /* If non-NULL, the name of the response file that caused a
      failure.  */
   const char *error_file = NULL;
+  /* CELL LOCAL End */
   /* The argument we are currently processing.  */
   int i = 0;
-  /* string buffer */
-  char *buffer;
-  /* part of ARGV constructed by buildargv() */
-  char **argv_in_buffer = NULL;
-  /* number of ARGV constructed by buildargv() */
-  size_t num_options;
-
+  /* Non-zero if ***argvp has been dynamically allocated.  */
+  int argv_dynamic = 0;
   /* Loop over the arguments, handling response files.  We always skip
      ARGVP[0], as that is the name of the program being run.  */
-  ++i;
-  while (i != *argcp)
+  while (++i < *argcp)
     {
       /* The name of the response file.  */
       const char *filename;
       /* The response file.  */
-      FILE *fp;
+      FILE *f;
+      /* An upper bound on the number of characters in the response
+	 file.  */
+      long pos;
+      /* The number of characters in the response file, when actually
+	 read.  */
+      size_t len;
+      /* A dynamically allocated buffer used to hold options read from a
+	 response file.  */
+      char *buffer;
+      /* Dynamically allocated storage for the options read from the
+	 response file.  */
+      char **file_argv;
       /* The number of options read from the response file, if any.  */
-
+      size_t file_argc;
+      /* CELL LOCAL Begin */
+      file_argv = NULL;
+      buffer = NULL;
+      /* CELL LOCAL End */
       /* We are only interested in options of the form "@file".  */
       filename = (*argvp)[i];
       if (filename[0] != '@')
-	{
-	  ++i;
-	  continue;
-	}
-
-      /* Open the file.  */
-      fp = fopen (++filename, "r");
-      if (!fp)
-	{
-	  error_file = filename;
-	  goto done;
-
-	}
-
-      /* set flagn to tell the argv is expanded */
+	continue;
+      /* Read the contents of the file.  */
+      f = fopen (++filename, "r");
+      if (!f)
+/* CELL LOCAL Begin */
+#if 1
+	goto error;
+#else
+/* CELL LOCAL End */
+	continue;
+#endif /* CELL LOCAL */
+      if (fseek (f, 0L, SEEK_END) == -1)
+	goto error;
+      pos = ftell (f);
+      if (pos == -1)
+	goto error;
+      if (fseek (f, 0L, SEEK_SET) == -1)
+	goto error;
+      /* CELL LOCAL Begin */
+      /* set flag to tell the argv is expanded */
       *expanded = 1;
-
-      /* @<response file> is not a real argv. So here I remove the pointer
-	 to the string of @<respoinse file> from argv. */
-      memmove (*argvp + i, *argvp + i + 1, (*argcp - i) * sizeof (char *));
-      -- *argcp;
-
-      /* Read all the options.  */
-
-      while (! feof (fp))
+      /* CELL LOCAL End */
+      buffer = (char *) xmalloc (pos * sizeof (char) + 1);
+      len = fread (buffer, sizeof (char), pos, f);
+      if (len != (size_t) pos
+	  /* On Windows, fread may return a value smaller than POS,
+	     due to CR/LF->CR translation when reading text files.
+	     That does not in-and-of itself indicate failure.  */
+	  && ferror (f))
+	goto error;
+      /* Add a NUL terminator.  */
+      buffer[len] = '\0';
+      /* Parse the string.  */
+      file_argv = buildargv (buffer);
+      /* If *ARGVP is not already dynamically allocated, copy it.  */
+      if (!argv_dynamic)
 	{
-	  buffer = read_huge_line (fp);
-	  if (buffer == NULL)
-	    {
-	      error_file = filename;
-	      goto done;
-	    }
-
-	  if (buffer[0] == '\0')
-	    continue;
-
-	  /* build arguments with considering single, double quotations
-	     and escape sequence. */
-	  /* FIXME: buildargv gets memories from heap. But this routine
-	     does not free them. */
-	  argv_in_buffer = buildargv (buffer);
-	  free (buffer);
-	  
-	  /* cound the number of arguments buid by buildargv() */
-	  for (num_options = 0; argv_in_buffer[num_options] != NULL; num_options++)
-	    /* DO NOTHING */;
-
 	  *argvp = dupargv (*argvp);
-
-	  /* Copy argumentes to real arguments. */
-	  /* The "+1" below handles the NULL terminator at the end of ARGV.  */
-	  *argvp = ((char **) 
-		    xrealloc (*argvp, 
-			      (*argcp + num_options + 1) * sizeof (char *)));
-	  /* move rest of argvs and argv terminator after @respose file. */
-	  memmove (*argvp + i + num_options, *argvp + i, 
-		   (*argcp - i + 1) * sizeof (char *));
-	  /* embed argvs written in @respose file */
-	  memcpy (*argvp + i, argv_in_buffer, num_options * sizeof (char *));
-
-	  /* adjust the numbur of options and current argv index. */
-	  *argcp += num_options;
-	  i += num_options;
+	  if (!*argvp)
+	    {
+	      fputs ("\nout of memory\n", stderr);
+	      xexit (1);
+	    }
 	}
-      fclose (fp);
+      /* Count the number of arguments.  */
+      file_argc = 0;
+      while (file_argv[file_argc] && *file_argv[file_argc])
+	++file_argc;
+      /* Now, insert FILE_ARGV into ARGV.  The "+1" below handles the
+	 NULL terminator at the end of ARGV.  */ 
+      *argvp = ((char **) 
+		xrealloc (*argvp, 
+			  (*argcp + file_argc + 1) * sizeof (char *)));
+      memmove (*argvp + i + file_argc, *argvp + i + 1, 
+	       (*argcp - i) * sizeof (char *));
+      memcpy (*argvp + i, file_argv, file_argc * sizeof (char *));
+      /* The original option has been replaced by all the new
+	 options.  */
+      *argcp += file_argc - 1;
+      /* Free up memory allocated to process the response file.  We do
+	 not use freeargv because the individual options in FILE_ARGV
+	 are now in the main ARGV.  */
+      free (file_argv);
+      free (buffer);
+      /* CELL LOCAL Begin */
+      file_argv = NULL;
+      buffer = NULL;
+      /* CELL LOCAL End */
+      /* Rescan all of the arguments just read to support response
+	 files that include other response files.  */
+      --i;
+#if 0 /* CELL LOCAL */
+    error:
+      /* We're all done with the file now.  */
+      fclose (f);
+/* CELL LOCAL Begin */	
+#else
+      /* We're all done with the file now.  */
+      fclose(f);	
+      continue;
+    error:
+      /* Clean up everything */
+      if (f)
+	fclose (f);
+      if (file_argv)
+	free (file_argv);
+      if (buffer)
+	free (buffer);
+     return filename;
+#endif
+/* CELL LOCAL End */
     }
+  return NULL; /* CELL LOCAL */
 
- done:
-  return error_file;
+/* CELL LOCAL End */  
 }
 
-
+/* CELL LOCAL Begin */
 static int response_file_sequence = 0;
 
 #define PATHMAX 512
@@ -514,14 +566,40 @@ create_response_file (basename, argv)
   /* dont emit commnad name into the response file */
   while (*argv != NULL)
     {
+      char *string;
+      unsigned i, len;
+#ifdef _WIN32
+      int quote = 0;
+#endif
       if (**argv == NULL)
 	continue;
-
+      string = *argv;
+      len = strlen (string);
+      for (i = 0; i < len; i++)
+	{
+	  /* Escape spaces, \, and the quotes if on unix, just quote under
+	     windows if including space or single quote.  */
+	  if (string[i] == '\''
+	      || ISSPACE (string[i])
+#ifndef _WIN32
+	      || string[i] == '\\' || string[i] == '\"'
+#endif
+	     )
+#ifndef _WIN32
+	    fprintf (rsp_fp, "\\%c", string[i]);
+	  else
+	    fprintf (rsp_fp, "%c", string[i]);
+#else
+	    quote = 1;
+#endif
+	}
+#ifdef _WIN32
       /* check if the argv requres quoted. */
-      if (index (*argv, ' ') != NULL || index (*argv, '\t') != NULL)
+      if (quote)
 	fprintf (rsp_fp, "\"%s\"\n", *argv);
       else
 	fprintf (rsp_fp, "%s\n", *argv);
+#endif
 
       ++argv;
     }
@@ -530,7 +608,7 @@ create_response_file (basename, argv)
 
   return response_filename;
 }
-
+/* CELL LOCAL End */
 
 #ifdef MAIN
 

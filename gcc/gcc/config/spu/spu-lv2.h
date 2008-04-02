@@ -1,4 +1,3 @@
-
 /* (C) Copyright
    Sony Computer Entertainment, Inc.,
    Toshiba Corporation,
@@ -21,7 +20,9 @@
    02110-1301, USA.  */
 
 #undef CPP_SPEC
-#define	CPP_SPEC "%{mis:-D__IS__}"
+#define	CPP_SPEC "%{mis:-D__IS__} " \
+                 "%{mspurs-job-initialize|mspurs-job:-D__SPURS_JOB__} " \
+                 "%{mspurs-task:-D__SPURS_TASK__} "
 
 #define TARGET_OS_CPP_BUILTINS()	\
   do {					\
@@ -44,7 +45,8 @@
 	"%{testing:%{!mno-error-reloc:;!merror-reloc:;!mwarn-reloc:;:-mno-warn-reloc}} " \
 	"%{!fno-aggressive-cmov:-faggressive-cmov} " \
 	"%{!fno-strict-aligned:-fstrict-aligned} " \
-	"%{Os:%{!mhint-max-nops*:-mhint-max-nops=0} %{!mdual-nops:-mno-dual-nops}} " 
+	"%{Os:%{!mhint-max-nops*:-mhint-max-nops=0} %{!mdual-nops:-mno-dual-nops}} " \
+	"%{mspurs-job-initialize: %{!mwarn-reloc: -mno-warn-reloc}}"
 
 #undef CC1PLUS_SPEC
 #define CC1PLUS_SPEC \
@@ -58,22 +60,26 @@
 #undef ASM_SPEC
 #define ASM_SPEC  "%{w:-W}"
 
+#undef ASM_ONLY_SPEC
+#define ASM_ONLY_SPEC  "%{mwarn-stop0:-mwarn-stop0}"
+
 #undef  STARTFILE_SPEC
 #define STARTFILE_SPEC	"%{cstdmain:crt2%O%s; " \
                         "  mraw|mapusim:crt3%O%s; " \
                         "  mcellsim|mspusim:cs-crt0%O%s; " \
                         "  mis:crt4%O%s; " \
                         "  mspurs-job:job_start_gcc%O%s; " \
+                        "  mspurs-job-initialize:job_start_w_crt%O%s job_crt%O%s; " \
                         "  mspurs-task:spurs_task%O%s; " \
                         "  :crt1%O%s} "
 
 #undef LIB_SPEC
 #define LIB_SPEC "--start-group -lc -lgcc -lstdc++ -lsupc++ " \
-		 "%{mspurs-task:-lspurs -lsync} " \
-		 "%{mspurs-job:-lspurs -lsync} " \
+		 "%{mspurs-task|mspurs-job|mspurs-job-initialize:-lspurs -lsync} " \
 		 "%{mraw:-lrawspu; mapusim:-lapusim; mcellsim|mspusim:-lcellsim; mis: ; :-lsputhread} " \
 		 "--end-group" \
-                 "%{mspurs-job: %{fPIC:-Ttext=0x0; fpic:-Ttext=0x0; :-Ttext=0x4c00}} " \
+                 "%{mspurs-job|mspurs-job-initialize: %{fPIC:-Ttext=0x0; fpic:-Ttext=0x0; :-Ttext=0x4c00}} " \
+                 "%{!testing:%{fPIC|fpic:%{!mno-error-reloc:%{!mno-warn-reloc:%{mspurs-job-initialize:--warn-pic-code;:--warn-pic-all}}}}} " \
                  "%{mspurs-task:-Ttext=0x3000} "
 
 #undef LINK_GCC_C_SEQUENCE_SPEC 

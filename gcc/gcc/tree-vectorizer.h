@@ -1,5 +1,5 @@
 /* Loop Vectorization
-   Copyright (C) 2003, 2004, 2005, 2006 Free Software Foundation, Inc.
+   Copyright (C) 2003, 2004, 2005, 2006, 2007 Free Software Foundation, Inc.
    Contributed by Dorit Naishlos <dorit@il.ibm.com>
 
 This file is part of GCC.
@@ -54,13 +54,14 @@ enum operation_type {
 enum dr_alignment_support {
   dr_unaligned_unsupported,
   dr_unaligned_supported,
-  dr_unaligned_software_pipeline,
+  dr_explicit_realign,
+  dr_explicit_realign_optimized,
   dr_aligned
 };
 
 /* Define type of def-use cross-iteration cycle.  */
 enum vect_def_type {
-  vect_constant_def,
+  vect_constant_def = 1,
   vect_invariant_def,
   vect_loop_def,
   vect_induction_def,
@@ -82,6 +83,71 @@ enum verbosity_levels {
   MAX_VERBOSITY_LEVEL
 };
 
+/************************************************************************
+  SLP 
+ ************************************************************************/
+
+/* A computation tree of an SLP instance. Each node corresponds to a group of
+   stmts to be packed in a SIMD stmt.  */
+typedef struct _slp_tree {
+  /* Only binary and unary operations are supported. LEFT child corresponds to 
+     the first operand and RIGHT child to the second if the operation is
+     binary.  */
+  struct _slp_tree *left;
+  struct _slp_tree *right;
+  /* A group of scalar stmts to be vectorized together.  */
+  VEC (tree, heap) *stmts;
+  /* Vectorized stmt/s.  */
+  VEC (tree, heap) *vec_stmts;
+  /* Number of vectorized stmts.  */
+  unsigned int vec_stmts_size;
+  /* Vectorization costs associated with SLP node.  */
+  struct  
+  {
+    int outside_of_loop;     /* Statements generated outside loop.  */
+    int inside_of_loop;      /* Statements generated inside loop.  */
+  } cost;
+} *slp_tree;
+
+
+/* SLP instance is a sequence of stmts in a loop that can be packed into 
+   SIMD stmts.  */
+typedef struct _slp_instance {
+  /* The root of SLP tree.  */
+  slp_tree root;
+
+  /* Size of groups of scalar stmts that will be replaced by SIMD stmt/s.  */
+  unsigned int group_size;  
+
+  /* The unrolling factor required to vectorized this SLP instance.  */
+  unsigned int unrolling_factor;  
+
+  /* Vectorization costs associated with SLP instance.  */
+  struct  
+  {
+    int outside_of_loop;     /* Statements generated outside loop.  */
+    int inside_of_loop;      /* Statements generated inside loop.  */
+  } cost;
+} *slp_instance;
+
+DEF_VEC_P(slp_instance);
+DEF_VEC_ALLOC_P(slp_instance, heap);
+
+/* Access Functions.  */
+#define SLP_INSTANCE_TREE(S)                             (S)->root
+#define SLP_INSTANCE_GROUP_SIZE(S)                       (S)->group_size
+#define SLP_INSTANCE_UNROLLING_FACTOR(S)                 (S)->unrolling_factor
+#define SLP_INSTANCE_OUTSIDE_OF_LOOP_COST(S)             (S)->cost.outside_of_loop
+#define SLP_INSTANCE_INSIDE_OF_LOOP_COST(S)              (S)->cost.inside_of_loop
+
+#define SLP_TREE_LEFT(S)                         (S)->left
+#define SLP_TREE_RIGHT(S)                        (S)->right
+#define SLP_TREE_SCALAR_STMTS(S)                 (S)->stmts
+#define SLP_TREE_VEC_STMTS(S)                    (S)->vec_stmts
+#define SLP_TREE_NUMBER_OF_VEC_STMTS(S)          (S)->vec_stmts_size
+#define SLP_TREE_OUTSIDE_OF_LOOP_COST(S)         (S)->cost.outside_of_loop
+#define SLP_TREE_INSIDE_OF_LOOP_COST(S)          (S)->cost.inside_of_loop
+
 /*-----------------------------------------------------------------*/
 /* Info on vectorized loops.                                       */
 /*-----------------------------------------------------------------*/
@@ -93,12 +159,16 @@ typedef struct _loop_vec_info {
   /* The loop basic blocks.  */
   basic_block *bbs;
 
-  /* The loop exit_condition.  */
-  tree exit_cond;
-
   /* Number of iterations.  */
   tree num_iters;
 
+  /* Minimum number of iterations below which vectorization is expected to
+     not be profitable (as estimated by the cost model). 
+     -1 indicates that vectorization will not be profitable.
+     FORNOW: This field is an int. Will be a tree in the future, to represent
+	     values unknown at compile time.  */ 
+  int min_profitable_iters;  
+  
   /* Is the loop vectorizable? */
   bool vectorizable;
 
@@ -133,13 +203,23 @@ typedef struct _loop_vec_info {
 
   /* The loop location in the source.  */
   LOC loop_line_number;
+
+  /* All interleaving chains of stores in the loop, represented by the first 
+     stmt in the chain.  */
+  VEC(tree, heap) *strided_stores;
+
+  /* All SLP groups in the loop.  */
+  VEC(slp_instance, heap) *slp_instances;
+
+  /* The unrolling factor needed to SLP the loop.  */
+  unsigned slp_unrolling_factor;
 } *loop_vec_info;
 
 /* Access Functions.  */
 #define LOOP_VINFO_LOOP(L)            (L)->loop
 #define LOOP_VINFO_BBS(L)             (L)->bbs
-#define LOOP_VINFO_EXIT_COND(L)       (L)->exit_cond
 #define LOOP_VINFO_NITERS(L)          (L)->num_iters
+#define LOOP_VINFO_COST_MODEL_MIN_ITERS(L)	(L)->min_profitable_iters
 #define LOOP_VINFO_VECTORIZABLE_P(L)  (L)->vectorizable
 #define LOOP_VINFO_VECT_FACTOR(L)     (L)->vectorization_factor
 #define LOOP_VINFO_PTR_MASK(L)        (L)->ptr_mask
@@ -150,10 +230,33 @@ typedef struct _loop_vec_info {
 #define LOOP_VINFO_UNALIGNED_DR(L)    (L)->unaligned_dr
 #define LOOP_VINFO_MAY_MISALIGN_STMTS(L) (L)->may_misalign_stmts
 #define LOOP_VINFO_LOC(L)             (L)->loop_line_number
+#define LOOP_VINFO_STRIDED_STORES(L)  (L)->strided_stores
+#define LOOP_VINFO_SLP_INSTANCES(L)   (L)->slp_instances
+#define LOOP_VINFO_SLP_UNROLLING_FACTOR(L) (L)->slp_unrolling_factor
+
+#define NITERS_KNOWN_P(n)                     \
+(host_integerp ((n),0)                        \
+&& TREE_INT_CST_LOW ((n)) > 0)
+
+#define NITERS_KNOWN_P(n)                     \
+(host_integerp ((n),0)                        \
+&& TREE_INT_CST_LOW ((n)) > 0)
 
 #define LOOP_VINFO_NITERS_KNOWN_P(L)                     \
-(host_integerp ((L)->num_iters,0)                        \
-&& TREE_INT_CST_LOW ((L)->num_iters) > 0)
+NITERS_KNOWN_P((L)->num_iters)
+
+static inline loop_vec_info
+loop_vec_info_for_loop (struct loop *loop)
+{
+  return (loop_vec_info) loop->aux;
+}
+
+static inline bool
+nested_in_vect_loop_p (struct loop *loop, tree stmt)
+{
+  return (loop->inner 
+          && (loop->inner == (bb_for_stmt (stmt))->loop_father));
+}
 
 /*-----------------------------------------------------------------*/
 /* Info on vectorized defs.                                        */
@@ -166,14 +269,24 @@ enum stmt_vec_info_type {
   assignment_vec_info_type,
   condition_vec_info_type,
   reduc_vec_info_type,
+  induc_vec_info_type,
   type_promotion_vec_info_type,
-  type_demotion_vec_info_type
+  type_demotion_vec_info_type,
+  loop_exit_ctrl_vec_info_type
 };
 
 enum vect_relevant {
   vect_unused_in_loop = 0,
+  vect_used_in_outer_by_reduction,
+  vect_used_in_outer,
   vect_used_by_reduction,
   vect_used_in_loop  
+};
+
+enum slp_vect_type {
+  loop_vect = 0,
+  pure_slp,
+  hybrid
 };
 
 typedef struct data_reference *dr_p;
@@ -210,8 +323,17 @@ typedef struct _stmt_vec_info {
      data-ref (array/pointer/struct access). A GIMPLE stmt is expected to have 
      at most one such data-ref.  **/
 
-  /* Information about the data-ref (access function, etc).  */
+  /* Information about the data-ref (access function, etc),
+     relative to the inner-most containing loop.  */
   struct data_reference *data_ref_info;
+
+  /* Information about the data-ref relative to this loop
+     nest (the loop that is being considered for vectorization).  */
+  tree dr_base_address;
+  tree dr_init;
+  tree dr_offset;
+  tree dr_step;
+  tree dr_aligned_to;
 
   /* Stmt is part of some pattern (computation idiom)  */
   bool in_pattern_p;
@@ -234,7 +356,31 @@ typedef struct _stmt_vec_info {
   /* Classify the def of this stmt.  */
   enum vect_def_type def_type;
 
+  /* If this stmt is a part of pure or hybrid SLP.  */
+  enum slp_vect_type slp_type;
+
+  /* Interleaving info.  */
+  /* First data-ref in the interleaving group.  */
+  tree first_dr;
+  /* Pointer to the next data-ref in the group.  */
+  tree next_dr;
+  /* The size of the interleaving group.  */
+  unsigned int size;
+  /* In case that two or more stmts share data-ref, this is the pointer to the
+     previously detected stmt with the same dr.  */
+  tree same_dr_stmt;
+  /* For loads only, if there is a store with the same location, this field is
+     TRUE.  */
+  bool read_write_dep;
+
+  /* Vectorization costs associated with statement.  */
+  struct
+  {
+    int outside_of_loop;     /* Statements generated outside loop.  */
+    int inside_of_loop;      /* Statements generated inside loop.  */
+  } cost;
 } *stmt_vec_info;
+
 
 /* Access Functions.  */
 #define STMT_VINFO_TYPE(S)                (S)->type
@@ -245,12 +391,97 @@ typedef struct _stmt_vec_info {
 #define STMT_VINFO_VECTYPE(S)             (S)->vectype
 #define STMT_VINFO_VEC_STMT(S)            (S)->vectorized_stmt
 #define STMT_VINFO_DATA_REF(S)            (S)->data_ref_info
+
+#define STMT_VINFO_DR_BASE_ADDRESS(S)      (S)->dr_base_address
+#define STMT_VINFO_DR_INIT(S)              (S)->dr_init
+#define STMT_VINFO_DR_OFFSET(S)            (S)->dr_offset
+#define STMT_VINFO_DR_STEP(S)              (S)->dr_step
+#define STMT_VINFO_DR_ALIGNED_TO(S)        (S)->dr_aligned_to
+
 #define STMT_VINFO_IN_PATTERN_P(S)        (S)->in_pattern_p
 #define STMT_VINFO_RELATED_STMT(S)        (S)->related_stmt
 #define STMT_VINFO_SAME_ALIGN_REFS(S)     (S)->same_align_refs
 #define STMT_VINFO_DEF_TYPE(S)            (S)->def_type
 
 #define STMT_VINFO_RELEVANT_P(S)          ((S)->relevant != vect_unused_in_loop)
+#define STMT_VINFO_DR_GROUP_FIRST_DR(S)    (S)->first_dr
+#define STMT_VINFO_DR_GROUP_NEXT_DR(S)     (S)->next_dr
+#define STMT_VINFO_DR_GROUP_SIZE(S)        (S)->size
+#define STMT_VINFO_DR_GROUP_SAME_DR_STMT(S)(S)->same_dr_stmt
+#define STMT_VINFO_DR_GROUP_READ_WRITE_DEPENDENCE(S)  (S)->read_write_dep
+#define STMT_VINFO_STRIDED_ACCESS(S)      ((S)->first_dr != NULL)
+
+#define STMT_VINFO_HYBRID_SLP(S)          ((S)->slp_type == hybrid)
+#define STMT_VINFO_PURE_SLP(S)            ((S)->slp_type == pure_slp)
+#define STMT_VINFO_SLP_TYPE(S)             (S)->slp_type
+
+#define DR_GROUP_FIRST_DR(S)               (S)->first_dr
+#define DR_GROUP_NEXT_DR(S)                (S)->next_dr
+#define DR_GROUP_SIZE(S)                   (S)->size
+#define DR_GROUP_SAME_DR_STMT(S)           (S)->same_dr_stmt
+#define DR_GROUP_READ_WRITE_DEPENDENCE(S)  (S)->read_write_dep
+
+#define STMT_VINFO_OUTSIDE_OF_LOOP_COST(S) (S)->cost.outside_of_loop
+#define STMT_VINFO_INSIDE_OF_LOOP_COST(S)  (S)->cost.inside_of_loop
+
+/* These are some defines for the initial implementation of the vectorizer's
+   cost model.  These will later be target specific hooks.  */
+
+/* Cost of conditional branch.  */
+#ifndef TARG_COND_BRANCH_COST
+#define TARG_COND_BRANCH_COST           6 /* SPU */
+#endif
+
+/* Cost of any scalar operation, excluding load and store.  */
+#ifndef TARG_SCALAR_STMT_COST
+#define TARG_SCALAR_STMT_COST           1
+#endif
+
+/* Cost of scalar load.  */
+#ifndef TARG_SCALAR_LOAD_COST
+#define TARG_SCALAR_LOAD_COST           2 /* SPU */
+#endif
+
+/* Cost of scalar load.  */
+#ifndef TARG_SCALAR_STORE_COST
+#define TARG_SCALAR_STORE_COST          10 /*SPU */
+#endif
+
+/* Cost of any vector operation, excluding load, store or vector to scalar
+   operation.  */
+#ifndef TARG_VEC_STMT_COST
+#define TARG_VEC_STMT_COST           1
+#endif
+
+/* Cost of vector to scalar operation.  */
+#ifndef TARG_VEC_TO_SCALAR_COST
+#define TARG_VEC_TO_SCALAR_COST      0	/* SPU */
+#endif
+
+/* Cost of scalar to vector operation.  */
+#ifndef TARG_SCALAR_TO_VEC_COST
+#define TARG_SCALAR_TO_VEC_COST      1
+#endif
+
+/* Cost of aligned vector load.  */
+#ifndef TARG_VEC_LOAD_COST
+#define TARG_VEC_LOAD_COST           1
+#endif
+
+/* Cost of misaligned vector load.  */
+#ifndef TARG_VEC_UNALIGNED_LOAD_COST
+#define TARG_VEC_UNALIGNED_LOAD_COST 2
+#endif
+
+/* Cost of vector store.  */
+#ifndef TARG_VEC_STORE_COST
+#define TARG_VEC_STORE_COST          1
+#endif
+
+/* Cost of mispredicted branch.  */
+#ifndef TARG_BRANCH_MISPREDICT_COST
+#define TARG_BRANCH_MISPREDICT_COST  19 /* SPU */
+#endif
 
 static inline void set_stmt_info (tree_ann_t ann, stmt_vec_info stmt_info);
 static inline stmt_vec_info vinfo_for_stmt (tree stmt);
@@ -267,6 +498,30 @@ vinfo_for_stmt (tree stmt)
 {
   tree_ann_t ann = tree_ann (stmt);
   return ann ? (stmt_vec_info) ann->common.aux : NULL;
+}
+
+static inline bool
+is_pattern_stmt_p (stmt_vec_info stmt_info)
+{
+  tree related_stmt;
+  stmt_vec_info related_stmt_info;
+
+  related_stmt = STMT_VINFO_RELATED_STMT (stmt_info);
+  if (related_stmt
+      && (related_stmt_info = vinfo_for_stmt (related_stmt))
+      && STMT_VINFO_IN_PATTERN_P (related_stmt_info))
+    return true;
+
+  return false;
+}
+
+static inline bool
+is_loop_header_bb_p (basic_block bb)
+{
+  if (bb == (bb->loop_father)->header)
+    return true;
+  gcc_assert (EDGE_COUNT (bb->preds) == 1);
+  return false;
 }
 
 /*-----------------------------------------------------------------*/
@@ -334,7 +589,7 @@ extern tree get_vectype_for_scalar_type (tree);
 extern bool vect_is_simple_use (tree, loop_vec_info, tree *, tree *,
 				enum vect_def_type *);
 extern bool vect_is_simple_iv_evolution (unsigned, tree, tree *, tree *);
-extern tree vect_is_simple_reduction (struct loop *, tree);
+extern tree vect_is_simple_reduction (loop_vec_info, tree);
 extern bool vect_can_force_dr_alignment_p (tree, unsigned int);
 extern enum dr_alignment_support vect_supportable_dr_alignment
   (struct data_reference *);
@@ -343,7 +598,7 @@ extern bool supportable_widening_operation (enum tree_code, tree, tree,
   tree *, tree *, enum tree_code *, enum tree_code *);
 /* Creation and deletion of loop and stmt info structs.  */
 extern loop_vec_info new_loop_vec_info (struct loop *loop);
-extern void destroy_loop_vec_info (loop_vec_info);
+extern void destroy_loop_vec_info (loop_vec_info, bool);
 extern stmt_vec_info new_stmt_vec_info (tree stmt, loop_vec_info);
 /* Main driver.  */
 extern void vectorize_loops (struct loops *);
@@ -352,7 +607,7 @@ extern void vectorize_loops (struct loops *);
 /** In tree-vect-analyze.c  **/
 /* Driver for analysis stage.  */
 extern loop_vec_info vect_analyze_loop (struct loop *);
-
+extern void vect_free_slp_tree (slp_tree);
 
 /** In tree-vect-patterns.c  **/
 /* Pattern recognition functions.
@@ -364,15 +619,23 @@ void vect_pattern_recog (loop_vec_info);
 
 
 /** In tree-vect-transform.c  **/
-extern bool vectorizable_load (tree, block_stmt_iterator *, tree *);
-extern bool vectorizable_store (tree, block_stmt_iterator *, tree *);
-extern bool vectorizable_operation (tree, block_stmt_iterator *, tree *);
+extern bool vectorizable_load (tree, block_stmt_iterator *, tree *, slp_tree);
+extern bool vectorizable_store (tree, block_stmt_iterator *, tree *, slp_tree);
+extern bool vectorizable_operation (tree, block_stmt_iterator *, tree *, slp_tree);
 extern bool vectorizable_type_promotion (tree, block_stmt_iterator *, tree *);
 extern bool vectorizable_type_demotion (tree, block_stmt_iterator *, tree *);
-extern bool vectorizable_assignment (tree, block_stmt_iterator *, tree *);
+extern bool vectorizable_assignment (tree, block_stmt_iterator *, tree *, slp_tree);
 extern bool vectorizable_condition (tree, block_stmt_iterator *, tree *);
 extern bool vectorizable_live_operation (tree, block_stmt_iterator *, tree *);
 extern bool vectorizable_reduction (tree, block_stmt_iterator *, tree *);
+extern bool vectorizable_induction (tree, block_stmt_iterator *, tree *);
+extern int  vect_estimate_min_profitable_iters (loop_vec_info);
+extern void vect_model_simple_cost (stmt_vec_info, int, enum vect_def_type *, 
+				    slp_tree);
+extern void vect_model_store_cost (stmt_vec_info, int, enum vect_def_type, 
+				   slp_tree);
+extern void vect_model_load_cost (stmt_vec_info, int, slp_tree);
+
 /* Driver for transformation stage.  */
 extern void vect_transform_loop (loop_vec_info, struct loops *);
 

@@ -3884,6 +3884,9 @@ initializer_constant_valid_p (tree value, tree endtype)
 	    tree inner = initializer_constant_valid_p (src, endtype);
 	    if (inner == null_pointer_node)
 	      return null_pointer_node;
+	    if (inner && targetm.valid_pointer_mode (TYPE_MODE (dest_type))
+		&& (TYPE_PRECISION (dest_type) >= TYPE_PRECISION (src_type)))
+	      return inner;
 	    break;
 	  }
 
@@ -4084,7 +4087,36 @@ output_constant (tree exp, unsigned HOST_WIDE_INT size, unsigned int align)
 	 way.  */
       if (TREE_CODE (exp) == ADDR_EXPR)
 	exp = build1 (ADDR_EXPR, saved_type, TREE_OPERAND (exp, 0));
+      else if (TREE_CODE (exp) == PLUS_EXPR || TREE_CODE (exp) == MINUS_EXPR)
+	exp = build2 (TREE_CODE (exp), saved_type, TREE_OPERAND (exp, 0), TREE_OPERAND (exp, 1));
     }
+
+  /* Also allow an integer the same size as a valid_pointer_mode to be
+   * assigned by a smaller pointer size */
+  {
+    tree inner = exp;
+    /* Peel off any intermediate conversions-to-pointer for valid
+       pointer modes.  */
+    while ((TREE_CODE (inner) == NOP_EXPR || TREE_CODE (inner) == CONVERT_EXPR)
+	   && targetm.valid_pointer_mode (TYPE_MODE (TREE_TYPE (inner))))
+      inner = TREE_OPERAND (inner, 0);
+    if (inner != exp && (POINTER_TYPE_P (TREE_TYPE (inner))
+	  || TREE_CODE (inner) == PLUS_EXPR 
+	  || TREE_CODE (inner) == MINUS_EXPR ))
+      {
+	tree saved_type = TREE_TYPE (exp);
+
+	/* If what we're left with is the address of something, we can
+	   convert the address to the final type and output it that
+	   way.  */
+	if (TREE_CODE (inner) == ADDR_EXPR)
+	  exp = build1 (ADDR_EXPR, saved_type, TREE_OPERAND (inner, 0));
+	else if (TREE_CODE (inner) == PLUS_EXPR
+		 || TREE_CODE (inner) == MINUS_EXPR)
+	  exp = build2 (TREE_CODE (inner), saved_type,
+			TREE_OPERAND (inner, 0), TREE_OPERAND (inner, 1));
+      }
+  }
 
   /* Eliminate any conversions since we'll be outputting the underlying
      constant.  */
@@ -4109,6 +4141,11 @@ output_constant (tree exp, unsigned HOST_WIDE_INT size, unsigned int align)
 
   code = TREE_CODE (TREE_TYPE (exp));
   thissize = int_size_in_bytes (TREE_TYPE (exp));
+
+  /* begin bugzilla 32305 */
+  /* Give the front end another chance to expand constants.  */
+  exp = lang_hooks.expand_constant (exp);
+  /* end  */
 
   /* Allow a constructor with no elements for any data type.
      This means to fill the space with zeros.  */
@@ -4281,8 +4318,47 @@ output_constructor (tree exp, unsigned HOST_WIDE_INT size,
 
   gcc_assert (HOST_BITS_PER_WIDE_INT >= BITS_PER_UNIT);
 
-  if (TREE_CODE (type) == RECORD_TYPE)
-    field = TYPE_FIELDS (type);
+  /** SCE bugilla #11003 **/
+  /* APPLE LOCAL begin bitfield reversal 4228294 4387676 4388773 */
+  if (TREE_CODE (type) == RECORD_TYPE && TYPE_FIELDS (type))
+    {
+      /* If bitfields were reversed they will not be in ascending
+	 address order here, which confuses the code below.   Sort
+	 the constructor.  Note that the type retains the old
+	 ordering, for debug info purposes.  (The comment below that
+	 says FIELD goes through the structure fields is misleading;
+	 FIELD is set from the constructor, not the type, so uses
+	 the constructor list's ordering.)  */
+
+      const int length = VEC_length (constructor_elt, CONSTRUCTOR_ELTS (exp));
+      int cnt1;
+
+      for (cnt1 = 0; cnt1 < length - 1; cnt1++)
+        {
+          int cnt2;
+          for (cnt2 = length - 1; cnt2 > cnt1; cnt2--) {
+            constructor_elt *ce1 = VEC_index (constructor_elt, CONSTRUCTOR_ELTS (exp), cnt2);
+            HOST_WIDE_INT pos1 = int_bit_position (ce1->index);
+
+            constructor_elt *ce2 = VEC_index (constructor_elt, CONSTRUCTOR_ELTS (exp), cnt2 - 1);
+            HOST_WIDE_INT pos2 = int_bit_position (ce2->index);
+
+            if (pos2 > pos1) {
+              constructor_elt tmp;
+              tmp.index = ce1->index;
+              tmp.value = ce1->value;
+
+              ce1->index = ce2->index;
+              ce1->value = ce2->value;
+              ce2->index = tmp.index;
+              ce2->value = tmp.value;
+            }
+          }
+	}
+
+      field = TYPE_FIELDS (type);
+    }
+  /* APPLE LOCAL end bitfield reversal 4228294 4387676 4388773 */
 
   if (TREE_CODE (type) == ARRAY_TYPE
       && TYPE_DOMAIN (type) != 0)

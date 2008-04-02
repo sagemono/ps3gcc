@@ -4659,7 +4659,7 @@ spu_real_wrapper (REAL_VALUE_TYPE *r, int icode, const REAL_VALUE_TYPE *op0,
 		  const REAL_VALUE_TYPE *op1, enum machine_mode mode)
 {
   bool inexact = false;
-  const struct real_format *fmt;
+  const struct real_format *fmt, *sf_fmt;
   REAL_VALUE_TYPE zero, maxval0, maxval1;
 
   fmt = REAL_MODE_FORMAT (mode);
@@ -4677,7 +4677,7 @@ spu_real_wrapper (REAL_VALUE_TYPE *r, int icode, const REAL_VALUE_TYPE *op0,
       /* The following code is needed for conformance with SPU floating 
 	 point constant expression evaluation as stated in p74 of 
          "SPU C/C++ Language Extensions". This is also a fix for BR2259, and
-	 the float-range-1.c also passes. 
+	 the float-range-1.c also passes. */
       /* TRANSMETA LOCAL End */
       if (fmt == &spu_extended_format)
 	{
@@ -4699,6 +4699,7 @@ spu_real_wrapper (REAL_VALUE_TYPE *r, int icode, const REAL_VALUE_TYPE *op0,
       {
 	long buf;
 
+      /*  double->double	IEEE complied  */
 	if (icode == REAL_CONVERT_DF_EXPR && mode == DFmode)
 	  {
 	    real_convert_1 (r, mode, op0);
@@ -4706,6 +4707,15 @@ spu_real_wrapper (REAL_VALUE_TYPE *r, int icode, const REAL_VALUE_TYPE *op0,
 	  }
 
 	*r = *op0;
+
+	/* return zero if input is SFmode denorm  */
+        sf_fmt = REAL_MODE_FORMAT (SFmode);
+        gcc_assert (sf_fmt);
+	if (real_isdenorm (sf_fmt, r))
+	{
+	    get_zero (r, 0);
+	    return false;
+	}
 
 	/* convert very big number to infinity & NaN as appropriate */
 	if (icode == REAL_CONVERT_SF_EXPR 
@@ -4739,6 +4749,14 @@ spu_real_wrapper (REAL_VALUE_TYPE *r, int icode, const REAL_VALUE_TYPE *op0,
 	    /* interpret this as an SPU extended single */
 	    ieee_single_format.encode (&ieee_single_format, &buf, r);
 	    (*fmt->decode) (fmt, r, &buf);
+
+	    /* if result is denorm, return 0.0  */
+	    if (real_isdenorm (fmt, r))
+	    {
+	       get_zero (r, 0);
+	       return false;
+	    }
+
 	  }
 	return false;
       }
