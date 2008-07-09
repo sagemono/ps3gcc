@@ -399,6 +399,17 @@
   return indexed_or_indirect_address (op, mode);
 })
 
+(define_predicate "reg_or_indexed_or_indirect_operand"
+  (ior (ior (match_operand 0 "indexed_or_indirect_operand")
+            (match_code "reg"))
+       (and (match_code "mem")
+	    (match_test "GET_CODE (XEXP (op, 0)) == PLUS
+			 && GET_CODE (XEXP (XEXP (op, 0), 0)) == REG
+			 && (XEXP (XEXP (op, 0), 0) == virtual_stack_vars_rtx
+			     || XEXP (XEXP (op, 0), 0) == arg_pointer_rtx
+			     || XEXP (XEXP (op, 0), 0) == virtual_incoming_args_rtx)
+			 && GET_CODE (XEXP (XEXP (op, 0), 1)) == CONST_INT"))))
+
 ;; Return 1 if the operand is an indexed or indirect address.
 (define_special_predicate "indexed_or_indirect_address"
   (and (match_test "REG_P (op)

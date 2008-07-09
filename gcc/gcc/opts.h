@@ -64,6 +64,7 @@ extern const struct cl_option cl_options[];
 extern const unsigned int cl_options_count;
 extern const char *const lang_names[];
 
+#define CL_UNOVERRIDABLE	(1 << 20) /* this option cannot overrite via #pragma option */
 #define CL_DISABLED		(1 << 21) /* Disabled in this configuration.  */
 #define CL_TARGET		(1 << 22) /* Target-specific option.  */
 #define CL_REPORT		(1 << 23) /* Report argument with -fverbose-asm  */
@@ -83,7 +84,7 @@ extern const char **in_fnames;
 
 extern unsigned num_in_fnames;
 
-extern void decode_options (unsigned int argc, const char **argv);
+extern void decode_options (unsigned int argc, const char **argv, int);
 extern int option_enabled (int opt_idx);
 extern bool get_option_state (int, struct cl_option_state *);
 

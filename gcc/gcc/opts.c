@@ -64,6 +64,11 @@ HOST_WIDE_INT larger_than_size;
    strict-aliasing safe.  */
 int warn_strict_aliasing;
 
+/* True to warn about any function whose frame size is larger
+ * than N bytes. */
+bool warn_frame_larger_than;
+HOST_WIDE_INT frame_larger_than_size;
+
 /* Hack for cooperation between set_Wunused and set_Wextra.  */
 static bool maybe_warn_unused_parameter;
 
@@ -109,11 +114,11 @@ static size_t find_opt (const char *, int);
 static int common_handle_option (size_t scode, const char *arg, int value);
 static void handle_param (const char *);
 static void set_Wextra (int);
-static unsigned int handle_option (const char **argv, unsigned int lang_mask);
+static unsigned int handle_option (const char **argv, unsigned int lang_mask, int called_by_pragma);
 static char *write_langs (unsigned int lang_mask);
 static void complain_wrong_lang (const char *, const struct cl_option *,
 				 unsigned int lang_mask);
-static void handle_options (unsigned int, const char **, unsigned int);
+static void handle_options (unsigned int, const char **, unsigned int, int called_by_pragma);
 static void wrap_help (const char *help, const char *item, unsigned int);
 static void print_target_help (void);
 static void print_help (void);
@@ -272,7 +277,7 @@ complain_wrong_lang (const char *text, const struct cl_option *option,
 /* Handle the switch beginning at ARGV for the language indicated by
    LANG_MASK.  Returns the number of switches consumed.  */
 static unsigned int
-handle_option (const char **argv, unsigned int lang_mask)
+handle_option (const char **argv, unsigned int lang_mask, int called_by_pragma)
 {
   size_t opt_index;
   const char *opt, *arg = 0;
@@ -318,6 +323,12 @@ handle_option (const char **argv, unsigned int lang_mask)
     {
       error ("command line option %qs"
 	     " is not supported by this configuration", opt);
+      goto done;
+    }
+
+  if (called_by_pragma && (option->flags & CL_UNOVERRIDABLE))
+    {
+      error ("#pragma option is not allowed to specify option %qs", opt);
       goto done;
     }
 
@@ -435,7 +446,7 @@ add_input_filename (const char *filename)
    contains has a single bit set representing the current
    language.  */
 static void
-handle_options (unsigned int argc, const char **argv, unsigned int lang_mask)
+handle_options (unsigned int argc, const char **argv, unsigned int lang_mask, int called_by_pragma)
 {
   unsigned int n, i;
 
@@ -453,7 +464,7 @@ handle_options (unsigned int argc, const char **argv, unsigned int lang_mask)
 	  continue;
 	}
 
-      n = handle_option (argv + i, lang_mask);
+      n = handle_option (argv + i, lang_mask, called_by_pragma);
 
       if (!n)
 	{
@@ -464,16 +475,20 @@ handle_options (unsigned int argc, const char **argv, unsigned int lang_mask)
 }
 
 /* Parse command line options and set default flag values.  Do minimal
-   options processing.  */
+   options processing. 
+   Option init and diag init are done only when NEED_INIT is non zero.*/
 void
-decode_options (unsigned int argc, const char **argv)
+decode_options (unsigned int argc, const char **argv, int called_by_pragma)
 {
-  unsigned int i, lang_mask;
-
+  unsigned int i;
+  static unsigned int lang_mask;
   /* Perform language-specific options initialization.  */
-  lang_mask = lang_hooks.init_options (argc, argv);
+  if (!called_by_pragma)
+    {
+      lang_mask = lang_hooks.init_options (argc, argv);
 
-  lang_hooks.initialize_diagnostics (global_dc);
+      lang_hooks.initialize_diagnostics (global_dc);
+    }
 
   /* Scan to see what optimization level has been specified.  That will
      determine the default value of many flags.  */
@@ -643,7 +658,7 @@ decode_options (unsigned int argc, const char **argv)
   OPTIMIZATION_OPTIONS (optimize, optimize_size);
 #endif
 
-  handle_options (argc, argv, lang_mask);
+  handle_options (argc, argv, lang_mask, called_by_pragma);
 
   if (flag_pie)
     flag_pic = flag_pie;
@@ -771,6 +786,11 @@ common_handle_option (size_t scode, const char *arg, int value)
     case OPT_Wlarger_than_:
       larger_than_size = value;
       warn_larger_than = value != -1;
+      break;
+
+    case OPT_Wframe_larger_than_:
+      frame_larger_than_size = value;
+      warn_frame_larger_than = value != -1;
       break;
 
     case OPT_Wstrict_aliasing:

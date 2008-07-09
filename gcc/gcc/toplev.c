@@ -2013,7 +2013,7 @@ toplev_main (unsigned int argc, const char **argv)
 
   /* Parse the options and do minimal processing; basically just
      enough to default flags appropriately.  */
-  decode_options (argc, argv);
+  decode_options (argc, argv, 0);
 
   randomize ();
 

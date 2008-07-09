@@ -4084,16 +4084,10 @@ cp_parser_postfix_expression (cp_parser *parser, bool address_p, bool cast_p)
 	       compound-literal expression.  */
 	    if (cp_parser_parse_definitely (parser))
 	      {
-/* CELL LOCAL Begin */
-/* We disable this check because vector literals are all over the
-   place in system headers */
-#if 1
-/* CELL LOCAL End */
 		/* Warn the user that a compound literal is not
-		   allowed in standard C++.  */
-		if (pedantic)
+		   allowed in standard C++ but not for vector types.  */
+		if (pedantic && TREE_CODE (type) != VECTOR_TYPE)
 		  pedwarn ("ISO C++ forbids compound-literals");
-#endif /* CELL LOCAL */
 		/* Form the representation of the compound-literal.  */
 		postfix_expression
 		  = finish_compound_literal (type, initializer_list);
@@ -6910,8 +6904,17 @@ cp_parser_implicitly_scoped_statement (cp_parser* parser)
 {
   tree statement;
 
+  /* Mark if () ; with a special NOP_EXPR.  */
+  if (cp_lexer_next_token_is (parser->lexer, CPP_SEMICOLON))
+    {
+      cp_lexer_consume_token (parser->lexer);
+      statement = add_stmt (build_empty_stmt ());
+    }
+  /* if a compound is opened, we simply parse the statement directly.  */
+  else if (cp_lexer_next_token_is (parser->lexer, CPP_OPEN_BRACE))
+    statement = cp_parser_compound_statement (parser, NULL, false);
   /* If the token is not a `{', then we must take special action.  */
-  if (cp_lexer_next_token_is_not (parser->lexer, CPP_OPEN_BRACE))
+  else
     {
       /* Create a compound-statement.  */
       statement = begin_compound_stmt (0);
@@ -6920,9 +6923,6 @@ cp_parser_implicitly_scoped_statement (cp_parser* parser)
       /* Finish the dummy compound-statement.  */
       finish_compound_stmt (statement);
     }
-  /* Otherwise, we simply parse the statement directly.  */
-  else
-    statement = cp_parser_compound_statement (parser, NULL, false);
 
   /* Return the statement.  */
   return statement;

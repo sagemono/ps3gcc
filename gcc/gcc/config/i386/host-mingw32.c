@@ -81,10 +81,28 @@ static void *
 mingw32_gt_pch_get_address (size_t size, int fd  ATTRIBUTE_UNUSED)
 {
   void* res;
+  void *oldaddress;
+  int fixed_address;
+  OSVERSIONINFO version_info;
+  
   size = (size + va_granularity - 1) & ~(va_granularity - 1);
 
   /* We are really using pch_VA_max_size as a minimum. */
   size = MAX (size, pch_VA_max_size);
+  
+  /* Determine the version of Windows we are running on.  */
+  version_info.dwOSVersionInfoSize = sizeof (version_info);
+  GetVersionEx (&version_info);
+  
+  /* For Vista use a fixed address, but we should enable it always so we don't
+     end up with the case where you cannot use the PCH on a different machine
+     with a non Vista.  */
+  fixed_address = 1; /*version_info.dwMajorVersion > 5;*/
+  
+  if (!fixed_address)
+    oldaddress = NULL;
+  else
+    oldaddress = (void*)0x20000000;
 
   /* FIXME: We let system determine base by setting first arg to NULL.
      Allocating at top of available address space avoids unnecessary
@@ -94,8 +112,8 @@ mingw32_gt_pch_get_address (size_t size, int fd  ATTRIBUTE_UNUSED)
      If we allocate at bottom we need to reserve the address as early as possible
      and at the same point in each invocation. */
  
-  res = VirtualAlloc (NULL, size,
-		      MEM_RESERVE | MEM_TOP_DOWN,
+  res = VirtualAlloc (oldaddress, size,
+		      MEM_RESERVE | (fixed_address ? 0 : MEM_TOP_DOWN),
 		      PAGE_NOACCESS);
   if (!res)
     w32_error (__FUNCTION__, __FILE__, __LINE__, "VirtualAlloc");
@@ -117,6 +135,18 @@ mingw32_gt_pch_use_address (void *addr, size_t size, int fd,
 {
   void * mmap_addr;
   static HANDLE mmap_handle;
+  
+  /* Apparently, MS Vista puts unnamed file mapping objects into Global
+     namespace when running an application in a Terminal Server
+     session.  This causes failure since, by default, applications 
+     don't get SeCreateGlobalPrivilege. We don't need global
+     memory sharing so explicitly put object into Local namespace.  */
+   const char object_name[] = "Local\\MinGWGCCPCH";
+
+  /* However, the documentation for CreateFileMapping says that on NT4
+     and earlier, backslashes are invalid in object name.  So, we need
+     to check if we are on Windows2000 or higher.  */
+  OSVERSIONINFO version_info;
 
   if (size == 0)
     return 0;
@@ -125,10 +155,16 @@ mingw32_gt_pch_use_address (void *addr, size_t size, int fd,
      this to work.  We can't change the offset. */ 
   if ((offset & (va_granularity - 1)) != 0)
     return -1;
+  
+  
+  /* Determine the version of Windows we are running on.  */
+  version_info.dwOSVersionInfoSize = sizeof (version_info);
+  GetVersionEx (&version_info);
 
-  mmap_handle = CreateFileMapping ((HANDLE) _get_osfhandle (fd),
-				   NULL, PAGE_WRITECOPY | SEC_COMMIT,
-				   0, 0,  NULL);
+  mmap_handle = CreateFileMappingA ((HANDLE) _get_osfhandle (fd), NULL, 
+				   PAGE_WRITECOPY | SEC_COMMIT, 0, 0,
+				   version_info.dwMajorVersion > 4
+				    ? object_name : NULL);
   if (mmap_handle == NULL)
     {
       w32_error (__FUNCTION__,  __FILE__, __LINE__, "CreateFileMapping");

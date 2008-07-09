@@ -1,4 +1,4 @@
-/* { dg-do compile { target powerpc*-*-linux* } } */
+/* { dg-do compile } */
 /* { dg-options "-maltivec" } */
 
 /* Valid AltiVec vector types should be accepted with no warnings.  */

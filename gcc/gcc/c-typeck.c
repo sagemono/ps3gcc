@@ -1823,6 +1823,17 @@ build_indirect_ref (tree ptr, const char *errorstring)
   return error_mark_node;
 }
 
+/* Like c_mark_addressable but don't check register qualifier.  */
+static void
+mark_addressable_vector (tree x)
+{
+  while (handled_component_p (x))
+    x = TREE_OPERAND (x, 0);
+  if (TREE_CODE (x) != VAR_DECL && TREE_CODE (x) != PARM_DECL)
+    return ;
+  TREE_ADDRESSABLE (x) = 1;
+}
+
 /* This handles expressions of the form "a[i]", which denotes
    an array reference.
 
@@ -1846,10 +1857,9 @@ build_array_ref (tree array, tree index)
     {
       tree temp;
       if (TREE_CODE (TREE_TYPE (index)) != ARRAY_TYPE
-	  && TREE_CODE (TREE_TYPE (index)) != POINTER_TYPE
-	  && TREE_CODE (TREE_TYPE (index)) != VECTOR_TYPE)
+	  && TREE_CODE (TREE_TYPE (index)) != POINTER_TYPE)
 	{
-	  error ("subscripted value is neither array nor pointer");
+	  error ("subscripted value is not an array, a pointer, or a vector");
 	  return error_mark_node;
 	}
       temp = array;
@@ -1890,8 +1900,7 @@ build_array_ref (tree array, tree index)
     {
       tree type = TREE_TYPE (array);
       tree type1;
-      if (!c_mark_addressable (array))
-	return error_mark_node;
+      mark_addressable_vector (array);
       type = build_qualified_type (TREE_TYPE (type), TYPE_QUALS (type));
       type = build_pointer_type (type);
       type1 = build_pointer_type (TREE_TYPE (array));
@@ -4626,12 +4635,13 @@ digest_init (tree type, tree init, bool strict_string, int require_constant)
 	   conversion.  */
 	inside_init = convert (type, inside_init);
 
-      if (require_constant && !flag_iso
+      if (require_constant && (!flag_iso || code == VECTOR_TYPE)
 	  && TREE_CODE (inside_init) == COMPOUND_LITERAL_EXPR)
 	{
 	  /* As an extension, allow initializing objects with static storage
 	     duration with compound literals (which are then treated just as
-	     the brace enclosed list they contain).  */
+	     the brace enclosed list they contain).  Also allow this for
+	     vectors, as we can only assign them with compound literals.  */
 	  tree decl = COMPOUND_LITERAL_EXPR_DECL (inside_init);
 	  inside_init = DECL_INITIAL (decl);
 	}
@@ -6375,7 +6385,8 @@ process_init_element (struct c_expr value)
 	   || TREE_CODE (constructor_type) == UNION_TYPE)
 	  && constructor_fields == 0)
 	process_init_element (pop_init_level (1));
-      else if (TREE_CODE (constructor_type) == ARRAY_TYPE
+      else if ((TREE_CODE (constructor_type) == ARRAY_TYPE
+	        || TREE_CODE (constructor_type) == VECTOR_TYPE)
 	       && (constructor_max_index == 0
 		   || tree_int_cst_lt (constructor_max_index,
 				       constructor_index)))
@@ -6435,7 +6446,7 @@ process_init_element (struct c_expr value)
 		   && value.value != error_mark_node
 		   && TYPE_MAIN_VARIANT (TREE_TYPE (value.value)) != fieldtype
 		   && (fieldcode == RECORD_TYPE || fieldcode == ARRAY_TYPE
-		       || fieldcode == UNION_TYPE))
+		       || fieldcode == UNION_TYPE || fieldcode == VECTOR_TYPE))
 	    {
 	      push_init_level (1);
 	      continue;
@@ -6564,7 +6575,7 @@ process_init_element (struct c_expr value)
 		   && value.value != error_mark_node
 		   && TYPE_MAIN_VARIANT (TREE_TYPE (value.value)) != elttype
 		   && (eltcode == RECORD_TYPE || eltcode == ARRAY_TYPE
-		       || eltcode == UNION_TYPE))
+		       || eltcode == UNION_TYPE || eltcode == VECTOR_TYPE))
 	    {
 	      push_init_level (1);
 	      continue;
@@ -7177,36 +7188,7 @@ c_finish_if_stmt (location_t if_locus, tree cond, tree then_block,
 		  &if_locus);
     }
 
-  /* Diagnose ";" via the special empty statement node that we create.  */
-  if (extra_warnings)
-    {
-      tree *inner_then = &then_block, *inner_else = &else_block;
-
-      if (TREE_CODE (*inner_then) == STATEMENT_LIST
-	  && STATEMENT_LIST_TAIL (*inner_then))
-	inner_then = &STATEMENT_LIST_TAIL (*inner_then)->stmt;
-      if (*inner_else && TREE_CODE (*inner_else) == STATEMENT_LIST
-	  && STATEMENT_LIST_TAIL (*inner_else))
-	inner_else = &STATEMENT_LIST_TAIL (*inner_else)->stmt;
-
-      if (TREE_CODE (*inner_then) == NOP_EXPR && !TREE_TYPE (*inner_then))
-	{
-	  if (!*inner_else)
-	    warning (0, "%Hempty body in an if-statement",
-		     EXPR_LOCUS (*inner_then));
-
-	  *inner_then = alloc_stmt_list ();
-	}
-      if (*inner_else
-	  && TREE_CODE (*inner_else) == NOP_EXPR
-	  && !TREE_TYPE (*inner_else))
-	{
-	  warning (0, "%Hempty body in an else-statement",
-		   EXPR_LOCUS (*inner_else));
-
-	  *inner_else = alloc_stmt_list ();
-	}
-    }
+  empty_body_warning (then_block, else_block);
 
   stmt = build3 (COND_EXPR, void_type_node, cond, then_block, else_block);
   SET_EXPR_LOCATION (stmt, if_locus);

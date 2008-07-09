@@ -778,7 +778,7 @@ static rtx rs6000_complex_function_value (enum machine_mode);
 static rtx rs6000_spe_function_arg (CUMULATIVE_ARGS *,
 				    enum machine_mode, tree);
 static void rs6000_darwin64_record_arg_advance_flush (CUMULATIVE_ARGS *,
-						      HOST_WIDE_INT);
+						      HOST_WIDE_INT, int);
 static void rs6000_darwin64_record_arg_advance_recurse (CUMULATIVE_ARGS *,
 							tree, HOST_WIDE_INT);
 static void rs6000_darwin64_record_arg_flush (CUMULATIVE_ARGS *,
@@ -2602,8 +2602,9 @@ rs6000_expand_vector_init (rtx target, rtx vals)
   /* Store value to stack temp.  Load vector element.  Splat.  */
   if (all_same)
     {
+      rtx val = XVECEXP (vals, 0, 0);
       /* BEGIN CELL VECREG */
-      if (nonimmediate_operand (XVECEXP (vals, 0, 0), inner_mode))
+      if (nonimmediate_operand (val, inner_mode))
 	{
 	  int icode, icode2;
 	  switch (mode)
@@ -2628,11 +2629,21 @@ rs6000_expand_vector_init (rtx target, rtx vals)
 	      gcc_unreachable();
 	  }
 	  x = gen_reg_rtx (mode);
-	  emit_insn (GEN_FCN (icode) (x, XVECEXP (vals, 0, 0), gen_reg_rtx (V16QImode), gen_reg_rtx (Pmode)));
+	  /* FIXME: This is not needed with GCC 4.3.0 and the data flow merge.  */
+	  /* Force the memory address to be valid while doing the expansion. */
+	  if (MEM_P (val))
+	    {
+	      rtx t = XEXP (val, 0);
+	      t = force_reg (Pmode, t);
+	      t = gen_rtx_MEM (GET_MODE (val), t);
+	      MEM_COPY_ATTRIBUTES (t, val);
+	      val = t;
+	    }
+	  emit_insn (GEN_FCN (icode) (x, val, gen_reg_rtx (V16QImode), gen_reg_rtx (Pmode)));
 	  emit_insn (GEN_FCN (icode2) (target, x, const0_rtx));
 	  return;
 	}
-      x = XVECEXP (vals, 0, 0);
+      x = val;
       if (GET_CODE (x) != VEC_SELECT)
 	{
 	  mem = assign_stack_temp (mode, GET_MODE_SIZE (inner_mode), 0);
@@ -2733,15 +2744,48 @@ rs6000_expand_vector_extract (rtx target, rtx vec, int elt)
   /* Store single field into inner_mode-sized buffer.  */
   x = gen_rtx_PARALLEL (VOIDmode, gen_rtvec (1, GEN_INT (elt)));
   x = gen_rtx_VEC_SELECT (inner_mode, vec, x);
-  x = gen_rtx_PARALLEL (VOIDmode, gen_rtvec (3,
+  x = gen_rtx_PARALLEL (VOIDmode, gen_rtvec (4,
 	gen_rtx_SET (VOIDmode, target, x),
 	gen_rtx_CLOBBER (VOIDmode, gen_reg_rtx (mode)),
-	gen_rtx_CLOBBER (VOIDmode, gen_reg_rtx (inner_mode))));
+	gen_rtx_CLOBBER (VOIDmode, gen_reg_rtx (inner_mode)),
+	gen_rtx_CLOBBER (VOIDmode, gen_reg_rtx (Pmode))));
   emit_insn (x);
 }
 
+/* A common function to rs6000_split_stve and rs6000_split_lve.
+   FIXME this can be removed with GCC 4.3.0 as no_new_pseudos does not
+   exist any more and you can create pseduos after the first data flow pass
+   (well flow.c is removed :) ).   */
+static rtx
+create_correct_vector_mem (rtx mem, enum machine_mode mode, rtx tmpreg)
+{
+  if (!no_new_pseudos)
+    return mem;
+  if (!memory_address_p (mode, XEXP (mem, 0)))
+    {
+      rtx addr = XEXP (mem, 0);
+      rtx new;
+      if (GET_CODE (addr) == PLUS)
+        {
+          gcc_assert (GET_CODE (XEXP (addr, 1)) == CONST_INT);
+          emit_move_insn (tmpreg, XEXP (addr, 1));
+          new = gen_rtx_MEM (mode, gen_rtx_PLUS (GET_MODE (addr), XEXP (addr, 0), tmpreg));
+        }
+      else
+        {
+          gcc_assert (GET_CODE (addr) == LO_SUM);
+          emit_move_insn (tmpreg, addr);
+          new = gen_rtx_MEM (mode, tmpreg);
+        }
+      MEM_COPY_ATTRIBUTES (new, mem);
+      mem = new;
+    }
+  return mem;
+}
+
+
 void
-rs6000_split_stve(rtx op0, rtx op1, rtx op2, rtx op3, rtx op4)
+rs6000_split_stve (rtx op0, rtx op1, rtx op2, rtx op3, rtx op4, rtx tmpreg)
 {
   enum machine_mode inner_mode = GET_MODE (op0);
   enum machine_mode mode = GET_MODE (op1);
@@ -2754,6 +2798,11 @@ rs6000_split_stve(rtx op0, rtx op1, rtx op2, rtx op3, rtx op4)
       if (elt == -1)
 	elt = 0;
       mem = adjust_address_nv (op1, inner_mode, elt * GET_MODE_SIZE (inner_mode));
+      /* FIXME: This is just a workaround as we cannot produce a
+         new psedu-register after the first flow pass has happened.
+         GCC 4.3.0 removes flow.c, adjust_address_nv with a non zero offset
+         does not produce legite address.   */
+      mem = create_correct_vector_mem (mem, inner_mode, tmpreg);
       if (GET_CODE (op0) == MEM)
 	emit_move_insn (op4, mem);
       else
@@ -2780,6 +2829,11 @@ rs6000_split_stve(rtx op0, rtx op1, rtx op2, rtx op3, rtx op4)
 	 address that uses a virtual register, which are no longer
 	 valid. */
       mem = assign_stack_local (inner_mode, GET_MODE_SIZE (inner_mode), 0);
+      /* FIXME: This is just a workaround as we cannot produce a
+         new psedu-register after the first flow pass has happened.
+         GCC 4.3.0 removes flow.c, assign_stack_local does not produce
+         legite address.   */
+      mem = create_correct_vector_mem (mem, inner_mode, tmpreg);
       x = gen_rtx_PARALLEL (VOIDmode, gen_rtvec (1, GEN_INT (-1)));
       x = gen_rtx_VEC_SELECT (inner_mode, op1, x);
       emit_insn (gen_rtx_SET (VOIDmode, mem, x));
@@ -2789,6 +2843,9 @@ rs6000_split_stve(rtx op0, rtx op1, rtx op2, rtx op3, rtx op4)
     {
       mem = assign_stack_local (mode, GET_MODE_SIZE (mode), 0);
       mem = adjust_address_nv (mem, mode, elt * GET_MODE_SIZE (inner_mode));
+      /* FIXME: This can go away with GCC 4.3.0, adjust_address_nv/assign_stack_local
+        could produce invalid addresses.  */
+      mem = create_correct_vector_mem (mem, mode, tmpreg);
       x = gen_rtx_UNSPEC (VOIDmode,
 			  gen_rtvec (1, const0_rtx), UNSPEC_STVE);
       emit_insn (gen_rtx_PARALLEL (VOIDmode,
@@ -2819,26 +2876,18 @@ rs6000_split_lve (rtx op0, rtx op1, rtx op2, rtx tmpreg)
     {
       mem = assign_stack_local (mode, GET_MODE_SIZE (inner_mode), 0);
       x = adjust_address_nv (mem, inner_mode, 0);
+      /* FIXME: This is just a workaround as we cannot produce a
+         new psedu-register after the first flow pass has happened.
+         GCC 4.3.0 removes flow.c, assign_stack_local does not produce
+         legite address.   */
+      x = create_correct_vector_mem (x, inner_mode, tmpreg);
       emit_move_insn (x, op1);
+      mem = create_correct_vector_mem (mem, mode, tmpreg);
       op1 = mem;
     }
   else
     mem = adjust_address_nv (op1, mode, 0);
 
-  /* FIXME: This is just a workaround as we cannot produce a
-     new psedu-register after the first flow pass has happened. */
-  gcc_assert (GET_CODE (mem) == MEM);
-  if (!memory_address_p (mode, XEXP (mem, 0)))
-    {
-      rtx addr = XEXP (mem, 0);
-      rtx new;
-      gcc_assert (GET_CODE (addr) == PLUS);
-      gcc_assert (GET_CODE (XEXP (addr, 1)) == CONST_INT);
-      emit_move_insn (tmpreg, XEXP (addr, 1));
-      new = gen_rtx_MEM (mode, gen_rtx_PLUS (GET_MODE (addr), XEXP (addr, 0), tmpreg));
-      MEM_COPY_ATTRIBUTES (new, mem);
-      op1 = mem = new;
-    }
 
   /* If we know the alignment of OP1 is equal or greater than 128, we can just emit a lve
      without a perm.  */
@@ -3264,6 +3313,13 @@ legitimate_lo_sum_address_p (enum machine_mode mode, rtx x, int strict)
   if (TARGET_E500_DOUBLE && (mode == DFmode || mode == DImode))
     return false;
   x = XEXP (x, 1);
+
+  /* CELL LOCAL Begin */
+  /* AltiVec vector modes.  Only reg+reg addressing is valid here.  */
+  if (mode == V16QImode || mode == V8HImode
+      || mode == V4SFmode || mode == V4SImode)
+    return false;
+  /* CELL LOCAL End */
 
   if (TARGET_ELF || TARGET_MACHO)
     {
@@ -3913,8 +3969,7 @@ rs6000_legitimate_address (enum machine_mode mode, rtx x, int reg_ok_strict)
       && GET_CODE (x) == PLUS
       && GET_CODE (XEXP (x, 0)) == REG
       && (XEXP (x, 0) == virtual_stack_vars_rtx
-	  || XEXP (x, 0) == arg_pointer_rtx
-	  || XEXP (x, 0) == frame_pointer_rtx)
+	  || XEXP (x, 0) == arg_pointer_rtx)
       && GET_CODE (XEXP (x, 1)) == CONST_INT)
     return 1;
   if (rs6000_legitimate_offset_address_p (mode, x, reg_ok_strict))
@@ -5009,17 +5064,31 @@ rs6000_arg_size (enum machine_mode mode, tree type)
 
 static void
 rs6000_darwin64_record_arg_advance_flush (CUMULATIVE_ARGS *cum,
-					  HOST_WIDE_INT bitpos)
+					  HOST_WIDE_INT bitpos, int final)
 {
   unsigned int startbit, endbit;
   int intregs, intoffset;
   enum machine_mode mode;
+
+  /* Handle the situations where a float is taking up the first half
+     of the GPR, and the other half is empty (typically due to
+     alignment restrictions). We can detect this by a 8-byte-aligned
+     int field, or by seeing that this is the final flush for this
+     argument. Count the word and continue on.  */
+  if (cum->floats_in_gpr == 1
+      && (cum->intoffset % 64 == 0
+	  || (cum->intoffset == -1 && final)))
+    {
+      cum->words++;
+      cum->floats_in_gpr = 0;
+    }
 
   if (cum->intoffset == -1)
     return;
 
   intoffset = cum->intoffset;
   cum->intoffset = -1;
+  cum->floats_in_gpr = 0;
 
   if (intoffset % BITS_PER_WORD != 0)
     {
@@ -5062,7 +5131,7 @@ rs6000_darwin64_record_arg_advance_recurse (CUMULATIVE_ARGS *cum,
 
 	if (DECL_SIZE (f) != 0
 	    && host_integerp (bit_position (f), 1))
-	  bitpos += int_bit_position (f);
+	    bitpos += int_bit_position (f);
 
 	/* ??? FIXME: else assume zero offset.  */
 
@@ -5070,13 +5139,47 @@ rs6000_darwin64_record_arg_advance_recurse (CUMULATIVE_ARGS *cum,
 	  rs6000_darwin64_record_arg_advance_recurse (cum, ftype, bitpos);
 	else if (USE_FP_FOR_ARG_P (cum, mode, ftype))
 	  {
-	    rs6000_darwin64_record_arg_advance_flush (cum, bitpos);
-	    cum->fregno += (GET_MODE_SIZE (mode) + 7) >> 3;
+	    rs6000_darwin64_record_arg_advance_flush (cum, bitpos, 0);
+
+	    /* Single-precision floats present a special problem for
+	       us, because they are smaller than an 8-byte GPR, and so
+	       the structure-packing rules combined with the standard
+	       varargs behavior mean that we want to pack float/float
+	       and float/int combinations into a single register's
+	       space. This is complicated by the arg advance flushing,
+	       which works on arbitrarily large groups of int-type
+	       fields.  */
+	    if (mode == SFmode)
+	      {
+		if (cum->floats_in_gpr == 1)
+		  {
+		    /* Two floats in a word; count the word and reset
+		       the float count.  */
+		    cum->words++;
+		    cum->floats_in_gpr = 0;
+		  }
+		else if (bitpos % 64 == 0)
+		  {
+		    /* A float at the beginning of an 8-byte word;
+		       count it and put off adjusting cum->words until
+		       we see if a arg advance flush is going to do it
+		       for us.  */
+		    cum->floats_in_gpr++;
+		  }
+		else
+		  {
+		    /* The float is at the end of a word, preceded
+		       by integer fields, so the arg advance flush
+		       just above has already set cum->words and
+		       everything is taken care of.  */
+		  }
+	      }
+	    else
 	    cum->words += (GET_MODE_SIZE (mode) + 7) >> 3;
 	  }
 	else if (USE_ALTIVEC_FOR_ARG_P (cum, mode, type, 1))
 	  {
-	    rs6000_darwin64_record_arg_advance_flush (cum, bitpos);
+	    rs6000_darwin64_record_arg_advance_flush (cum, bitpos, 0);
 	    cum->vregno++;
 	    cum->words += 2;
 	  }
@@ -5181,9 +5284,10 @@ function_arg_advance (CUMULATIVE_ARGS *cum, enum machine_mode mode,
 	     { int; double; int; } [powerpc alignment].  We have to
 	     grovel through the fields for these too.  */
 	  cum->intoffset = 0;
+	  cum->floats_in_gpr = 0;
 	  rs6000_darwin64_record_arg_advance_recurse (cum, type, 0);
 	  rs6000_darwin64_record_arg_advance_flush (cum,
-						    size * BITS_PER_UNIT);
+						    size * BITS_PER_UNIT, 1);
 	}
     }
   else if (DEFAULT_ABI == ABI_V4)
@@ -5498,6 +5602,7 @@ rs6000_darwin64_record_arg (CUMULATIVE_ARGS *orig_cum, tree type,
 
   cum->intoffset = 0;
   cum->use_stack = 0;
+  cum->floats_in_gpr = 0;
   cum->named = named;
 
   /* Put entries into rvec[] for individual FP and vector fields, and
@@ -13769,7 +13874,6 @@ rs6000_stack_info (void)
 #ifdef TARGET_RELOCATABLE
       || (TARGET_RELOCATABLE && (get_pool_size () != 0))
 #endif
-      || info_ptr->first_altivec_reg_save <= LAST_ALTIVEC_REGNO
       || (DEFAULT_ABI == ABI_V4 && current_function_calls_alloca)
       || info_ptr->calls_p)
     {
@@ -18919,12 +19023,15 @@ rs6000_sched_finish_cell (FILE *dump, int sched_verbose)
         continue;
 
       if (recog_memoized (insn) >= 0
-	  && (INSN_NEEDNOP8 (insn)||INSN_NEEDNOP10 (insn)))
+	  && (INSN_NEEDNOP8 (insn) || INSN_NEEDNOP10 (insn)))
       {
 	if (INSN_NEEDNOP8 (insn))
           nops = gen_db8cyc();
-	else if (INSN_NEEDNOP10 (insn))
-          nops = gen_db10cyc();
+	else
+	  {
+	     gcc_assert (INSN_NEEDNOP10 (insn));
+             nops = gen_db10cyc();
+	  }
         emit_insn_after (nops, insn);
         insn = NEXT_INSN (insn);
         if (sched_verbose > 2)
@@ -19104,7 +19211,7 @@ rs6000_handle_altivec_attribute (tree *node,
   /* Check for invalid AltiVec type qualifiers.  */
   if (type == long_unsigned_type_node || type == long_integer_type_node)
     {
-    if (TARGET_64BIT)
+    if (TARGET_64BIT && !TARGET_PPC64_LP32)
       error ("use of %<long%> in AltiVec types is invalid for 64-bit code");
     else if (rs6000_warn_altivec_long)
       warning (0, "use of %<long%> in AltiVec types is deprecated; use %<int%>");
@@ -21454,17 +21561,18 @@ rs6000_use_address_p (rtx insn1, rtx insn2)
 const char*
 rs6000_emit_pgo_info (rtx *operands, rtx insn)
 {
-  // FIXME: Might wish to make this a nop for a couple of reasons:
-  // - scheduler will, I think, assume the length is 4 and make various
-  //   decisions using that
-  // - may need to distinguish an edge from the subsequent code
+  /* FIXME: Might wish to make this a nop for a couple of reasons:
+     - scheduler will, I think, assume the length is 4 and make various
+       decisions using that
+     - may need to distinguish an edge from the subsequent code */
 
-  //unsigned word_mode_bitsize = GET_MODE_BITSIZE (word_mode);
+  /* unsigned word_mode_bitsize = GET_MODE_BITSIZE (word_mode); */
   enum rtx_code kind_code = GET_CODE (operands[0]);
   int kind;
   rtx prev_insn;
-#if 0 // ??? needed?
-  char asm_addr[10]; // .4byte or .8byte
+  const char* nop;
+#if 0 /*  ??? needed? */
+  char asm_addr[10]; /* .4byte or .8byte */
 
   if (TARGET_64BIT)
     strcpy (asm_addr, ".8byte");
@@ -21500,22 +21608,23 @@ rs6000_emit_pgo_info (rtx *operands, rtx insn)
   output_asm_insn ("\t.4byte %1", operands);
 
   /* We want to print the register _number_ here, so we have to do
-  // things differently, we can't use any of GCC's extra %-modifiers.
-  // The mode is printed as 4 bytes to allow for expansion beyond just
-  // simple modes.
+     things differently, we can't use any of GCC's extra %-modifiers.
+     The mode is printed as 4 bytes to allow for expansion beyond just
+     simple modes.
 
-  // We _have_ to emit a real instruction here (or rewrite things adding
-  // a whole lot more complexity).  Counter records are distinguished by pc
-  // and we don't want records colliding that otherwise shouldn't.  Without a
-  // nop (or something) a branch around a pgo_info record will end up at the
-  // same pc as the pgo_info record, and thus the data will be collected
-  // regardless of whether the branch is taken or not.
-  //
-  // However, for any group of consecutive pgo_info records, we only need
-  // one nop.  So only emit a nop if the previous non-note insn is not a
-  // pgo_info rtx.
-  // ??? GCC thinks this rtl generates an insn of length 4 bytes.  */
-  const char* nop = "nop";
+     We _have_ to emit a real instruction here (or rewrite things adding
+     a whole lot more complexity).  Counter records are distinguished by pc
+     and we don't want records colliding that otherwise shouldn't.  Without a
+     nop (or something) a branch around a pgo_info record will end up at the
+     same pc as the pgo_info record, and thus the data will be collected
+     regardless of whether the branch is taken or not.
+    
+     However, for any group of consecutive pgo_info records, we only need
+     one nop.  So only emit a nop if the previous non-note insn is not a
+     pgo_info rtx.
+     ??? GCC thinks this rtl generates an insn of length 4 bytes.  */
+
+  nop = "nop";
   prev_insn = prev_nonnote_insn (insn);
   if (prev_insn != NULL
       && GET_CODE (prev_insn) == INSN
@@ -21536,8 +21645,8 @@ rs6000_emit_pgo_info (rtx *operands, rtx insn)
       gcc_assert (GET_CODE (operands[4]) == CONST_INT);
       fprintf (asm_out_file, "\t\t.4byte %u\n", get_pgo_mode (GET_MODE (operands[2])));
       fprintf (asm_out_file, "\t\t.4byte %u\n", get_pgo_regno (REGNO (operands[2])));
-      // ??? Stripping off high 32 bits by casting to int is risky.
-      // What if we discard something important?
+      /* ??? Stripping off high 32 bits by casting to int is risky.
+         What if we discard something important? */
       fprintf (asm_out_file, "\t\t.4byte %d\n", (int) INTVAL (operands[3]));
       fprintf (asm_out_file, "\t\t.4byte %d\n", (int) INTVAL (operands[4]));
       fprintf (asm_out_file, "\t\t.popsection\n");

@@ -2260,11 +2260,12 @@ emit_nop_for_insn (rtx insn)
 }
 
 /* Insert nops in basic blocks to meet dual issue alignment
- * requirements. */
+ * requirements.  Also make sure hbrp and hint instructions are at least
+ * one cycle apart, possibly inserting a nop.  */
 static void
 pad_bb(void)
 {
-  rtx insn, next_insn, prev_insn;
+  rtx insn, next_insn, prev_insn, hbr_insn = 0;
   int length;
   int addr;
 
@@ -2281,6 +2282,24 @@ pad_bb(void)
   for (; insn; insn = next_insn)
     {
       next_insn = next_active_insn (insn);
+      if (INSN_CODE (insn) == CODE_FOR_iprefetch
+	  || INSN_CODE (insn) == CODE_FOR_hbr)
+	{
+	  if (hbr_insn)
+	    {
+	      int a0 = INSN_ADDRESSES (INSN_UID (hbr_insn));
+	      int a1 = INSN_ADDRESSES (INSN_UID (insn));
+	      if ((a1 - a0 == 8 && GET_MODE (insn) != TImode)
+		  || (a1 - a0 == 4))
+		{
+		  prev_insn = emit_insn_before (gen_lnop (), insn);
+		  PUT_MODE (prev_insn, GET_MODE (insn));
+		  PUT_MODE (insn, TImode);
+		  length += 4;
+		}
+	    }
+	  hbr_insn = insn;
+	}
       if (INSN_CODE (insn) == CODE_FOR_blockage)
       {
 	if (GET_MODE (insn) == TImode)
@@ -3294,8 +3313,8 @@ spu_sched_reorder (FILE *file ATTRIBUTE_UNUSED, int verbose ATTRIBUTE_UNUSED,
 		   rtx *ready, int *nreadyp, int clock)
 {
   int i, nready = *nreadyp;
-  int pipe_0, pipe_1, pipe_hbrp, pipe_ls, schedule_i;
-  rtx insn;
+  int pipe_0, pipe_1, pipe_hbrp, pipe_ls, schedule_i, pipe_early;
+  rtx insn, set;
 
   if (nready <= 0 || pipe1_clock >= clock)
     return 0;
@@ -3321,11 +3340,13 @@ spu_sched_reorder (FILE *file ATTRIBUTE_UNUSED, int verbose ATTRIBUTE_UNUSED,
   if (sched_last_even)
     return 1;
 
-  pipe_0 = pipe_1 = pipe_hbrp = pipe_ls = schedule_i = -1;
+  pipe_0 = pipe_1 = pipe_hbrp = pipe_ls = pipe_early = schedule_i = -1;
   for (i = 0; i < nready; i++)
     if (INSN_CODE (ready[i]) != -1)
       {
 	insn = ready[i];
+	if (!in_spu_reorg && INSN_SCHED_EARLY (insn))
+	  pipe_early = i;
 	switch (get_attr_type (insn))
 	  {
 	  default:
@@ -3363,6 +3384,16 @@ spu_sched_reorder (FILE *file ATTRIBUTE_UNUSED, int verbose ATTRIBUTE_UNUSED,
     {
       insn = ready[pipe_ls];
       ready[pipe_ls] = ready[nready-1];
+      ready[nready-1] = insn;
+      return 1;
+    }
+
+  /* In the first scheduling phase, schedule register copies as soon as
+   * possible to make it more likely the copy will be eliminated. */
+  if (!in_spu_reorg && pipe_early >= 0)
+    {
+      insn = ready[pipe_early];
+      ready[pipe_early] = ready[nready-1];
       ready[nready-1] = insn;
       return 1;
     }
@@ -3545,6 +3576,21 @@ spu_sched_adjust_cost (rtx insn, rtx link, rtx dep_insn, int cost)
   if (INSN_CODE (insn) == CODE_FOR_iprefetch
       || INSN_CODE (dep_insn) == CODE_FOR_iprefetch)
     return 0;
+
+  /* Give a copy instruction a cost of 0 during the first scheduling
+   * pass so it gets scheduled with the instruction which makes it
+   * more likely the copy instruction gets deleted. */
+  if (!in_spu_reorg
+      && INSN_DEPEND (dep_insn)
+      && (! XEXP (INSN_DEPEND (dep_insn), 1)
+          || ! XEXP (XEXP (INSN_DEPEND (dep_insn), 1), 1))
+      && (set = single_set (insn))
+      && register_operand (SET_SRC (set), VOIDmode)
+      && register_operand (SET_DEST (set), VOIDmode))
+    {
+      INSN_SCHED_EARLY (insn) = 1;
+      return 0;
+    }
 
   /* Assuming that it is unlikely an argument register will be used in
    * the first cycle of the called function, we reduce the cost for
@@ -5938,8 +5984,125 @@ spu_simplify_unspec (rtx x, rtx c0, rtx c1, rtx c2)
       break;
 
     case UNSPEC_FREST:
+      {
+	static int frest_table[] = {
+	  0x7ffbe0, 0x7f87a6, 0x70ef72, 0x708b40, 0x638b12, 0x633aea, 0x5792c4, 0x574aa0,
+	  0x4cca7e, 0x4c9262, 0x430a44, 0x42d62a, 0x3a2e12, 0x39fdfa, 0x3215e4, 0x31f1d2,
+	  0x2aa9be, 0x2a85ac, 0x23d59a, 0x23bd8e, 0x1d8576, 0x1d8576, 0x17ad5a, 0x17ad5a,
+	  0x124543, 0x124543, 0x0d392d, 0x0d392d, 0x08851a, 0x08851a, 0x041d07, 0x041d07
+	};
+	if (GET_CODE (op0) == CONST_DOUBLE
+	    || GET_CODE (op0) == CONST_VECTOR)
+	  {
+	    constant_to_array(GET_MODE (op0), op0, arr0);
+	    for (i = 0; i < 16; i+= 4)
+	      {
+		unsigned int w = array_to_int (arr0, i, 4, 0);
+		unsigned int r = w & 0x80000000;
+		unsigned int e = (w >> 23) & 0xff;
+		/* Don't fold when the DBZ flag would be set. */
+	        if (e == 0 && !flag_unsafe_math_optimizations)
+		  break;
+		if (e == 0)
+		  r |= 0x7f800000;
+		else if (e <= 253)
+		  r |= (253 - e) << 23;
+		r |= frest_table[(w >> 18) & 0x1f];
+		int_to_array (r, arr0, i, 4);
+	      }
+	    if (i == 16)
+	      return array_to_constant(mode, arr0);
+	  }
+      }
+      break;
+
     case UNSPEC_FRSQEST:
+      {
+	static int frsqest_table[] = {
+	  0x350160, 0x34e954, 0x2f993d, 0x2f993d, 0x2aa523, 0x2aa523, 0x26190d, 0x26190d,
+	  0x21e4f9, 0x21e4f9, 0x1e00e9, 0x1e00e9, 0x1a5cd9, 0x1a5cd9, 0x16f8cb, 0x16f8cb,
+	  0x13ccc0, 0x13ccc0, 0x10ccb3, 0x10ccb3, 0x0e00aa, 0x0e00aa, 0x0b58a1, 0x0b58a1,
+	  0x08d498, 0x08d498, 0x067491, 0x067491, 0x043089, 0x043089, 0x020c83, 0x020c83,
+	  0x7ffdf4, 0x7fd1de, 0x7859c8, 0x783dba, 0x71559c, 0x71559c, 0x6ae57c, 0x6ae57c,
+	  0x64f561, 0x64f561, 0x5f7149, 0x5f7149, 0x5a4d33, 0x5a4d33, 0x55811f, 0x55811f,
+	  0x51050f, 0x51050f, 0x4cc8fe, 0x4cc8fe, 0x48d0f0, 0x48d0f0, 0x4510e4, 0x4510e4,
+	  0x4180d7, 0x4180d7, 0x3e24cc, 0x3e24cc, 0x3af4c3, 0x3af4c3, 0x37e8ba, 0x37e8ba,
+	};
+	if (GET_CODE (op0) == CONST_DOUBLE
+	    || GET_CODE (op0) == CONST_VECTOR)
+	  {
+	    constant_to_array(GET_MODE (op0), op0, arr0);
+	    for (i = 0; i < 16; i+= 4)
+	      {
+		unsigned int w = array_to_int (arr0, i, 4, 0);
+		unsigned int r = 0;
+		unsigned int e = (w >> 23) & 0xff;
+		/* Don't fold when the DBZ flag would be set. */
+	        if (e == 0 && !flag_unsafe_math_optimizations)
+		  break;
+		if (e == 0)
+		  r |= 0x7f800000;
+		else 
+		  r |= ((380 - e) & 0x1fe) << 22;
+		r |= frsqest_table[(w >> 18) & 0x3f];
+		int_to_array (r, arr0, i, 4);
+	      }
+	    if (i == 16)
+	      return array_to_constant(mode, arr0);
+	  }
+      }
+      break;
+
     case UNSPEC_FI:
+	if ((GET_CODE (op0) == CONST_DOUBLE
+	     || GET_CODE (op0) == CONST_VECTOR)
+	    && (GET_CODE (op1) == CONST_DOUBLE
+		|| GET_CODE (op1) == CONST_VECTOR))
+	{
+	    constant_to_array(GET_MODE (op0), op0, arr0);
+	    constant_to_array(GET_MODE (op1), op1, arr1);
+	    for (i = 0; i < 16; i+= 4)
+	      {
+		unsigned int w0 = array_to_int (arr0, i, 4, 0);
+		unsigned int w1 = array_to_int (arr1, i, 4, 0);
+		unsigned int sign = w1 & 0x80000000;
+		unsigned int exp  = w1 & 0x7f800000;
+		unsigned int base = w1 & 0x007ffc00;
+		unsigned int step = w1 & 0x000003ff;
+		unsigned int y    = w0 & 0x0007ffff;
+		unsigned int r, a, b;
+
+		/* Don't fold when the DIFF flag would be set. */
+	        if (((exp == 0 && (w1 & 0x007fffff)) || exp == 0x7f800000
+		      || ((w0 & 0x7f800000) == 0 && (w0 & 0x007fffff))
+		      || (w0 & 0x7f800000) == 0x7f800000)
+		    && !flag_unsafe_math_optimizations)
+		  break;
+
+		/* For outputs of frest and frsqest, a is never less
+		 * than b, for any value of y.  Don't fold when a is
+		 * less than b. */
+		a = (base << 9);
+		b = step * y;
+		if (a < b)
+		  break;
+
+		/* Don't fold when the DIFF flag would be set. */
+	        if (exp == 0 && ((a - b) != 0 || sign != 0)
+		    && !flag_unsafe_math_optimizations)
+		  break;
+
+		if (exp == 0)
+		  r = 0;
+		else
+		  r = sign | exp | ((a - b) >> 9);
+		int_to_array (r, arr0, i, 4);
+	      }
+	    if (i == 16)
+	      return array_to_constant(mode, arr0);
+	}
+      break;
+
     case UNSPEC_CSFLT:
     case UNSPEC_CFLTS:
     case UNSPEC_CUFLT:
@@ -6251,9 +6414,6 @@ static bool
 spu_function_ok_for_sibcall (tree decl, tree exp ATTRIBUTE_UNUSED)
 {
   if (TARGET_LARGE_MEM)
-    return false;
-
-  if (!decl)
     return false;
 
   return true;

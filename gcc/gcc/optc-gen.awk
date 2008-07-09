@@ -85,7 +85,36 @@ for (i = 0; i < n_opts; i++) {
 	var_seen[name] = 1;
 }
 
-print ""
+# dump initialization function
+#delete var_seen
+#print "void"
+#print "initialize_default_options ()"
+#print "{"
+#for (i = 0; i < n_opts; i++) {
+#	name = var_name(flags[i]);
+#	if (name == "")
+#		continue;
+#
+#	if (flag_set_p("VarExists", flags[i]))
+#		continue;
+#
+#	init = opt_args("Init", flags[i])
+#	if (name in var_seen)
+#	    continue;
+#
+#	if (init != "")
+#		init = " = " init;
+#	else 
+#		init = " = 0"
+#
+#	print "  /* Set by -" opts[i] "."
+#	print "     " help[i] "  */"
+#	print "  " name init ";"
+#	var_seen[name] = 1;
+#}
+#print "}"
+#print ""
+
 print "/* Local state variables.  */"
 for (i = 0; i < n_opts; i++) {
 	name = static_var(opts[i], flags[i]);
@@ -165,4 +194,101 @@ for (i = 0; i < n_opts; i++) {
 }
 
 print "};"
+print ""
+
+# pointer to the top of option stack list
+print "struct option_stack * option_stack_top = NULL;"
+print ""
+
+# Generate a funciton to move flag values
+print "static void copy_flags_to_stack (struct option_stack *s);"
+print "static void copy_flags_from_stack (struct option_stack *s);"
+print ""
+print "static void"
+print "copy_flags_to_stack (struct option_stack *s)"
+print "{"
+print "  s->m_optimize = optimize;"
+print "  s->m_optimize_size = optimize_size;"
+delete var_seen
+for (i = 0; i < n_opts; i++) {
+	name = var_name(flags[i]);
+	if (name == "")
+		continue;
+
+	if (name in var_seen)
+		continue;
+
+	print "  s->m_" name " = " name ";"
+
+	var_seen[name] = 1;
+}
+print "}"
+print ""
+print "static void"
+print "copy_flags_from_stack (struct option_stack *s)"
+print "{"
+print "  optimize = s->m_optimize;"
+print "  optimize_size = s->m_optimize_size;"
+delete var_seen
+for (i = 0; i < n_opts; i++) {
+	name = var_name(flags[i]);
+	if (name == "")
+		continue;
+
+	if (name in var_seen)
+		continue;
+
+	print "  " name " = s->m_" name ";"
+	pritn ""
+
+	var_seen[name] = 1;
+}
+print "}"
+print ""
+print "void"
+print "push_option_stack (void)"
+print "{"
+print "  struct option_stack * os = (struct option_stack *)xmalloc (sizeof (struct option_stack));"
+print "  gcc_assert (os != NULL);"
+print "  copy_flags_to_stack (os);"
+print "  os->next = option_stack_top;"
+print "  option_stack_top = os;"
+print "}"
+print ""
+print "void"
+print "pop_option_stack (void)"
+print "{"
+print "  struct option_stack * os = option_stack_top;"
+print "  gcc_assert (os != NULL);"
+print "  copy_flags_from_stack (os);"
+print "  option_stack_top = os->next;"
+print "  free (os);"
+print "}"
+
+print "void"
+print "dump_option_setting (FILE *fp, const char *filename, const int linenum)"
+print "{"
+print "  fprintf (fp, " quote "%s %d\\n", quote, ", filename, linenum);"
+print "  fprintf (fp, " quote "optimize = %d\\n" quote ", optimize);"
+print "  fprintf (fp, " quote "optimize_size = %d\\n" quote ", optimize_size);"
+delete var_seen
+for (i = 0; i < n_opts; i++) {
+	name = var_name(flags[i]);
+	if (name == "")
+		continue;
+
+	if (name in var_seen)
+		continue;
+
+	print "   fprintf (fp, " quote  name " = %d\\n" quote ", " name ");" 
+
+	var_seen[name] = 1;
+}
+print "}"
+
+print "int"
+print "is_overridable_option (const char *opt)"
+print "{"
+print "}"
+
 }

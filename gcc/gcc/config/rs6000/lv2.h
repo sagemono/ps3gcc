@@ -761,6 +761,8 @@ enum { SIGNAL_FRAMESIZE = 128 };
     give to GCC into options for GCC to pass to the linker.  */
 /* sce local bugzilla 37796
    add condition to handle mno-sn-ld option. */
+/* sce local bugzilla 50260
+   PPU GUID option for SN LD */
 #undef	LINK_SPEC
 #define	LINK_SPEC \
   "%{h*} %{v:-V} %{!msdata=none:%{G*}} %{msdata=none:-G0} " \
@@ -768,7 +770,9 @@ enum { SIGNAL_FRAMESIZE = 128 };
   "%{Qy:} %{!Qn:-Qy} "					 \
   "%{mlp64:-melf64ppc} "						\
   "%{mno-sn-ld|mprx|mprx-with-runtime: ; : " \
-  "  %{!mlp64:--alternative-ld=ps3ppuld --gnu-mode %{!mno-prxfixup: %{!mforce-prx-fixup:--prx-fixup}} %{mprx|mprx-with-runtime:--no-check-unresolved} } } " \
+  "  %{!mlp64:--alternative-ld=ps3ppuld --gnu-mode %{!mno-prxfixup: %{!mforce-prx-fixup:--prx-fixup}} %{mprx|mprx-with-runtime:--no-check-unresolved} " \
+  "    %{mppuguid: %{!r:-ppuguid}} " \
+  "    %{r|mno-ppuguid:-no-ppuguid} } } " \
   "%{shared}"
 
 /*  Macro: LIB_SPEC
@@ -785,7 +789,7 @@ enum { SIGNAL_FRAMESIZE = 128 };
     - for incremental linking: "-r" == "-Wl,-r -mno-prxfixup -mlv2-stub" */
 #define LIB_SPEC \
   "%{!mno-sn-ld: -L%R/lib} " \
-  "--start-group -lc -lgcc -lstdc++ -lsupc++" \
+  "--start-group -lc -lgcc -lstdc++ -lsupc++ %:if-file-exist(%:prepend-cmddir(../../../target/ppu/lib/libsnc.a) -lsnc)" \
   " %{mlv2-stub|!mno-prxfixup:-llv2_stub; :-llv2} -lsyscall --end-group" \
   " %{r|mno-prxfixup|T: ; : -T %R/lib/elf64_lv2_prx.x} "
 /* TRANSMETA end */
@@ -815,13 +819,16 @@ enum { SIGNAL_FRAMESIZE = 128 };
 
     If this macro is not defined, a default is provided that loads the
     standard C startup file from the usual place. See gcc.c.  */
+/* sce local bugzilla 50260
+   PPU GUID option for GNU LD */
 
 #undef STARTFILE_SPEC
 #define STARTFILE_SPEC \
 	"ecrti.o%s " \
 	"%{!shared:%{!mmambo:crt0.o%s crt1.o%s;: " \
 	"mmambo:--whole-archive mambo-crt1.o%s libmambo.a%s --no-whole-archive}} "\
-	"%{shared: crtbeginS.o%s; :crtbegin.o%s} "
+	"%{shared: crtbeginS.o%s; :crtbegin.o%s} " \
+	"%{mppuguid: %{!r: %{mno-sn-ld: %R/lib/crtid.o;:}}} "
 
 /*  Macro: ENDFILE_SPEC
 
@@ -1056,7 +1063,6 @@ enum { SIGNAL_FRAMESIZE = 128 };
 {					   \
   { GCC_INCLUDE_DIR, "GCC", 0, 0, 0 },     \
   { "/include", STANDARD_INCLUDE_COMPONENT, 0, 0, 1 }, \
-  { "/include/sys", STANDARD_INCLUDE_COMPONENT, 0, 0, 1 }, \
   { "/../common/include", STANDARD_INCLUDE_COMPONENT, 0, 0, 1 }, \
   { 0, 0, 0, 0 }			   \
 }
@@ -1112,8 +1118,9 @@ enum { SIGNAL_FRAMESIZE = 128 };
 /* end sce local bugzilla 23831 */
 
 /* begin sce local bugzilla 37796 */
+/* Bugzilla 51422 : '--sysroot' is not specified when linking PRX */
 #undef  SYSROOT_SPEC
-#define SYSROOT_SPEC "%{mno-sn-ld|mlp64: --sysroot=%R; : } "
+#define SYSROOT_SPEC "%{mno-sn-ld|mprx|mprx-with-runtime|mlp64: --sysroot=%R; : } "
 /* end sce local bugzilla 37796 */
 
 /* begin sce local bugzilla 37796 */

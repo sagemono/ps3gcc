@@ -322,12 +322,16 @@ extern int flag_resolve_non_dependent_early;
    will most likely result in crashes.  */
 extern int flag_nil_receivers;
 
+#if 0
+/* following flags are moved struct option stack */
 /* Nonzero means that we will allow new ObjC exception syntax (@throw,
    @try, etc.) in source code.  */
 extern int flag_objc_exceptions;
 
+
 /* Nonzero means that we generate NeXT setjmp based exceptions.  */
 extern int flag_objc_sjlj_exceptions;
+#endif
 
 /* Nonzero means that code generation will be altered to support
    "zero-link" execution.  This currently affects ObjC only, but may
@@ -660,6 +664,7 @@ extern tree fix_string_type (tree);
 struct varray_head_tag;
 extern void constant_expression_warning (tree);
 extern void strict_aliasing_warning(tree, tree, tree);
+extern void empty_body_warning (tree, tree);
 extern tree convert_and_check (tree, tree);
 extern void overflow_warning (tree);
 extern void unsigned_conversion_warning (tree, tree);

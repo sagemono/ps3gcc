@@ -4964,13 +4964,17 @@ cp_finish_decl (tree decl, tree init, bool init_const_expr_p,
 
       if (init && DECL_INITIAL (decl))
 	{
-	  DECL_INITIAL (decl) = init;
 	  if (init_const_expr_p)
 	    {
 	      DECL_INITIALIZED_BY_CONSTANT_EXPRESSION_P (decl) = 1;
 	      if (DECL_INTEGRAL_CONSTANT_VAR_P (decl))
-		TREE_CONSTANT (decl) = 1;
+	        {
+		  if (TREE_CODE (init) == TREE_LIST && !TREE_CHAIN (init))
+		    init = TREE_VALUE (init);
+		  TREE_CONSTANT (decl) = 1;
+		}
 	    }
+	  DECL_INITIAL (decl) = init;
 	}
 
       if (TREE_CODE (decl) == VAR_DECL
@@ -5039,7 +5043,11 @@ cp_finish_decl (tree decl, tree init, bool init_const_expr_p,
 		{
 		  DECL_INITIALIZED_BY_CONSTANT_EXPRESSION_P (decl) = 1;
 		  if (DECL_INTEGRAL_CONSTANT_VAR_P (decl))
-		    TREE_CONSTANT (decl) = 1;
+		    {
+		      if (TREE_CODE (init) == TREE_LIST && !TREE_CHAIN (init))
+			init = TREE_VALUE (init);
+		      TREE_CONSTANT (decl) = 1;
+		    }
 		}
 	    }
 	  init = check_initializer (decl, init, flags, &cleanup);
@@ -7128,9 +7136,13 @@ grokdeclarator (const cp_declarator *declarator,
   /* BEGIN CELL VECREG */
   if (declspecs->specs[(int)ds_vecreg])
     {
-      if (TREE_CODE (type) != INTEGER_TYPE && TREE_CODE (type) != REAL_TYPE)
-	error ("complex invalid for %qs", name);
+      tree t = type;
       type = build_vecreg_type (type);
+      if (!type)
+	{
+	  error ("vecreg invalid for %qs", name);
+	  type = t;
+	}
     }
   /* END CELL VECREG */
 

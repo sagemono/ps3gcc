@@ -4809,3 +4809,19 @@ const struct powerpc_macro powerpc_macros[] = {
 
 const int powerpc_num_macros =
   sizeof (powerpc_macros) / sizeof (powerpc_macros[0]);
+
+/* return 1 if the OP is a direct function call instructions.
+   Otherwide return 0. */
+int
+bfd_opcode_ppc_direct_call_or_jump_p (const struct powerpc_opcode *op)
+{
+  // Branch I-form LK=1 and LK=0
+  if ((op->opcode & B(0x3f, 0, 0)) == B(18, 0, 0))
+    return 1;
+
+  // Branch Conditional B-form LK=1
+  if ((op->opcode & B(0x3f, 0, 1)) == B(16, 0, 1))
+    return 1;
+
+  return 0;
+}

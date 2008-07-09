@@ -168,7 +168,7 @@ Target Report Var(rs6000_base_toc) Init(-1)
 Access global constants with a 16 bit offset from r2 and all other globals using a 32 bit offset from r2
 
 mall-base-toc
-Target Report Var(rs6000_base_toc,2) 
+Target Report Var(rs6000_base_toc,2) VarExists
 Access all globals, including constants, using a 32 bit offset from r2
 
 mvrsave

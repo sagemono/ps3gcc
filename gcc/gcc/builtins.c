@@ -4724,12 +4724,14 @@ expand_builtin_expect (tree arglist, rtx target)
    need to relax the conditions checked here so that programs containing
    a variable branch hint can pass the compiler.
 */
-#if !defined (HAVE_branch_hint) && !defined (HAVE_conditional_move)
+#if !defined(SKIP_BUILTIN_ARG_CHECK)
+#if defined (HAVE_branch_hint) || defined (HAVE_conditional_move)
   if (TREE_CODE (c) != INTEGER_CST)
     {
       error ("second argument to %<__builtin_expect%> must be a constant");
       c = integer_zero_node;
     }
+#endif
 #endif
 /* CELL LOCAL End */
 

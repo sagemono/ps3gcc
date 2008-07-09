@@ -1572,6 +1572,14 @@ build_offset_ref (tree type, tree name, bool address_p)
 static tree
 constant_value_1 (tree decl, bool integral_p)
 {
+  /* If we have a conditional expression, fold the 2 other operands, only if we
+     don't want an integral constant expression. */
+  if (!integral_p && TREE_CODE (decl) == COND_EXPR)
+    return build3 (COND_EXPR, TREE_TYPE (decl),
+		   TREE_OPERAND (decl, 0),
+		   constant_value_1 (TREE_OPERAND (decl, 1), integral_p),
+		   constant_value_1 (TREE_OPERAND (decl, 2), integral_p));
+
   while (TREE_CODE (decl) == CONST_DECL
 	 || (integral_p 
 	     ? DECL_INTEGRAL_CONSTANT_VAR_P (decl)

@@ -304,6 +304,17 @@ grokclassfn (tree ctype, tree function, enum overload_flags flags,
     maybe_retrofit_in_chrg (function);
 }
 
+/* Like cxx_mark_addressable but don't check register qualifier.  */
+static void
+mark_addressable_vector (tree x)
+{
+  while (handled_component_p (x))
+    x = TREE_OPERAND (x, 0);
+  if (TREE_CODE (x) != VAR_DECL && TREE_CODE (x) != PARM_DECL)
+    return ;
+  TREE_ADDRESSABLE (x) = 1;
+}
+
 /* Create an ARRAY_REF, checking for the user doing things backwards
    along the way.  */
 
@@ -345,8 +356,7 @@ grok_array_decl (tree array_expr, tree index_exp)
 	{
 	  tree type = TREE_TYPE (array_expr);
 	  tree type1;
-	  if (!cxx_mark_addressable (array_expr))
-	    return error_mark_node;
+	  mark_addressable_vector (array_expr);
 	  type = build_qualified_type (TREE_TYPE (type), TYPE_QUALS (type));
 	  type = build_pointer_type (type);
 	  type1 = build_pointer_type (TREE_TYPE (array_expr));

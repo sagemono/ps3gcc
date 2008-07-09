@@ -1900,14 +1900,14 @@ mprotect (char *addr, int len, int prot)
     return -1;
 }
 
-#endif /* WINNT && ! __CYGWIN__ && ! _UWIN */
+#endif /* _WIN32 && ! __CYGWIN__ && ! _UWIN */
 
 #ifdef TRANSFER_FROM_TRAMPOLINE
 TRANSFER_FROM_TRAMPOLINE
 #endif
 #endif /* L_trampoline */
 
-#ifndef __CYGWIN__
+#if !(defined __CYGWIN__ || defined __MINGW32__)
 #ifdef L__main
 
 #include "gbl-ctors.h"
@@ -2005,7 +2005,7 @@ SYMBOL__MAIN (void)
 #endif /* no HAS_INIT_SECTION or INVOKE__main */
 
 #endif /* L__main */
-#endif /* __CYGWIN__ */
+#endif /* !(__CYGWIN__ || __MINGW32__) */
 
 #ifdef L_ctors
 

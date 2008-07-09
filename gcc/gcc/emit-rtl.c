@@ -959,7 +959,8 @@ set_reg_attrs_from_mem (rtx reg, rtx mem)
       REG_ATTRS (reg)
         = get_reg_attrs (MEM_EXPR (mem), INTVAL (MEM_OFFSET (mem)));
       /* CELL LOCAL Begin */
-      if (MEM_EXPR (mem) && POINTER_TYPE_P (TREE_TYPE (MEM_EXPR (mem))))
+      if (MEM_POINTER (mem)
+	  && MEM_EXPR (mem) && POINTER_TYPE_P (TREE_TYPE (MEM_EXPR (mem))))
 	mark_reg_pointer (reg,
 			  TYPE_ALIGN (TREE_TYPE (TREE_TYPE (MEM_EXPR (mem)))));
       /* CELL LOCAL End */

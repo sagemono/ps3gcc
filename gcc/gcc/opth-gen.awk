@@ -63,15 +63,49 @@ print ""
 print "extern int target_flags;"
 print ""
 
+delete var_seen
 for (i = 0; i < n_opts; i++) {
 	name = var_name(flags[i]);
 	if (name == "")
 		continue;
 
-	print "extern " var_type(flags[i]) name ";"
-}
-print ""
+	if (name in var_seen)
+	    continue;
 
+	print "extern " var_type(flags[i]) " " name ";"
+	var_seen[name] = 1
+}
+
+#print "/* accessors to members defined in struct option_stack. */"
+#for (i = 0; i < n_opts; i++) {
+#	name = var_name(flags[i]);
+#	if (name == "")
+#		continue;
+#	if (var_seen[name] == 1)
+#	    continue;
+#
+#	if (flag_set_p("VarExists", flags[i]))
+#	    continue;
+#	print "#define " name "\t(option_stack_top->m_" name")"
+#	var_seen[name] = 1
+#}
+#print ""
+#print "/* independent option flags. */"
+#for (i = 0; i < n_opts; i++) {
+#	name = var_name(flags[i]);
+#	if (name == "")
+#		continue;
+#	if (var_seen[name] == 1)
+#	    continue;
+#
+#	if (flag_set_p("VarExists", flags[i]))
+#	    print "extern " var_type(flags[i]) name ";";
+#
+#	var_seen[name] = 1
+#}
+
+print ""
+print "/* Mask defs */"
 for (i = 0; i < n_opts; i++) {
 	name = opt_args("Mask", flags[i])
 	vname = var_name(flags[i])
@@ -180,6 +214,42 @@ for (i = 0; i < n_opts; i++) {
 
 print "  N_OPTS"
 print "};"
+print ""
+
+# Generate a struct to hold option settings
+
+print ""
+print "/* struct to save option settings */"
+print "struct option_stack {"
+print "  struct option_stack *next;"
+print "  int m_optimize;"
+print "  int m_optimize_size;"
+delete var_seen
+for (i = 0; i < n_opts; i++) {
+	name = var_name(flags[i]);
+	if (name == "")
+		continue;
+
+	if (name in var_seen)
+		continue;
+
+#	if (flag_set_p("VarExists", flags[i]))
+#		continue;
+
+	print "  /* Set by -" opts[i] "."
+	print "     " help[i] "  */"
+	print "  " var_type(flags[i]) " m_" name ";"
+	print "  "
+
+	var_seen[name] = 1;
+}
+
+print "};"
+print ""
+print "extern struct option_stack * option_stack_top;"
+#print "extern void initialize_default_options (void);"
+print "extern void push_option_stack (void);"
+print "extern void pop_option_stack (void);"
 print ""
 print "#endif /* OPTIONS_H */"
 }

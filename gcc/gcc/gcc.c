@@ -88,13 +88,6 @@ compilation is specified by a string called a "spec".  */
 #include "gcc.h"
 #include "flags.h"
 
-#ifdef HAVE_SYS_RESOURCE_H
-#include <sys/resource.h>
-#endif
-#if defined (HAVE_GETRUSAGE) && defined (HAVE_DECL_GETRUSAGE) && !HAVE_DECL_GETRUSAGE
-extern int getrusage (int, struct rusage *);
-#endif
-
 /* By default there is no special suffix for target executables.  */
 /* FIXME: when autoconf is fixed, remove the host check - dj */
 #if defined(TARGET_EXECUTABLE_SUFFIX) && defined(HOST_EXECUTABLE_SUFFIX)
@@ -359,12 +352,15 @@ static void init_gcc_specs (struct obstack *, const char *, const char *,
 #if defined(HAVE_TARGET_OBJECT_SUFFIX) || defined(HAVE_TARGET_EXECUTABLE_SUFFIX)
 static const char *convert_filename (const char *, int, int);
 #endif
-
+#if !(defined (__MSDOS__) || defined (OS2) || defined (VMS))
+static void retry_ice (const char *prog, const char **argv);
+#endif
 static const char *if_exists_spec_function (int, const char **);
 static const char *if_exists_else_spec_function (int, const char **);
 static const char *replace_outfile_spec_function (int, const char **);
 static const char *prepend_target_system_root_function (int, const char **);
 static const char *prepend_cmddir_function (int, const char **);/* begin sce local, bugzilla #11401 */
+static const char *subst_if_file_exist (int, const char **);
 static const char *version_compare_spec_function (int, const char **);
 
 /* The Specs Language
@@ -1638,6 +1634,7 @@ static const struct spec_function static_spec_functions[] =
   { "replace-outfile",		  replace_outfile_spec_function },
   { "prepend-target-system-root", prepend_target_system_root_function },
   { "prepend-cmddir",             prepend_cmddir_function }, /* begin sce local */
+  { "if-file-exist",              subst_if_file_exist },
   { "version-compare",	 	  version_compare_spec_function },
   { 0, 0 }
 };
@@ -2775,11 +2772,6 @@ execute (void)
 
       commands[0].argv = newargv;
 
-#ifdef __MINGW32__
-      /* In case of Windows, need to guard quoted-strings. */
-      /* FIXME fix_argv allocates memory. fix memory leak. */
-      commands[0].argv = fix_argv(commands[0].argv);
-#endif
       if (!save_temps_flag)
 	record_temp_file (response_filename+1, 1, 1);
     }
@@ -2931,7 +2923,7 @@ execute (void)
 #undef newerror1pattern
 	}
 
-      if (string != commands[i].prog)
+      if (i && string != commands[i].prog)
 	free ((void *) string);
     }
 
@@ -2987,6 +2979,17 @@ See %s for instructions.",
 	else if (WIFEXITED (status)
 		 && WEXITSTATUS (status) >= MIN_FATAL_STATUS)
 	  {
+#if !(defined (__MSDOS__) || defined (OS2) || defined (VMS))
+	    /* For ICEs in cc1, cc1obj, cc1plus see if it is
+	       reproduceable or not.  */
+	    char *p;
+	    if (WEXITSTATUS (status) == ICE_EXIT_CODE
+		&& i == 0
+		&& (p = strrchr (commands[i].argv[0], DIR_SEPARATOR))
+		&& ! strncmp (p + 1, "cc1", 3))
+	      retry_ice (commands[i].prog, commands[i].argv);
+#endif
+
 	    if (WEXITSTATUS (status) > greatest_status)
 	      greatest_status = WEXITSTATUS (status);
 	    ret_code = -1;
@@ -3006,6 +3009,9 @@ See %s for instructions.",
 	      notice ("# %s %.2f %.2f\n", commands[i].prog, ut, st);
 	  }
       }
+
+    if (commands[0].argv[0] != commands[0].prog)
+      free ((PTR) commands[0].argv[0]);
 
     return ret_code;
   }
@@ -6075,6 +6081,211 @@ give_switch (int switchnum, int omit_first_word)
   switches[switchnum].validated = 1;
 }
 
+#if !(defined (__MSDOS__) || defined (OS2) || defined (VMS))
+#define RETRY_ICE_ATTEMPTS 2
+
+static void
+retry_ice (const char *prog, const char **argv)
+{
+  int nargs, out_arg = -1, quiet = 0, attempt;
+  const char **new_argv;
+  char *temp_filenames[RETRY_ICE_ATTEMPTS * 2 + 2];
+  char *report_filename;
+  struct pex_obj *pex;
+
+  if (input_filename == NULL || ! strcmp (input_filename, "-"))
+    return;
+
+  for (nargs = 0; argv[nargs] != NULL; ++nargs)
+    /* Only retry compiler ICEs, not preprocessor ones.  */
+    if (! strcmp (argv[nargs], "-E"))
+      return;
+    else if (argv[nargs][0] == '-' && argv[nargs][1] == 'o')
+      {
+	if (out_arg == -1)
+	  out_arg = nargs;
+	else
+	  return;
+      }
+    /* If the compiler is going to output any time infomation,
+       it might varry between invocations.  */
+    else if (! strcmp (argv[nargs], "-quiet"))
+      quiet = 1;
+    else if (! strcmp (argv[nargs], "-ftime-report"))
+      return;
+
+  if (out_arg == -1 || !quiet)
+    return;
+
+  memset (temp_filenames, '\0', sizeof (temp_filenames));
+  new_argv = alloca ((nargs + 2) * sizeof (const char *));
+  memcpy (new_argv, argv, (nargs + 1) * sizeof (const char *));
+  if (new_argv[out_arg][2] == '\0')
+    new_argv[out_arg + 1] = "-";
+  else
+    new_argv[out_arg] = "-o-";
+
+  for (attempt = 0; attempt < RETRY_ICE_ATTEMPTS + 1; ++attempt)
+    {
+      int status;
+      int err;
+      const char *errmsg;
+      int fd1, fd2;
+      struct stat st1, st2;
+      size_t n, len;
+      char *buf;
+
+      temp_filenames[attempt * 2] = make_temp_file (".out");
+      temp_filenames[attempt * 2 + 1] = make_temp_file (".err");
+
+      if (attempt == RETRY_ICE_ATTEMPTS)
+	{
+	  int i;
+
+	  buf = xmalloc (8192);
+
+	  for (i = 0; i < 2; ++i)
+	    {
+	      fd1 = open (temp_filenames[i], O_RDONLY | O_BINARY);
+	      fd2 = open (temp_filenames[2 + i], O_RDONLY | O_BINARY);
+
+	      if (fd1 < 0 || fd2 < 0
+		  || fstat (fd1, &st1) < 0 || fstat (fd2, &st2) < 0
+		  || st1.st_size != st2.st_size)
+		{
+		  i = -1;
+		  close (fd1);
+		  close (fd2);
+		  break;
+		}
+
+	      len = 0;
+	      for (n = st1.st_size; n; n -= len)
+		{
+		  len = n;
+		  if (len > 4096)
+		    len = 4096;
+
+		  if (read (fd1, buf, len) != (int) len
+		      || read (fd2, buf + 4096, len) != (int) len)
+		    {
+		      i = -1;
+		      break;
+		    }
+
+		  if (memcmp (buf, buf + 4096, len) != 0)
+		    break;
+		}
+
+	      close (fd1);
+	      close (fd2);
+
+	      if (n)
+		break;
+	    }
+
+	  free (buf);
+	  if (i == -1)
+	    break;
+
+	  if (i != 2)
+	    {
+	      notice ("The bug is not reproduceable, so it is likely a hardware or OS problem\n");
+	      break;
+	    }
+
+	  report_filename = make_temp_file (".out");
+	  fd1 = open (report_filename, O_WRONLY | O_BINARY);
+	  if (fd1 < 0)
+	    break;
+	  write (fd1, "//", 2);
+	  for (i = 0; i < nargs; i++)
+	    {
+	      write (fd1, " ", 1);
+	      write (fd1, new_argv[i], strlen (new_argv[i]));
+	    }
+	  write (fd1, "\n", 1);
+	  write (fd1, "// ", 3);
+	  write (fd1, version_string, strlen (version_string));
+	  write (fd1, "\n", 1);
+	  close (fd1);
+	  new_argv[nargs] = "-E";
+	  new_argv[nargs + 1] = NULL;
+	}
+
+      pex = pex_init(0, programname, NULL);
+      if (pex == NULL)
+        pfatal_with_name ("pex_init failed");
+
+      errmsg = pex_run(pex, PEX_LAST | (prog == new_argv[0] ? PEX_SEARCH : 0),
+		       (prog == new_argv[0] ? prog : new_argv[0]), new_argv,
+		       temp_filenames[attempt * 2],
+		       temp_filenames[attempt * 2 + 1], &err);
+
+      if (errmsg != NULL)
+	{
+	  if (err != 0)
+	    pfatal_with_name (errmsg);
+	  else
+	    fatal (errmsg);
+	}
+
+      if(!pex_get_status (pex, 1, &status))
+        pfatal_with_name ("can't get program status");
+
+      pex_free (pex);
+
+      if (attempt < RETRY_ICE_ATTEMPTS
+	  && (! WIFEXITED (status) || WEXITSTATUS (status) != ICE_EXIT_CODE))
+	{
+	  notice ("The bug is not reproduceable, so it is likely a hardware or OS problem\n");
+	  break;
+	}
+      else if (attempt == RETRY_ICE_ATTEMPTS)
+	{
+	  if (WIFEXITED (status)
+	      && WEXITSTATUS (status) == SUCCESS_EXIT_CODE)
+	    {
+	      fd1 = open (report_filename, O_WRONLY | O_APPEND | O_BINARY);
+	      fd2 = open (temp_filenames[attempt * 2], O_RDONLY | O_BINARY);
+	      if (fd1 < 0 || fd2 < 0 || fstat (fd2, &st2) < 0)
+		{
+		  close (fd1);
+		  close (fd2);
+		  break;
+		}
+	      buf = xmalloc (4096);
+	      len = 0;
+              for (n = st2.st_size; n; n -= len)
+                {
+                  len = n;
+                  if (len > 4096)
+                    len = 4096;
+
+                  read (fd2, buf, len);
+		  write (fd1, buf, len);
+                }
+	      free (buf);
+	      close (fd1);
+	      close (fd2);
+	      notice ("Preprocessed source stored into %s file, please attach this to your bugreport\n",
+	      report_filename);
+	      /* Make sure it is not deleted.  */
+	      free (report_filename);
+	      break;
+	    }
+	}
+    }
+
+  for (attempt = 0; attempt < RETRY_ICE_ATTEMPTS * 2 + 2; attempt++)
+    if (temp_filenames[attempt])
+      {
+	unlink (temp_filenames[attempt]);
+	free (temp_filenames[attempt]);
+      }
+}
+#endif
+
 /* Search for a file named NAME trying various prefixes including the
    user's -B prefix and some standard ones.
    Return the absolute file name found.  If nothing is found, return NAME.  */
@@ -7986,6 +8197,24 @@ prepend_cmddir_function (int argc, const char **argv)
 }
 /* end sce local */
 
+/* */
+static const char*
+subst_if_file_exist(int tc, const char **tv)
+{
+  int i;
+
+  struct stat stat_result;
+
+  if (tc == 2 && tv[0] != NULL && tv[1] != NULL)
+    {
+      if (stat (tv[0], &stat_result) == 0)
+	return tv[1];
+      else
+	return "";
+    }
+  else
+    fatal ("illegal usage of if-file-exist in spec file\n");
+}
 
 /* Given two version numbers, compares the two numbers.
    A version number must match the regular expression

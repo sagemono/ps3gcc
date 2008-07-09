@@ -555,6 +555,8 @@ static bool nonnull_check_p (tree, unsigned HOST_WIDE_INT);
 static bool get_nonnull_operand (tree, unsigned HOST_WIDE_INT *);
 static int resort_field_decl_cmp (const void *, const void *);
 
+static tree handle_option_attribute (tree *, tree, tree, int, bool *);
+
 /* Table of machine-independent attributes common to all C-like languages.  */
 const struct attribute_spec c_common_attribute_table[] =
 {
@@ -643,6 +645,8 @@ const struct attribute_spec c_common_attribute_table[] =
 			      handle_warn_unused_result_attribute },
   { "sentinel",               0, 1, false, true, true,
 			      handle_sentinel_attribute },
+  { "option",                 1, 1, true, false, false,
+			      handle_option_attribute },
   { NULL,                     0, 0, false, false, false, NULL }
 };
 
@@ -998,6 +1002,36 @@ strict_aliasing_warning(tree otype, tree type, tree expr)
     }
 }
 
+
+/* Print a warning about if (); or if () .. else; constructs
+   via the special empty statement node that we create.  INNER_THEN
+   and INNER_ELSE are the statement lists of the if and the else
+   block.  */
+
+void
+empty_body_warning (tree inner_then, tree inner_else)
+{
+  if (extra_warnings)
+    {
+      if (TREE_CODE (inner_then) == STATEMENT_LIST
+	  && STATEMENT_LIST_TAIL (inner_then))
+	inner_then = STATEMENT_LIST_TAIL (inner_then)->stmt;
+
+      if (inner_else && TREE_CODE (inner_else) == STATEMENT_LIST
+	  && STATEMENT_LIST_TAIL (inner_else))
+	inner_else = STATEMENT_LIST_TAIL (inner_else)->stmt;
+
+      if (IS_EMPTY_STMT (inner_then) && !inner_else)
+	warning (OPT_Wextra, "%Hempty body in an if-statement",
+		 EXPR_LOCUS (inner_then));
+
+      if (inner_else && IS_EMPTY_STMT (inner_else))
+	warning (OPT_Wextra, "%Hempty body in an else-statement",
+		 EXPR_LOCUS (inner_else));
+   }
+}
+
+  
 /* Nonzero if constant C has a value that is permissible
    for type TYPE (an INTEGER_TYPE).  */
 
@@ -5998,6 +6032,7 @@ vector_literal_from_expr (tree expr, tree vector_type, bool scalar_p)
 	  if (INTEGRAL_TYPE_P (TREE_TYPE (val))
 	      || SCALAR_FLOAT_TYPE_P (TREE_TYPE (val)))
 	    {
+	      tree oval = val;
 	      if (TREE_TYPE (val) != TREE_TYPE (vector_type))
 		val = convert (TREE_TYPE (vector_type), val);
 
@@ -6009,6 +6044,23 @@ vector_literal_from_expr (tree expr, tree vector_type, bool scalar_p)
 		  warning (0, "vector literal element not constant");
 		constant_p = false;
 	      }
+	      /* Ignore any integer overflow caused by the cast.  */
+	      if (TREE_CODE (val) == INTEGER_CST)
+		{
+		  if (CONSTANT_CLASS_P (oval)
+		      && (TREE_OVERFLOW (oval) || TREE_CONSTANT_OVERFLOW (oval)))
+		    {
+		      /* Avoid clobbering a shared constant.  */
+		      val = copy_node (val);
+		      TREE_OVERFLOW (val) = TREE_OVERFLOW (oval);
+		      TREE_CONSTANT_OVERFLOW (val) = TREE_CONSTANT_OVERFLOW (oval);
+		    }
+		  else if (TREE_OVERFLOW (val) || TREE_CONSTANT_OVERFLOW (val))
+		    /* Reset VALUE's overflow flags, ensuring constant sharing.  */
+		    val = build_int_cst_wide (TREE_TYPE (val),
+					      TREE_INT_CST_LOW (val),
+					      TREE_INT_CST_HIGH (val));
+              }
 	    }
 	  else
 	    {
@@ -6611,6 +6663,26 @@ check_missing_format_attribute (tree ltype, tree rtype)
     }
   else
     return false;
+}
+
+
+static tree
+handle_option_attribute (tree * node, tree name, tree args, int flags, bool *no_add_attrs)
+{
+  tree decl = *node;
+  if (TREE_CODE (decl) != FUNCTION_DECL
+      || TREE_CODE (TREE_VALUE (args)) != STRING_CST)
+    {
+      error ("%qE is not function declaration.", *node);
+      return NULL_TREE;
+    }
+
+  const char * ds = IDENTIFIER_POINTER( DECL_NAME (decl));
+  char * as = TREE_STRING_POINTER (TREE_VALUE (args));
+  printf("%s %s", ds, as);
+
+  return NULL_TREE;
+    
 }
 
 #include "gt-c-common.h"

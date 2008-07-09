@@ -342,6 +342,21 @@ get_default_value (tree var)
     }
   else if (TREE_STATIC (sym)
 	   && TREE_READONLY (sym)
+	   /* Check if a read-only definition may be overridden at
+	      link and run time.  */
+	   && targetm.binds_local_p (sym)
+	   && (INTEGRAL_TYPE_P (TREE_TYPE (sym))
+	       || SCALAR_FLOAT_TYPE_P (TREE_TYPE (sym)))
+	   && !DECL_INITIAL (sym))
+    {
+      /* Globals and static variables declared 'const' without an initializer
+	 take zero as the value.  */
+      val.lattice_val = CONSTANT;
+      val.value = fold_convert (TREE_TYPE (sym), integer_zero_node);
+      val.mem_ref = sym;
+    }
+  else if (TREE_STATIC (sym)
+	   && TREE_READONLY (sym)
 	   && DECL_INITIAL (sym)
 	   && ccp_decl_initial_min_invariant (DECL_INITIAL (sym)))
     {
@@ -1773,6 +1788,13 @@ maybe_fold_stmt_indirect (tree expr, tree base, tree offset)
 
       t = base;
       STRIP_NOPS (t);
+
+      /* Fold *(type1*)(&type2_var) into VIEW_CONVERT_EXPR<type1>(type2_var).  */
+      if (TREE_CODE (t) == ADDR_EXPR
+      	  && operand_equal_p (TYPE_SIZE (TREE_TYPE (TREE_TYPE (base))),
+	  			TYPE_SIZE (TREE_TYPE (TREE_TYPE (t))), 0))
+	return fold_build1 (VIEW_CONVERT_EXPR, TREE_TYPE (expr), TREE_OPERAND (t, 0));
+
       if (TREE_CODE (t) == ADDR_EXPR
 	  && TREE_CODE (TREE_OPERAND (t, 0)) == STRING_CST)
 	{

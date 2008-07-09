@@ -5625,9 +5625,14 @@ rewrite_elf_program_header (bfd *ibfd, bfd *obfd)
           /** 
            * SCE local :: bugzilla #22917
            * ignore the warning if the SCE specific segment is empty
+	   *
+	   * In addition, bugzilla 47569 request strip command not to
+	   * wann empty segmnet for .ph_rodata, ph_data segment.
+	   * Considering avaibable segment types for PPU, its meaningless
+	   * to check emptyness for PPU here.
            **/
-	  if (segment->p_type == PT_LOAD &&
-              !(segment->p_flags & (PF_SPU_X | PF_SPU_W | PF_SPU_R | PF_RSX_X | PF_RSX_W | PF_RSX_R)))
+	  if (segment->p_type == PT_LOAD
+	      && elf_elfheader(ibfd)->e_ident[EI_OSABI] != ELFOSABI_CELLOSLV2)
 	    (*_bfd_error_handler)
 	      (_("%B: warning: Empty loadable segment detected, is this intentional ?\n"),
 	       ibfd);

@@ -1,4 +1,4 @@
-/* { dg-do compile { target powerpc*-*-linux*  } } */
+/* { dg-do compile } */
 /* { dg-require-effective-target ilp32 } */
 /* { dg-options "-maltivec -mno-warn-altivec-long" } */
 

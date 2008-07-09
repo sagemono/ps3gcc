@@ -77,7 +77,9 @@ function switch_flags (flags)
 	  test_flag("RejectNegative", flags, " | CL_REJECT_NEGATIVE") \
 	  test_flag("UInteger", flags, " | CL_UINTEGER") \
 	  test_flag("Undocumented", flags,  " | CL_UNDOCUMENTED") \
-	  test_flag("Report", flags, " | CL_REPORT")
+	  test_flag("Report", flags, " | CL_REPORT") \
+	  test_flag("DontOverwidden", flags, " | CL_DONT_OVERWRIDDEN") \
+	  test_flag("Unoverridable", flags, " | CL_UNOVERRIDABLE")
 	sub( "^0 \\| ", "", result )
 	return result
 }

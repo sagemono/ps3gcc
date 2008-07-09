@@ -258,7 +258,7 @@ type_after_usual_arithmetic_conversions (tree t1, tree t2)
 	      || TREE_CODE (t1) == ENUMERAL_TYPE);
   gcc_assert (ARITHMETIC_TYPE_P (t2)
 	      || TREE_CODE (t2) == COMPLEX_TYPE
-	      || TREE_CODE (t1) == VECTOR_TYPE
+	      || TREE_CODE (t2) == VECTOR_TYPE
 	      || TREE_CODE (t2) == ENUMERAL_TYPE);
 
   /* In what follows, we slightly generalize the rules given in [expr] so
@@ -2232,6 +2232,17 @@ build_indirect_ref (tree ptr, const char *errorstring)
   return error_mark_node;
 }
 
+/* Like cxx_mark_addressable but don't check register qualifier.  */
+static void
+mark_addressable_vector (tree x)
+{
+  while (handled_component_p (x))
+    x = TREE_OPERAND (x, 0);
+  if (TREE_CODE (x) != VAR_DECL && TREE_CODE (x) != PARM_DECL)
+    return ;
+  TREE_ADDRESSABLE (x) = 1;
+}
+
 /* This handles expressions of the form "a[i]", which denotes
    an array reference.
 
@@ -2277,6 +2288,18 @@ build_array_ref (tree array, tree idx)
 
     default:
       break;
+    }
+
+  if (TREE_CODE (TREE_TYPE (array)) == VECTOR_TYPE)
+    {
+      tree type = TREE_TYPE (array);
+      tree type1;
+      mark_addressable_vector (array);
+      type = build_qualified_type (TREE_TYPE (type), TYPE_QUALS (type));
+      type = build_pointer_type (type);
+      type1 = build_pointer_type (TREE_TYPE (array));
+      array = build1 (ADDR_EXPR, type1, array);
+      array = convert (type, array);
     }
 
   if (TREE_CODE (TREE_TYPE (array)) == ARRAY_TYPE)
@@ -2376,7 +2399,7 @@ build_array_ref (tree array, tree idx)
 
     if (TREE_CODE (TREE_TYPE (ar)) != POINTER_TYPE)
       {
-	error ("subscripted value is neither array nor pointer");
+	error ("subscripted value is neither array, pointer or vector");
 	return error_mark_node;
       }
     if (TREE_CODE (TREE_TYPE (ind)) != INTEGER_TYPE)

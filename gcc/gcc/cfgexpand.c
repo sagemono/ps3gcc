@@ -377,8 +377,8 @@ has_common_area (struct stack_var *stack_var1,
       for (field = TYPE_FIELDS (type_i); field; field = TREE_CHAIN (field)) {
         if (TREE_CODE (field) == FIELD_DECL) {
           tree field_type = TREE_TYPE (field);
-          HOST_WIDE_INT field_size = tree_low_cst (TYPE_SIZE_UNIT (field_type), 1);
-          HOST_WIDE_INT align = TYPE_ALIGN_UNIT(field_type) - 1;
+          HOST_WIDE_INT field_size = tree_low_cst (DECL_SIZE_UNIT (field), 1);
+          HOST_WIDE_INT align = DECL_ALIGN_UNIT(field) - 1;
 
           if (TREE_CODE (field_type) == ARRAY_TYPE) { /* type_i's field is an array */
             tree base_type_f = TREE_TYPE (field_type);

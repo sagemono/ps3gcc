@@ -227,6 +227,10 @@ extern int errno;
 # endif
 #endif
 
+#ifndef ICE_EXIT_CODE
+# define  ICE_EXIT_CODE 27
+#endif
+
 #ifdef HAVE_UNISTD_H
 # include <unistd.h>
 #endif
@@ -499,6 +503,11 @@ extern int vsnprintf(char *, size_t, const char *, va_list);
 # else
 #  define S_ISFIFO(m) 0
 # endif
+#endif
+
+/* Approximate O_BINARY.  */
+#ifndef O_BINARY
+# define O_BINARY 0
 #endif
 
 /* Define well known filenos if the system does not define them.  */

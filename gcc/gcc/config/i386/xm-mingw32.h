@@ -34,12 +34,6 @@ Software Foundation, 51 Franklin Street, Fifth Floor, Boston, MA
 #define HOST_QUOTE_CHAR '"'
 #define HOST_QUOTED_QUOTE_STR "\"\\\"\""
 
-/* This replaces the use of stat to determine if files are different
-   in gcc.c (do_spec_1) handling of --save-temps switch.  */
-extern int
-w32_file_id_cmp (const char *, const char *);
-#define HOST_FILE_ID_CMP(SRC,DST) w32_file_id_cmp (SRC, DST)
-
 /*  The st_ino field of struct stat is always 0.  */
 #define HOST_LACKS_INODE_NUMBERS
 

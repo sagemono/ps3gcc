@@ -614,14 +614,18 @@ void __do_frame_fini (void);
 void
 __do_frame_init (void)
 {
-  __w32_sharedptr_initialize();
-  __register_frame_info (__EH_FRAME_BEGIN__, &obj);
+  if (__register_frame_info)
+    {
+      __w32_sharedptr_initialize();
+      __register_frame_info (__EH_FRAME_BEGIN__, &obj);
+    }
 }
 
 void
 __do_frame_fini (void)
 {
-  __deregister_frame_info (__EH_FRAME_BEGIN__);
+  if (__deregister_frame_info)
+    __deregister_frame_info (__EH_FRAME_BEGIN__);
 }
 #else /* USE_EH_FRAME_REGISTRY && !__USING_SJLJ__EXCEPTIONS__ */
 void __do_sjlj_init (void);

@@ -1074,7 +1074,7 @@ simplify_const_unary_operation (enum rtx_code code, enum machine_mode mode,
 	  d = REAL_VALUE_NEGATE (d, mode);
 	  break;
 	case FLOAT_TRUNCATE:
-	  d = real_value_truncate (mode, d);
+	  d = real_value_truncate2 (mode, d, op_mode);
 	  break;
 	case FLOAT_EXTEND:
 	  /* All this does is change the mode.  */

@@ -1685,7 +1685,7 @@ spu_elf_count_relocs (asection *sec, Elf_Internal_Rela *relocs)
  * special sequence that computes the base pic register: 
  *     ila $a,label
  *     ...
- *     brsl $b,label
+ *     brsl $b,4
  *  label:
  *     ...
  */
@@ -1838,12 +1838,33 @@ spu_elf_relocate_section (bfd *output_bfd,
 	      if (safe_addr18 < 2)
 		{
 		  bfd_byte *insn1 = contents + rel->r_offset;
-		  bfd_byte *insn2 = contents + rel->r_addend - 4;
+		  bfd_byte *insn2 = contents + rel->r_addend - 4
+				    + relocation
+				    - input_section->output_section->vma
+				    - input_section->output_offset;
 		  if (input_section == sec
 		      && is_picreg_insns (input_bfd, insn1, insn2))
 		    safe_addr18 = 2;
 		  else 
 		    safe_addr18 = 1;
+		}
+	      break;
+	    case R_SPU_REL16:    /* brsl */
+	      if (safe_addr18 < 2)
+		{
+		  /* When we see a brsl whose target is the next
+		     instruction, we assume all R_SPU_ADDR18 are part of
+		     a PIC reference. */
+		  bfd_byte *insn1 = contents + rel->r_offset;
+		  bfd_byte *insn2 = contents + rel->r_addend - 4
+				    + relocation
+				    - input_section->output_section->vma
+				    - input_section->output_offset;
+		  bfd_vma x = bfd_get_32 (input_bfd, insn1);
+		  if (input_section == sec
+		      && insn1 == insn2
+		      && (x & 0xff800000) == 0x33000000) /* brsl */
+		    safe_addr18 = 2;
 		}
 	      break;
 	    }

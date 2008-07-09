@@ -2983,6 +2983,8 @@ gimplify_init_constructor (tree *expr_p, tree *pre_p,
 	    if (tret == GS_ERROR)
 	      ret = GS_ERROR;
 	  }
+	if (!is_gimple_reg (TREE_OPERAND (*expr_p, 0)))
+	  TREE_OPERAND (*expr_p, 1) = get_formal_tmp_var (ctor, pre_p);
       }
       break;
 
@@ -3182,6 +3184,8 @@ gimplify_modify_expr_rhs (tree *expr_p, tree *from_p, tree *to_p, tree *pre_p,
 
 	    if (!(rhs_predicate_for (*to_p))(*from_p))
 	      /* If we need a temporary, *to_p isn't accurate.  */
+	      use_target = false;
+	    else if (TREE_THIS_VOLATILE (*to_p))
 	      use_target = false;
 	    else if (TREE_CODE (*to_p) == RESULT_DECL
 		     && DECL_NAME (*to_p) == NULL_TREE

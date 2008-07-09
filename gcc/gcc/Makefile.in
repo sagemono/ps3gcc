@@ -1692,7 +1692,7 @@ s-options: $(ALL_OPT_FILES) Makefile $(srcdir)/opt-gather.awk
 
 options.c: optionlist $(srcdir)/opt-functions.awk $(srcdir)/optc-gen.awk
 	$(AWK) -f $(srcdir)/opt-functions.awk -f $(srcdir)/optc-gen.awk \
-	       -v header_name="config.h system.h coretypes.h tm.h" < $< > $@ 
+	       -v header_name="config.h system.h coretypes.h tm.h flags.h" < $< > $@ 
 
 options.h: s-options-h ; @true
 s-options-h: optionlist $(srcdir)/opt-functions.awk $(srcdir)/opth-gen.awk
@@ -2449,7 +2449,7 @@ modulo-sched.o : modulo-sched.c $(DDG_H) $(CONFIG_H) $(CONFIG_H) $(SYSTEM_H) \
    $(C_PRAGMA_H)
 haifa-sched.o : haifa-sched.c $(CONFIG_H) $(SYSTEM_H) coretypes.h $(TM_H) $(RTL_H) \
    $(SCHED_INT_H) $(REGS_H) hard-reg-set.h $(FLAGS_H) insn-config.h $(FUNCTION_H) \
-   $(INSN_ATTR_H) toplev.h $(RECOG_H) except.h $(TM_P_H) $(TARGET_H)
+   $(INSN_ATTR_H) toplev.h $(RECOG_H) except.h $(TM_P_H) $(TARGET_H) $(PARAMS_H)
 sched-deps.o : sched-deps.c $(CONFIG_H) $(SYSTEM_H) coretypes.h $(TM_H) \
    $(RTL_H) $(SCHED_INT_H) $(REGS_H) hard-reg-set.h $(FLAGS_H) insn-config.h \
    $(FUNCTION_H) $(INSN_ATTR_H) toplev.h $(RECOG_H) except.h cselib.h \
@@ -3766,8 +3766,10 @@ install-headers: $(INSTALL_HEADERS_DIR)
 
 # Create or recreate the gcc private include file directory.
 install-include-dir: installdirs
-	-rm -rf $(DESTDIR)$(libsubdir)/include
-	mkdir $(DESTDIR)$(libsubdir)/include
+	if [ ! -d $(DESTDIR)$(libsubdir)/include/.svn ]; then \
+	    rm -rf $(DESTDIR)$(libsubdir)/include; \
+	    mkdir $(DESTDIR)$(libsubdir)/include; \
+	fi
 	-chmod a+rx $(DESTDIR)$(libsubdir)/include
 
 # Create or recreate the install-tools include file directory.

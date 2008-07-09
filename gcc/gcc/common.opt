@@ -85,6 +85,10 @@ Wfatal-errors
 Common Var(flag_fatal_errors)
 Exit on the first error occurred
 
+Wframe-larger-than=
+Common RejectNegative Joined UInteger
+-Wframe-larger-than=<number> Warn if a function's stack frame requires more than <number> bytes
+
 Winline
 Common Var(warn_inline)
 Warn when an inlined function cannot be inlined
@@ -390,6 +394,10 @@ Perform early inlining
 feliminate-dwarf2-dups
 Common Report Var(flag_eliminate_dwarf2_dups)
 Perform DWARF2 duplicate elimination
+
+feliminate-unused-debug-declarations
+Common Report Var(flag_eliminate_unused_debug_decls) Init(1)
+Perform unused function and variable elimination in debug info
 
 feliminate-unused-debug-symbols
 Common Report Var(flag_debug_only_used_symbols)

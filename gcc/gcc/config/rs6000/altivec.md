@@ -2034,11 +2034,12 @@
 ;; Using these patterns allows us to delay creation of stack slots,
 ;; potentially not needing them at all.
 (define_insn_and_split "vec_sel_v4si"
-  [(set (match_operand:SI 0 "nonimmediate_operand" "=Z,r")
+  [(set (match_operand:SI 0 "reg_or_indexed_or_indirect_operand" "=Z,r")
         (vec_select:SI (match_operand:V4SI 1 "altivec_register_operand" "v,v")
 		       (parallel [(match_operand:SI 2 "const_int_operand" "i,i")])))
    (clobber (match_operand:V4SI 3 "register_operand" "=X,X"))
-   (clobber (match_operand:SI 4 "register_operand" "=X,X"))]
+   (clobber (match_operand:SI 4 "register_operand" "=X,X"))
+   (clobber (match_operand 5 "register_operand" "=X,X"))]
   "TARGET_ALTIVEC && !reload_completed"
   "#"
   ""
@@ -2047,16 +2048,17 @@
 		       (parallel [(match_dup:SI 2)])))]
   {
     rs6000_split_stve (operands[0], operands[1], operands[2],
-		       operands[3], operands[4]);
+		       operands[3], operands[4], operands[5]);
     DONE;
   })
 
 (define_insn_and_split "vec_sel_v8hi"
-  [(set (match_operand:HI 0 "nonimmediate_operand" "=Z,r")
+  [(set (match_operand:HI 0 "reg_or_indexed_or_indirect_operand" "=Z,r")
         (vec_select:HI (match_operand:V8HI 1 "altivec_register_operand" "v,v")
 		       (parallel [(match_operand:HI 2 "const_int_operand" "i,i")])))
    (clobber (match_operand:V8HI 3 "register_operand" "=X,X"))
-   (clobber (match_operand:HI 4 "register_operand" "=X,X"))]
+   (clobber (match_operand:HI 4 "register_operand" "=X,X"))
+   (clobber (match_operand 5 "register_operand" "=X,X"))]
   "TARGET_ALTIVEC && !reload_completed"
   "#"
   ""
@@ -2065,16 +2067,17 @@
 		       (parallel [(match_dup:HI 2)])))]
   {
     rs6000_split_stve (operands[0], operands[1], operands[2],
-		       operands[3], operands[4]);
+		       operands[3], operands[4], operands[5]);
     DONE;
   })
 
 (define_insn_and_split "vec_sel_v16qi"
-  [(set (match_operand:QI 0 "nonimmediate_operand" "=Z,r")
+  [(set (match_operand:QI 0 "reg_or_indexed_or_indirect_operand" "=Z,r")
         (vec_select:QI (match_operand:V16QI 1 "altivec_register_operand" "v,v")
 		       (parallel [(match_operand:QI 2 "const_int_operand" "i,i")])))
    (clobber (match_operand:V16QI 3 "register_operand" "=X,X"))
-   (clobber (match_operand:QI 4 "register_operand" "=X,X"))]
+   (clobber (match_operand:QI 4 "register_operand" "=X,X"))
+   (clobber (match_operand 5 "register_operand" "=X,X"))]
   "TARGET_ALTIVEC && !reload_completed"
   "#"
   ""
@@ -2083,16 +2086,17 @@
 		       (parallel [(match_dup:QI 2)])))]
   {
     rs6000_split_stve (operands[0], operands[1], operands[2],
-		       operands[3], operands[4]);
+		       operands[3], operands[4], operands[5]);
     DONE;
   })
 
 (define_insn_and_split "vec_sel_v4sf"
-  [(set (match_operand:SF 0 "nonimmediate_operand" "=Z,r")
+  [(set (match_operand:SF 0 "reg_or_indexed_or_indirect_operand" "=Z,r")
         (vec_select:SF (match_operand:V4SF 1 "altivec_register_operand" "v,v")
 		       (parallel [(match_operand:SI 2 "const_int_operand" "i,i")])))
    (clobber (match_operand:V4SF 3 "register_operand" "=X,X"))
-   (clobber (match_operand:SF 4 "register_operand" "=X,X"))]
+   (clobber (match_operand:SF 4 "register_operand" "=X,X"))
+   (clobber (match_operand 5 "register_operand" "=X,X"))]
   "TARGET_ALTIVEC && !reload_completed"
   "#"
   ""
@@ -2101,13 +2105,13 @@
 		       (parallel [(match_dup:SI 2)])))]
   {
     rs6000_split_stve (operands[0], operands[1], operands[2],
-		       operands[3], operands[4]);
+		       operands[3], operands[4], operands[5]);
     DONE;
   })
 
 (define_insn_and_split "vec_pro_v4si"
   [(set (match_operand:V4SI 0 "register_operand" "=v,v")
-        (vec_select:V4SI (match_operand:SI 1 "nonimmediate_operand" "Z,r")
+        (vec_select:V4SI (match_operand:SI 1 "reg_or_indexed_or_indirect_operand" "Z,r")
                          (parallel [(const_int  0)])))
    (clobber (match_operand:V16QI 2 "register_operand" "=X,X"))
    (clobber (match_operand 3 "register_operand" "=X,X"))]
@@ -2123,7 +2127,7 @@
 
 (define_insn_and_split "vec_pro_v8hi"
   [(set (match_operand:V8HI 0 "register_operand" "=v,v")
-        (vec_select:V8HI (match_operand:HI 1 "nonimmediate_operand" "Z,r")
+        (vec_select:V8HI (match_operand:HI 1 "reg_or_indexed_or_indirect_operand" "Z,r")
                          (parallel [(const_int  0)])))
    (clobber (match_operand:V16QI 2 "register_operand" "=X,X"))
    (clobber (match_operand 3 "register_operand" "=X,X"))]
@@ -2139,7 +2143,7 @@
 
 (define_insn_and_split "vec_pro_v16qi"
   [(set (match_operand:V16QI 0 "register_operand" "=v,v")
-        (vec_select:V16QI (match_operand:QI 1 "nonimmediate_operand" "Z,r")
+        (vec_select:V16QI (match_operand:QI 1 "reg_or_indexed_or_indirect_operand" "Z,r")
                           (parallel [(const_int  0)])))
    (clobber (match_operand:V16QI 2 "register_operand" "=X,X"))
    (clobber (match_operand 3 "register_operand" "=X,X"))]
@@ -2155,7 +2159,7 @@
 
 (define_insn_and_split "vec_pro_v4sf"
   [(set (match_operand:V4SF 0 "register_operand" "=v,v")
-        (vec_select:V4SF (match_operand:SF 1 "nonimmediate_operand" "Z,r")
+        (vec_select:V4SF (match_operand:SF 1 "reg_or_indexed_or_indirect_operand" "Z,r")
                          (parallel [(const_int  0)])))
    (clobber (match_operand:V16QI 2 "register_operand" "=X,X"))
    (clobber (match_operand 3 "register_operand" "=X,X"))]

@@ -476,14 +476,16 @@ cgraph_remove_node (struct cgraph_node *node)
       if (!n->next_clone && !n->global.inlined_to
 	  && (cgraph_global_info_ready
 	      && (TREE_ASM_WRITTEN (n->decl) || DECL_EXTERNAL (n->decl))))
-	kill_body = true;
+	{
+	  DECL_INITIAL (node->decl) = error_mark_node;
+	  kill_body = true;
+	}
     }
 
   if (kill_body && !dump_enabled_p (TDI_tree_all) && flag_unit_at_a_time)
     {
       DECL_SAVED_TREE (node->decl) = NULL;
       DECL_STRUCT_FUNCTION (node->decl) = NULL;
-      DECL_INITIAL (node->decl) = error_mark_node;
     }
   cgraph_n_nodes--;
   /* Do not free the structure itself so the walk over chain can continue.  */

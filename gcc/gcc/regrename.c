@@ -49,6 +49,7 @@ struct du_chain
   ENUM_BITFIELD(reg_class) cl : 16;
   unsigned int need_caller_save_reg:1;
   unsigned int earlyclobber:1;
+  unsigned int dest_earlyclobber:1;
 };
 
 enum scan_actions
@@ -77,6 +78,10 @@ static const char * const scan_actions_name[] =
 };
 
 static struct obstack rename_obstack;
+
+/* While creating the def-use chain, the dest_earlyclobber field in each
+ * du_chain is set to this. */
+static int dest_earlyclobber;
 
 static void do_replace (struct du_chain *, int);
 static void scan_rtx_reg (rtx, rtx *, enum reg_class,
@@ -175,7 +180,7 @@ merge_overlapping_regs (basic_block b, HARD_REG_SET *pset,
       /* For the last reference, also merge in all registers set in the
 	 same insn.
 	 @@@ We only have take earlyclobbered sets into account.  */
-      if (! t->next_use)
+      if (! t->next_use && t->dest_earlyclobber)
 	note_stores (PATTERN (insn), note_sets, (void *) pset);
 
       t = t->next_use;
@@ -231,7 +236,7 @@ regrename_optimize (void)
       CLEAR_HARD_REG_SET (regs_seen);
       while (all_chains)
 	{
-	  int new_reg, best_new_reg;
+	  int new_reg, best_new_reg, prefer_reg;
 	  int n_uses;
 	  struct du_chain *this = all_chains;
 	  struct du_chain *tmp, *last;
@@ -242,6 +247,7 @@ regrename_optimize (void)
 	  all_chains = this->next_chain;
 
 	  best_new_reg = reg;
+	  prefer_reg = -1;
 
 #if 0 /* This just disables optimization opportunities.  */
 	  /* Only rename once we've seen the reg more than once.  */
@@ -284,6 +290,25 @@ regrename_optimize (void)
 
 	  merge_overlapping_regs (bb, &this_unavailable, this);
 
+	  /* If there is only 1 use and it is the source of a reg->reg
+	   * copy instruction, choose the destination as the preferred
+	   * register.  This will lead to the copy instruction getting
+	   * deleted. */
+	  if (n_uses == 1 && !last->dest_earlyclobber)
+	    {
+	      rtx x = PATTERN (last->insn);
+	      if (GET_CODE (x) == SET
+		  && GET_CODE (SET_DEST (x)) == REG
+		  && GET_CODE (SET_SRC (x)) == REG)
+	      {
+		prefer_reg = REGNO (SET_DEST (x));
+		if (dump_file)
+		  fprintf (dump_file, "Prefer register %s for %s in insn %d\n",
+			   reg_names[prefer_reg], reg_names[reg],
+			   INSN_UID (last->insn));
+	      }
+	    }
+
 	  /* Now potential_regs is a reasonable approximation, let's
 	     have a closer look at each register still in there.  */
 	  for (new_reg = 0; new_reg < FIRST_PSEUDO_REGISTER; new_reg++)
@@ -323,7 +348,8 @@ regrename_optimize (void)
 		  break;
 	      if (! tmp)
 		{
-		  if (tick[best_new_reg] > tick[new_reg])
+		  if (new_reg == prefer_reg
+		      || (best_new_reg != prefer_reg && tick[best_new_reg] > tick[new_reg]))
 		    best_new_reg = new_reg;
 		}
 	    }
@@ -408,6 +434,7 @@ scan_rtx_reg (rtx insn, rtx *loc, enum reg_class cl,
 	  this->cl = cl;
 	  this->need_caller_save_reg = 0;
 	  this->earlyclobber = earlyclobber;
+	  this->dest_earlyclobber = dest_earlyclobber;
 	  open_chains = this;
 	}
       return;
@@ -459,6 +486,7 @@ scan_rtx_reg (rtx insn, rtx *loc, enum reg_class cl,
 		  this->insn = insn;
 		  this->cl = cl;
 		  this->need_caller_save_reg = 0;
+		  this->dest_earlyclobber = dest_earlyclobber;
 		  while (*p)
 		    p = &(*p)->next_use;
 		  *p = this;
@@ -770,6 +798,14 @@ build_def_use (basic_block bb)
 	  preprocess_constraints ();
 	  alt = which_alternative;
 	  n_ops = recog_data.n_operands;
+
+	  /* Record that this instruction has an earlyclobber in every
+	   * use created. */
+	  dest_earlyclobber = 0;
+	  for (i = 0; i < n_ops; i++)
+	    if (recog_data.operand_type[i] == OP_OUT
+		&& recog_op_alt[i][alt].earlyclobber)
+	      dest_earlyclobber = 1;
 
 	  /* Simplify the code below by rewriting things to reflect
 	     matching constraints.  Also promote OP_OUT to OP_INOUT

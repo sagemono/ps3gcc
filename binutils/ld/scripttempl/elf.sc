@@ -346,6 +346,7 @@ cat <<EOF
     ${ALWAYS_FIRST_TEXT_SECTIONS}
 
     ${RELOCATING+${TEXT_START_SYMBOLS}}
+    ${RELOCATING+${INITIAL_TEXT_SECTIONS}}
     *(.text .stub${RELOCATING+ .text.* .gnu.linkonce.t.*})
     KEEP (*(.text.*personality*))
     *(.spu.elf)

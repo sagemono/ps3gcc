@@ -185,7 +185,7 @@ tree_nrv (void)
   DECL_NAME (result) = DECL_NAME (found);
   DECL_SOURCE_LOCATION (result) = DECL_SOURCE_LOCATION (found);
   DECL_ABSTRACT_ORIGIN (result) = DECL_ABSTRACT_ORIGIN (found);
-  TREE_ADDRESSABLE (result) = TREE_ADDRESSABLE (found);
+  TREE_ADDRESSABLE (result) |= TREE_ADDRESSABLE (found);
 
   /* Now walk through the function changing all references to VAR to be
      RESULT.  */
@@ -259,7 +259,8 @@ execute_return_slot_opt (void)
 	      && (call = TREE_OPERAND (stmt, 1),
 		  TREE_CODE (call) == CALL_EXPR)
 	      && !CALL_EXPR_RETURN_SLOT_OPT (call)
-	      && aggregate_value_p (call, call))
+	      && aggregate_value_p (call, call)
+	      && !TREE_THIS_VOLATILE (TREE_OPERAND (stmt, 0)))
 	    {
 	      def_operand_p def_p;
 	      ssa_op_iter op_iter;

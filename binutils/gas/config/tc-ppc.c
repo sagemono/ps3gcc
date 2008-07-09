@@ -1134,16 +1134,6 @@ md_parse_option (c, arg)
 	{
 	  flag_leave_branch_relocs = TRUE;
 	}
-#if 0
-      else if (strcmp (arg, "leave-branch-relocs") == 0)
-	{
-	  flag_leave_branch_relocs = TRUE;
-	}
-      else if (strcmp (arg, "no-leave-branch-relocs") == 0)
-	{
-	  flag_leave_branch_relocs = FALSE;
-	}
-#endif
       /* end sce local bugzilla 39026 */
 #endif
       else
@@ -2246,7 +2236,6 @@ md_assemble (str)
 #ifdef OBJ_ELF
   bfd_reloc_code_real_type reloc;
 #endif
-  int keep_this_reloc_unresolved = 0;
 
   /* Get the opcode.  */
   for (s = str; *s != '\0' && ! ISSPACE (*s); s++)
@@ -2268,13 +2257,6 @@ md_assemble (str)
 
       return;
     }
-  /* begin sce local bugzilla 39026 */
-  if (strcmp (opcode->name, "b") == 0
-      || strcmp (opcode->name, "bl") == 0
-      || strcmp (opcode->name, "ba") == 0
-      || strcmp (opcode->name, "bla") == 0)
-    keep_this_reloc_unresolved = 1;
-  /* end sce local bugzilla 39026 */
 
   insn = opcode->opcode;
 
@@ -2852,16 +2834,13 @@ md_assemble (str)
 				    (operand->flags & PPC_OPERAND_RELATIVE) != 0,
 				    ((bfd_reloc_code_real_type)
 				     (fixups[i].opindex + (int) BFD_RELOC_UNUSED )));
-	  if (keep_this_reloc_unresolved
+
+	  if (bfd_opcode_ppc_direct_call_or_jump_p(opcode)
 	      && fix->fx_addsy
 	      && symbol_constant_p (fix->fx_addsy)
 	      && ! is_local_label (fix->fx_addsy))
 	    {
-	      const char * dstname = S_GET_NAME (fix->fx_addsy);
-	      const char * non_local_name
-		= latest_non_local_label != NULL? S_GET_NAME(latest_non_local_label): "";
-	      if (strcmp (dstname, non_local_name) != 0)
-		REMAIN_UNRESOLVED(fix);
+	      REMAIN_UNRESOLVED(fix);
 	    }
 	  /* end sce local bugzilla 39026 */
 	}

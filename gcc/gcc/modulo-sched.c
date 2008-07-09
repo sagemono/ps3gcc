@@ -1336,8 +1336,8 @@ sms_schedule (FILE *dump_file)
 	    }
 
 	  if (pli && pli->info)
-	    inform ("SMS succeeded with II %d and stage count %d", ps->ii,
-		    stage_count);
+	    inform ("%HSMS succeeded with II %d and stage count %d",
+		    EXPR_LOCUS (pli->stmt), ps->ii, stage_count);
 	  
 	  /* Set the stage boundaries.  If the DDG is built with closing_branch_deps,
 	     the closing_branch was scheduled and should appear in the last (ii-1)

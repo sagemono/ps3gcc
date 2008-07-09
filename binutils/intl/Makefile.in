@@ -34,7 +34,7 @@ datadir = $(prefix)/@DATADIRNAME@
 localedir = $(datadir)/locale
 gnulocaledir = $(datadir)/locale
 gettextsrcdir = @datadir@/gettext/intl
-aliaspath = $(localedir):.
+aliaspath = $(localedir)
 subdir = intl
 
 INSTALL = @INSTALL@

@@ -13,7 +13,7 @@ install directory and the rebuild working directory by setting
 environment variables.  See comments in script files for details.
 Example:
     mkdir work/src
-    unzip toolchain-src-2.2.0-GCC411.zip -d work/src
+    unzip toolchain-src-2.4.0-GCC411.zip -d work/src
     mkdir work/build
     cd work/build
     ../src/build.sh

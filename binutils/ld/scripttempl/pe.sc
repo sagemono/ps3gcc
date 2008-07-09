@@ -68,14 +68,14 @@ SECTIONS
 			*(EXCLUDE_FILE (*crtend.o) .ctors);
 			*(.ctor);
 			*(SORT(.ctors.*));
-			*crtend.o (.ctors);
+			*(.ctors);
 			LONG (0); }
     ${CONSTRUCTING+	___DTOR_LIST__ = .; __DTOR_LIST__ = . ;
 			LONG (-1);
 			*(EXCLUDE_FILE (*crtend.o) .dtors);
 			*(.dtor);
 			*(SORT(.dtors.*));
-			*crtend.o (.dtors);
+			*(.dtors);
 			LONG (0); }
     ${RELOCATING+ *(.fini)}
     /* ??? Why is .gcc_exc here?  */

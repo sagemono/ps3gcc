@@ -3797,6 +3797,9 @@ static GTY(()) size_t file_table_last_lookup_index;
    The key is a DECL_UID() which is a unique number identifying each decl.  */
 static GTY ((param_is (struct die_struct))) htab_t decl_die_table;
 
+/* A hash table of global decls which we use to prune unused decls */
+static GTY ((param_is (union tree_node))) htab_t global_decl_table;
+
 /* Node of the variable location list.  */
 struct var_loc_node GTY ((chain_next ("%h.next")))
 {
@@ -4195,9 +4198,19 @@ static void output_loc_list (dw_loc_list_ref);
 static char *gen_internal_sym (const char *);
 
 static void prune_unmark_dies (dw_die_ref);
+static bool die_of_unused_decl (dw_die_ref);
+static bool import_of_unused_decl (dw_die_ref);
+static void prune_unused_decls_walk_attribs (dw_die_ref);
+static void prune_unused_decls_mark (dw_die_ref, int);
+static void prune_unused_decls_walk (dw_die_ref);
+static void prune_unused_decls_prune_imports (dw_die_ref);
+static void prune_unused_decls_prune (dw_die_ref);
+static void prune_unused_decls (void);
+static bool import_of_unused_type (dw_die_ref);
 static void prune_unused_types_mark (dw_die_ref, int);
 static void prune_unused_types_walk (dw_die_ref);
 static void prune_unused_types_walk_attribs (dw_die_ref);
+static void prune_unused_types_prune_imports (dw_die_ref);
 static void prune_unused_types_prune (dw_die_ref);
 static void prune_unused_types (void);
 static int maybe_emit_file (int);
@@ -5578,6 +5591,40 @@ lookup_decl_die (tree decl)
   return htab_find_with_hash (decl_die_table, decl, DECL_UID (decl));
 }
 
+/* Returns a hash value for X (which really is a DECL_UID).  */
+
+static hashval_t
+global_decl_table_hash (const void *x)
+{
+  return (hashval_t) x;
+}
+
+/* Return nonzero if DECL_UID (X) is the same as Y (which is a DECL_UID.) */
+
+static int
+global_decl_table_eq (const void *x, const void *y)
+{
+  return DECL_UID ((const tree) x) == (unsigned int) y;
+}
+
+/* Return the DECL associated with a given DECL_UID.  */
+
+static inline tree
+lookup_global_decl (unsigned int decl_id)
+{
+  return htab_find_with_hash (global_decl_table, (void *) decl_id, decl_id);
+}
+
+static void
+add_global_decl (tree decl)
+{
+  unsigned int decl_id = DECL_UID (decl);
+  void **slot;
+
+  slot = htab_find_slot_with_hash (global_decl_table, (void *) decl_id, decl_id, INSERT);
+  *slot = decl;
+}
+
 /* Returns a hash value for X (which really is a var_loc_list).  */
 
 static hashval_t
@@ -5683,6 +5730,10 @@ print_die (dw_die_ref die, FILE *outfile)
   print_spaces (outfile);
   fprintf (outfile, "  abbrev id: %lu", die->die_abbrev);
   fprintf (outfile, " offset: %lu\n", die->die_offset);
+  if (die->die_mark)
+    fprintf (outfile, " marked\n");
+  if (die->die_perennial_p)
+    fprintf (outfile, " perennial\n");
 
   for (a = die->die_attr; a != NULL; a = a->dw_attr_next)
     {
@@ -12495,9 +12546,6 @@ gen_typedef_die (tree decl, dw_die_ref context_die)
 
   type_die = new_die (DW_TAG_typedef, context, decl);
 
-  if (type_die && class_or_namespace_scope_p (context))
-    type_die->die_perennial_p = 1;
-
   origin = decl_ultimate_origin (decl);
   if (origin != NULL)
     add_abstract_origin_attribute (type_die, origin);
@@ -13271,6 +13319,7 @@ dwarf2out_global_decl (tree decl)
      definitions which have not yet been forced out.  */
   if (TREE_CODE (decl) != FUNCTION_DECL || !DECL_INITIAL (decl))
     dwarf2out_decl (decl);
+  add_global_decl (decl);
 }
 
 /* Output debug information for type decl DECL.  Called from toplev.c
@@ -13847,6 +13896,10 @@ dwarf2out_init (const char *filename ATTRIBUTE_UNUSED)
   decl_die_table = htab_create_ggc (10, decl_die_table_hash,
 				    decl_die_table_eq, NULL);
 
+  /* Allocate the decl_die_table.  */
+  global_decl_table = htab_create_ggc (10, global_decl_table_hash,
+				    global_decl_table_eq, NULL);
+
   /* Allocate the decl_loc_table.  */
   decl_loc_table = htab_create_ggc (10, decl_loc_table_hash,
 				    decl_loc_table_eq, NULL);
@@ -13970,6 +14023,223 @@ prune_unmark_dies (dw_die_ref die)
     prune_unmark_dies (c);
 }
 
+static bool
+die_of_unused_decl (dw_die_ref die)
+{
+  tree decl;
+  if (die->decl_id == 0)
+    return false;
+  decl = lookup_global_decl (die->decl_id);
+  return decl && VAR_OR_FUNCTION_DECL_P (decl) && !TREE_ASM_WRITTEN (decl);
+}
+
+static bool
+import_of_unused_decl (dw_die_ref die)
+{
+  dw_die_ref imported;
+  if (die->die_tag != DW_TAG_imported_declaration)
+    return false;
+  imported = get_AT_ref (die, DW_AT_import);
+  return imported && imported->die_mark == 0;
+}
+
+/* Given DIE that we're marking as used, find any other dies
+   it references as attributes and mark them as used.  */
+
+static void
+prune_unused_decls_walk_attribs (dw_die_ref die)
+{
+  dw_attr_ref a;
+
+  if (die->die_tag == DW_TAG_imported_declaration)
+    return;
+
+  for (a = die->die_attr; a != NULL; a = a->dw_attr_next)
+    if (a->dw_attr_val.val_class == dw_val_class_die_ref)
+      {
+	/* A reference to another DIE.
+	   Make sure that it will get emitted.  */
+	prune_unused_decls_mark (a->dw_attr_val.v.val_die_ref.die, 1);
+      }
+}
+
+
+/* Mark DIE as being used.  If DOKIDS is true, then walk down
+   to DIE's children.  */
+
+static void
+prune_unused_decls_mark (dw_die_ref die, int dokids)
+{
+  dw_die_ref c;
+
+  if (die->die_mark == 0)
+    {
+      /* We haven't done this node yet.  Mark it as used.  */
+      die->die_mark = 1;
+
+      /* We also have to mark its parents as used.
+	 (But we don't want to mark our parents' kids due to this.)  */
+      if (die->die_parent)
+	prune_unused_decls_mark (die->die_parent, 0);
+
+      /* Mark any referenced nodes.  */
+      prune_unused_decls_walk_attribs (die);
+
+      /* If this node is a specification,
+         also mark the definition, if it exists.  */
+      if (get_AT_flag (die, DW_AT_declaration) && die->die_definition)
+        prune_unused_decls_mark (die->die_definition, 1);
+    }
+
+  if (dokids && die->die_mark != 2)
+    {
+      /* We need to walk the children, but haven't done so yet.
+	 Remember that we've walked the kids.  */
+      die->die_mark = 2;
+
+      /* Walk them.  */
+      for (c = die->die_child; c; c = c->die_sib)
+	{
+	  /* If this is an array type, we need to make sure our
+	     kids get marked, even if they're decls.  */
+	  if (die->die_tag == DW_TAG_array_type)
+	    prune_unused_decls_mark (c, 1);
+	  else
+	    prune_unused_decls_walk (c);
+	}
+    }
+}
+
+
+/* Walk the tree DIE and mark decls that we actually use.  */
+
+static void
+prune_unused_decls_walk (dw_die_ref die)
+{
+  dw_die_ref c;
+
+  /* Don't do anything if this node is already marked.  */
+  if (die->die_mark)
+    return;
+
+  if (die_of_unused_decl (die))
+    return;
+
+  /* We remove all declarations.  Ideally we keep the ones that are
+   * being used, but we have no way of knowing at this point. */
+  if (die->die_tag == DW_TAG_subprogram
+      && get_AT (die, DW_AT_declaration)
+      && die->die_parent
+      && (die->die_parent->die_tag == DW_TAG_compile_unit
+          || die->die_parent->die_tag == DW_TAG_namespace))
+    return;
+
+  die->die_mark = 1;
+
+  /* Now, mark any dies referenced from here.  */
+  prune_unused_decls_walk_attribs (die);
+
+  /* Mark children.  */
+  for (c = die->die_child; c; c = c->die_sib)
+    prune_unused_decls_walk (c);
+}
+
+/* Prune any unused imported declarations because we need to test the
+   DIE reference before it is deleted. */
+static void
+prune_unused_decls_prune_imports (dw_die_ref die)
+{
+  dw_die_ref c, p, n;
+
+  p = NULL;
+  for (c = die->die_child; c; c = n)
+    {
+      n = c->die_sib;
+      if (import_of_unused_decl (c))
+	{
+	  if (p)
+	    p->die_sib = n;
+	  else
+	    die->die_child = n;
+	  free_die (c);
+	}
+      else 
+	{
+	  prune_unused_decls_prune_imports (c);
+	  p = c;
+	}
+    }
+
+}
+
+/* Remove from the tree DIE any dies that aren't marked.  */
+
+static void
+prune_unused_decls_prune (dw_die_ref die)
+{
+  dw_die_ref c, p, n;
+
+  p = NULL;
+  for (c = die->die_child; c; c = n)
+    {
+      n = c->die_sib;
+      if (c->die_mark == 0)
+	{
+	  if (p)
+	    p->die_sib = n;
+	  else
+	    die->die_child = n;
+	  free_die (c);
+	}
+      else
+	{
+	  prune_unused_decls_prune (c);
+	  p = c;
+	}
+    }
+}
+
+
+/* Remove dies representing declarations that we never use.  */
+
+static void
+prune_unused_decls (void)
+{
+  unsigned int i;
+  limbo_die_node *node;
+
+  /* Clear all the marks.  */
+  prune_unmark_dies (comp_unit_die);
+  for (node = limbo_die_list; node; node = node->next)
+    prune_unmark_dies (node->die);
+
+  /* Set the mark on nodes that are actually used.  */
+  prune_unused_decls_walk (comp_unit_die);
+  for (node = limbo_die_list; node; node = node->next)
+    prune_unused_decls_walk (node->die);
+
+  /* Also set the mark on nodes referenced from the
+     pubname_table or arange_table.  */
+  for (i = 0; i < pubname_table_in_use; i++)
+    prune_unused_decls_mark (pubname_table[i].die, 1);
+  for (i = 0; i < arange_table_in_use; i++)
+    prune_unused_decls_mark (arange_table[i], 1);
+
+  /* Get rid of decl imports whose decl is not marked.  */
+  prune_unused_decls_prune_imports (comp_unit_die);
+  for (node = limbo_die_list; node; node = node->next)
+    prune_unused_decls_prune_imports (node->die);
+
+  /* Get rid of nodes that aren't marked.  */
+  prune_unused_decls_prune (comp_unit_die);
+  for (node = limbo_die_list; node; node = node->next)
+    prune_unused_decls_prune (node->die);
+
+  /* Leave the marks clear.  */
+  prune_unmark_dies (comp_unit_die);
+  for (node = limbo_die_list; node; node = node->next)
+    prune_unmark_dies (node->die);
+}
 
 /* Given DIE that we're marking as used, find any other dies
    it references as attributes and mark them as used.  */
@@ -13978,6 +14248,9 @@ static void
 prune_unused_types_walk_attribs (dw_die_ref die)
 {
   dw_attr_ref a;
+
+  if (die->die_tag == DW_TAG_imported_declaration)
+    return;
 
   for (a = die->die_attr; a != NULL; a = a->dw_attr_next)
     {
@@ -14056,6 +14329,7 @@ prune_unused_types_walk (dw_die_ref die)
     return;
 
   switch (die->die_tag) {
+  case DW_TAG_base_type:
   case DW_TAG_const_type:
   case DW_TAG_packed_type:
   case DW_TAG_pointer_type:
@@ -14096,6 +14370,47 @@ prune_unused_types_walk (dw_die_ref die)
     prune_unused_types_walk (c);
 }
 
+static bool
+import_of_unused_type (dw_die_ref die)
+{
+  dw_die_ref imported;
+  if (die->die_tag != DW_TAG_imported_declaration)
+    return false;
+  imported = get_AT_ref (die, DW_AT_import);
+  /* Only type DIE's can have die_mark of 0 after prune_unused_types_walk. */
+  return imported && !imported->die_mark;
+}
+
+
+/* Prune any unused imported declarations because we need to test the
+   DIE reference before it is deleted. */
+static void
+prune_unused_types_prune_imports (dw_die_ref die)
+{
+  dw_die_ref c, p, n;
+
+  gcc_assert (die->die_mark);
+
+  p = NULL;
+  for (c = die->die_child; c; c = n)
+    {
+      n = c->die_sib;
+      if (import_of_unused_type (c))
+	{
+	  if (p)
+	    p->die_sib = n;
+	  else
+	    die->die_child = n;
+	  free_die (c);
+	}
+      else if (c->die_mark)
+	{
+	  prune_unused_types_prune_imports (c);
+	  p = c;
+	}
+    }
+
+}
 
 /* Remove from the tree DIE any dies that aren't marked.  */
 
@@ -14151,6 +14466,11 @@ prune_unused_types (void)
     prune_unused_types_mark (pubname_table[i].die, 1);
   for (i = 0; i < arange_table_in_use; i++)
     prune_unused_types_mark (arange_table[i], 1);
+
+  /* Get rid of type imports whose type is not marked.  */
+  prune_unused_types_prune_imports (comp_unit_die);
+  for (node = limbo_die_list; node; node = node->next)
+    prune_unused_types_prune_imports (node->die);
 
   /* Get rid of nodes that aren't marked.  */
   prune_unused_types_prune (comp_unit_die);
@@ -14252,6 +14572,9 @@ dwarf2out_finish (const char *filename)
   /* We need to reverse all the dies before break_out_includes, or
      we'll see the end of an include file before the beginning.  */
   reverse_all_dies (comp_unit_die);
+
+  if (flag_eliminate_unused_debug_decls)
+    prune_unused_decls ();
 
   if (flag_eliminate_unused_debug_types)
     prune_unused_types ();

@@ -3190,12 +3190,12 @@ selb\t%0,%4,%0,%3"
 
 (define_insn "_sibcall"
   [(parallel
-    [(call (match_operand:QI 0 "call_operand" "R,S")
+    [(call (mem:QI (match_operand:SI 0 "spu_nonmem_operand" "q,s"))
 	   (match_operand:QI 1 "" "i,i"))
      (use (reg:SI 0))])]
   "SIBLING_CALL_P(insn)"
   {
-      return which_alternative==0 ? "bi\t%i0" : "br\t%0";
+      return which_alternative==0 ? "bi\t%0" : "br\t%0";
   }
    [(set_attr "type" "br")])
 
@@ -3214,12 +3214,12 @@ selb\t%0,%4,%0,%3"
 (define_insn "_sibcall_value"
   [(parallel
     [(set (match_operand 0 "" "")
-	  (call (match_operand:QI 1 "call_operand" "R,S")
+	  (call (mem:QI (match_operand:SI 1 "spu_nonmem_operand" "q,s"))
 		(match_operand:QI 2 "" "i,i")))
      (use (reg:SI 0))])]
   "SIBLING_CALL_P(insn)"
   {
-      return which_alternative==0 ? "bi\t%i1" : "br\t%1";
+      return which_alternative==0 ? "bi\t%1" : "br\t%1";
   }
    [(set_attr "type" "br")])
 

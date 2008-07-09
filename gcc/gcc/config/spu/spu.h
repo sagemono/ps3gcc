@@ -295,6 +295,7 @@ enum spu_float_accuracy { SPU_FP_COMPAT, SPU_FP_ACCURATE, SPU_FP_FAST };
    desirable that there be another class that represents their union.  */
 enum reg_class { 
    NO_REGS, 
+   SIBCALL_REGS,
    GENERAL_REGS,
    ALL_REGS,
    LIM_REG_CLASSES 
@@ -305,6 +306,7 @@ enum reg_class {
 /* Give names of register classes as strings for dump file.   */
 #define REG_CLASS_NAMES \
 {  "NO_REGS", \
+   "SIBCALL_REGS", \
    "GENERAL_REGS", \
    "ALL_REGS" \
 }
@@ -313,13 +315,14 @@ enum reg_class {
    for a vector of HARD_REG_SET of length N_REG_CLASSES.  */
 #define REG_CLASS_CONTENTS { \
     {0, 0, 0, 0, 0}, /* no regs */ \
+    {0xfffffffb, 0xffffffff, 0x0000ffff, 0x00000000, 0x0}, /* sibcall regs */ \
     {0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0x3}, /* general regs */ \
     {0xffffffff, 0xffffffff, 0xffffffff, 0xffffffff, 0x3}} /* all regs */
 
 /* The same information, inverted: Return the class number of the 
    smallest class containing reg number REGNO.  This could be a 
    conditional expression or could index an array.  */ 
-#define REGNO_REG_CLASS(REGNO) (GENERAL_REGS)
+#define REGNO_REG_CLASS(REGNO) (((REGNO) == 2 || (REGNO) >= 80) ? GENERAL_REGS : SIBCALL_REGS )
 
 /* The class value for index registers, and the one for base regs.  */
 
@@ -328,7 +331,8 @@ enum reg_class {
 
 /* Get reg_class from a letter such as appears in the machine description.  */
 
-#define REG_CLASS_FROM_LETTER(C) (NO_REGS)
+#define REG_CLASS_FROM_LETTER(C) ((C) == 'q' ? SIBCALL_REGS : NO_REGS)
+
 /*
   A - An immediate which can be loaded with the il/ila/ilh/ilhu
       instructions.  const_int is treated as a 32 bit value.
@@ -1089,3 +1093,11 @@ extern int darwin_ms_struct;
 /* We want to generate warnings when in pic code */
 #define NOTICE_STATIC_STORAGE_VARS(VARS)  spu_notice_static_storage_vars(VARS)
 
+
+/* sce bugzilla 43400 */
+/* XXX: This is sce original macro extension.
+
+   If this is macro defined, tree expansion path does not
+   check if 2nd arg of __builtin_expect is constant.
+   SPU GCC port allows __bulitin_epand to have variable args. So the macro is defiend. */
+#define SKIP_BUILTIN_ARG_CHECK 1

@@ -55,7 +55,7 @@ void int_test (int i, int *p, volatile int *vp, int &r, volatile int &vr)
   *ip_fn ();			// ok, no warning
   *vip_fn ();			// ok, no warning
   ir_fn ();			// ok, no warning
-  vir_fn ();			// { dg-warning "" } reference not accessed
+  vir_fn ();			// ok, no warning
 }
 
 struct S;
@@ -137,7 +137,7 @@ void complete_test (int i, T *p, volatile T *vp, T &r, volatile T &vr)
   *tp_fn ();			// ok, no warning
   *vtp_fn ();			// ok, no warning
   tr_fn ();			// ok, no warning
-  vtr_fn ();			// ok, no warning{ dg-warning "" } reference not accessed
+  vtr_fn ();			// ok, no warning
 }
 
 void extern_test ()

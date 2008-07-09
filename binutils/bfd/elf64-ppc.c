@@ -11988,20 +11988,48 @@ ppc64_elf_finish_dynamic_sections (bfd *output_bfd,
 void
 ppc64_elf_post_process_headers (abfd, link_info)
      bfd * abfd;
-     struct bfd_link_info * link_info ATTRIBUTE_UNUSED;
+     struct bfd_link_info * link_info;
 {
-  Elf_Internal_Ehdr * i_ehdrp = elf_elfheader (abfd);
-  BFD_ASSERT (i_ehdrp != NULL);
+  Elf_Internal_Ehdr * out_ehdrp = elf_elfheader (abfd);
+  BFD_ASSERT (out_ehdrp != NULL);
 
   if (strcmp (bfd_get_target(abfd), "elf64-powerpc-celloslv2") == 0)
     {
-      i_ehdrp->e_ident[EI_OSABI] = ELFOSABI_CELLOSLV2;
-      i_ehdrp->e_ident[EI_ABIVERSION] = 0x0;
+      out_ehdrp->e_ident[EI_OSABI] = ELFOSABI_CELLOSLV2;
+      out_ehdrp->e_ident[EI_ABIVERSION] = 0x0;
+
+      /* begin sce local bugzilla 45657 */
+      if (link_info && link_info->relocatable)
+	{
+	  bfd_boolean keep = TRUE;
+	  /* Scan all objects that contain sections linked into the output file.
+	     If all of input objects are aplicable for the SN LD dead code stripper,
+	     the output file should also be aplicable. */
+	  asection *s;
+	  struct bfd_link_order *lo;
+	  for (s = abfd->sections; s != NULL; s = s->next)
+	    {
+	      for (lo = s->map_head.link_order; lo != NULL; lo = lo->next)
+		{
+		  if (lo->type == bfd_indirect_link_order
+		      && lo->u.indirect.section
+		      && lo->u.indirect.section->owner)
+		    {
+		      Elf_Internal_Ehdr * in_ehdrp = elf_elfheader (lo->u.indirect.section->owner);
+		      keep &= ((in_ehdrp->e_flags & EF_PPC64_REL24) == EF_PPC64_REL24);
+		      break;
+		    }
+		}
+	    }
+	  if (keep == TRUE)
+	    out_ehdrp->e_flags |= EF_PPC64_REL24;
+	}
+      /* begin sce local bugzilla 45657 */
     }
   else
     {
-      i_ehdrp->e_ident[EI_OSABI] = ELFOSABI_NONE; /* SYSV ABI */
-      i_ehdrp->e_ident[EI_ABIVERSION] = 0x0;
+      out_ehdrp->e_ident[EI_OSABI] = ELFOSABI_NONE; /* SYSV ABI */
+      out_ehdrp->e_ident[EI_ABIVERSION] = 0x0;
     }
 }
 /* end sce local */

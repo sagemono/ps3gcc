@@ -324,6 +324,9 @@ extern const struct real_format real_internal_format;
 extern REAL_VALUE_TYPE real_value_truncate (enum machine_mode,
 					    REAL_VALUE_TYPE);
 
+extern REAL_VALUE_TYPE real_value_truncate2 (enum machine_mode, REAL_VALUE_TYPE,
+					     enum machine_mode);
+
 #define REAL_VALUE_TO_INT(plow, phigh, r) \
   real_to_integer2 (plow, phigh, &(r))
 

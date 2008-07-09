@@ -3635,7 +3635,7 @@ c_parser_if_body (c_parser *parser, bool *if_p)
     c_parser_label (parser);
   *if_p = c_parser_next_token_is_keyword (parser, RID_IF);
   if (extra_warnings && c_parser_next_token_is (parser, CPP_SEMICOLON))
-    add_stmt (build (NOP_EXPR, NULL_TREE, NULL_TREE));
+    add_stmt (build_empty_stmt ());
   c_parser_statement_after_labels (parser);
   return c_end_compound_stmt (block, flag_isoc99);
 }
@@ -5365,7 +5365,8 @@ c_parser_postfix_expression_after_paren_type (c_parser *parser,
   finish_init ();
   maybe_warn_string_init (type, init);
 
-  if (pedantic && !flag_isoc99)
+  /* Don't ped warn about vector compound literals */
+  if (pedantic && !flag_isoc99 && TREE_CODE (type) != VECTOR_TYPE)
     pedwarn ("ISO C90 forbids compound literals");
   expr.value = build_compound_literal (type, init.value);
   expr.original_code = ERROR_MARK;

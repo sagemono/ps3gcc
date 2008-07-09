@@ -80,6 +80,7 @@ extern bool c_lex_return_raw_strings;
 
 struct pragma_loop_info GTY(())
 {
+  tree stmt;            /* The stmt the pragma is attached too. */
   int multiple;		/* loop iterations is a multiple of this. */
   int unroll_times;	/* -2 - not specified;  -1 - nounroll; 0 - unroll; >0 - unroll (N) */
   int peel_times;	/* values are like unroll_times */

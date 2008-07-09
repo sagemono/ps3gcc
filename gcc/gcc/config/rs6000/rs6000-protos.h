@@ -54,7 +54,7 @@ extern void rs6000_expand_vector_init (rtx, rtx);
 extern void rs6000_expand_vector_set (rtx, rtx, int);
 extern void rs6000_expand_vector_extract (rtx, rtx, int);
 /* BEGIN CELL LOCAL */
-extern void rs6000_split_stve (rtx, rtx, rtx, rtx, rtx);
+extern void rs6000_split_stve (rtx, rtx, rtx, rtx, rtx, rtx);
 extern void rs6000_split_lve (rtx, rtx, rtx, rtx);
 /* END CELL LOCAL */
 extern void build_mask64_2_operands (rtx, rtx *);

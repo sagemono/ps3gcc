@@ -142,6 +142,16 @@ Boston, MA 02110-1301, USA.  */
 
      ptr2 = &x[index];
 
+  Or
+   
+     ptr = (type1 *)&a;
+     var = *ptr;
+  
+  Will get turned into:
+     var = VIEW_CONVERT_EXPR<type1>(a);
+
+     if type1 is the same size as typeof(a).
+
 
    This will (of course) be extended as other needs arise.  */
 
@@ -569,6 +579,11 @@ forward_propagate_addr_expr (tree stmt)
      propagate the ADDR_EXPR into the use of NAME and fold the result.  */
   if (TREE_CODE (lhs) == INDIRECT_REF && TREE_OPERAND (lhs, 0) == name)
     {
+      /* Don't prop casted address express to the left hand side. */
+      if (TREE_CODE (TREE_OPERAND (stmt, 1)) == NOP_EXPR
+          || TREE_CODE (TREE_OPERAND (stmt, 1)) == CONVERT_EXPR)
+      	return false;
+
       /* This should always succeed in creating gimple, so there is
 	 no need to save enough state to undo this propagation.  */
       TREE_OPERAND (lhs, 0) = unshare_expr (TREE_OPERAND (stmt, 1));
@@ -586,7 +601,8 @@ forward_propagate_addr_expr (tree stmt)
      for example.  */
   if (TREE_CODE (lhs) == SSA_NAME && TREE_OPERAND (use_stmt, 1) == name)
     {
-      TREE_OPERAND (use_stmt, 1) = unshare_expr (TREE_OPERAND (stmt, 1));
+      tree addr_expr = TREE_OPERAND (stmt, 1);
+      TREE_OPERAND (use_stmt, 1) = unshare_expr (addr_expr);
       tidy_after_forward_propagate_addr (use_stmt);
       return true;
     }
@@ -603,13 +619,35 @@ forward_propagate_addr_expr (tree stmt)
      propagate the ADDR_EXPR into the use of NAME and fold the result.  */
   if (TREE_CODE (rhs) == INDIRECT_REF && TREE_OPERAND (rhs, 0) == name)
     {
+      tree addr_expr = TREE_OPERAND (stmt, 1);
+      if (TREE_CODE (addr_expr) == NOP_EXPR
+	  || TREE_CODE (addr_expr) == CONVERT_EXPR)
+      	{
+	  if (!POINTER_TYPE_P (TREE_TYPE (addr_expr)))
+	    return false;
+	  /* For Function types, ignore it.  */
+	  if (TREE_CODE (TREE_TYPE (TREE_TYPE (TREE_OPERAND (addr_expr, 0)))) == FUNCTION_TYPE)
+	    return false;
+	  /* Not the same size, ignore.  */
+	  if (TYPE_SIZE (TREE_TYPE (TREE_TYPE (addr_expr))) == NULL
+	      || TYPE_SIZE (TREE_TYPE (TREE_TYPE (TREE_OPERAND (addr_expr, 0)))) == NULL
+	      || !operand_equal_p (TYPE_SIZE (TREE_TYPE (TREE_TYPE (addr_expr))),
+	  			TYPE_SIZE (TREE_TYPE (TREE_TYPE (TREE_OPERAND (addr_expr,
+									       0)))), 0))
+	    return false;
+	}
       /* This should always succeed in creating gimple, so there is
          no need to save enough state to undo this propagation.  */
-      TREE_OPERAND (rhs, 0) = unshare_expr (TREE_OPERAND (stmt, 1));
+      TREE_OPERAND (rhs, 0) = unshare_expr (addr_expr);
       fold_stmt_inplace (use_stmt);
       tidy_after_forward_propagate_addr (use_stmt);
       return true;
     }
+
+  /* At this point, we cannot handle any more where we need to create VIEW_CONVERT_EXPRs. */
+  if (TREE_CODE (TREE_OPERAND (stmt, 1)) == NOP_EXPR
+      || TREE_CODE (TREE_OPERAND (stmt, 1)) == CONVERT_EXPR)
+    return false;
 
   /* The remaining cases are all for turning pointer arithmetic into
      array indexing.  They only apply when we have the address of
@@ -701,10 +739,12 @@ tree_ssa_forward_propagate_single_use_vars (void)
 	  /* If this statement sets an SSA_NAME to an address,
 	     try to propagate the address into the uses of the SSA_NAME.  */
 	  if (TREE_CODE (stmt) == MODIFY_EXPR
-	      && TREE_CODE (TREE_OPERAND (stmt, 1)) == ADDR_EXPR
 	      && TREE_CODE (TREE_OPERAND (stmt, 0)) == SSA_NAME)
 	    {
-	      if (forward_propagate_addr_expr (stmt))
+	      tree rhs = TREE_OPERAND (stmt, 1);
+	      STRIP_NOPS (rhs);
+	      if (TREE_CODE (rhs) == ADDR_EXPR
+	          && forward_propagate_addr_expr (stmt))
 		bsi_remove (&bsi);
 	      else
 		bsi_next (&bsi);

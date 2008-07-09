@@ -428,6 +428,26 @@ pp_c_specifier_qualifier_list (c_pretty_printer *pp, tree t)
       break;
 
     case VECTOR_TYPE:
+      /* For vector types, print out the type's main variant's name if it exist, it might
+         not be the same as the underlying type followed by vector.  */
+      {
+	tree node = TYPE_MAIN_VARIANT (t);
+	if (TYPE_NAME (node))
+	  {
+            if (TREE_CODE (TYPE_NAME (node)) == IDENTIFIER_NODE)
+	      {
+		pp_c_tree_decl_identifier (pp, TYPE_NAME (node));
+		break;
+	      }
+            else if (TREE_CODE (TYPE_NAME (node)) == TYPE_DECL
+		     && DECL_NAME (TYPE_NAME (node)))
+	     {
+		pp_id_expression (pp, TYPE_NAME (node));
+		break;
+	     }
+	 }
+      }
+    /* FALLTHROUGH.  */
     case COMPLEX_TYPE:
       pp_c_specifier_qualifier_list (pp, TREE_TYPE (t));
       if (code == COMPLEX_TYPE)

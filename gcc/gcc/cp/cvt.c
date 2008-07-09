@@ -871,9 +871,14 @@ convert_to_void (tree expr, const char *implicit)
 	/* Don't load the value if this is an implicit dereference, or if
 	   the type needs to be handled by ctors/dtors.  */
 	else if (is_volatile && (is_reference || TREE_ADDRESSABLE (type)))
-	  warning (0, "object of type %qT will not be accessed in %s",
-		   TREE_TYPE (TREE_OPERAND (expr, 0)),
-		   implicit ? implicit : "void context");
+	  {
+	    tree inner = TREE_OPERAND (expr, 0);
+	    /* Don't warn if the reference is comming from a function call.  */
+	    if (TREE_CODE (inner) != CALL_EXPR)
+	      warning (0, "object of type %qT will not be accessed in %s",
+		       TREE_TYPE (TREE_OPERAND (expr, 0)),
+		       implicit ? implicit : "void context");
+	  }
 	if (is_reference || !is_volatile || !is_complete || TREE_ADDRESSABLE (type))
 	  expr = TREE_OPERAND (expr, 0);
 	break;

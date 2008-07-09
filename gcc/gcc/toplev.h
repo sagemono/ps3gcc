@@ -118,6 +118,8 @@ extern int target_flags_explicit;
 extern bool user_defined_section_attribute;
 
 /* See toplev.c.  */
+#if 0
+/* this varilables moved to struct options_satck */
 extern int flag_loop_optimize;
 extern int flag_crossjumping;
 extern int flag_if_conversion;
@@ -132,6 +134,7 @@ extern int flag_unroll_all_loops;
 extern int flag_unswitch_loops;
 extern int flag_cprop_registers;
 extern int time_report;
+#endif
 
 /* Things to do with target switches.  */
 extern void print_version (FILE *, const char *);

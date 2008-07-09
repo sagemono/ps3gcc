@@ -15,7 +15,7 @@
 ƒƒ“ƒg‚ğQÆ‚µ‚Ä‚­‚¾‚³‚¢B
 —á:
     mkdir work/src
-    unzip toolchain-src-2.2.0-GCC411.zip -d work/src
+    unzip toolchain-src-2.4.0-GCC411.zip -d work/src
     mkdir work/build
     cd work/build
     ../src/build.sh

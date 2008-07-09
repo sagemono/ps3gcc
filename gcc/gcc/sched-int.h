@@ -234,9 +234,12 @@ struct haifa_insn_data
   /* CELL LOCAL */
   unsigned int neednop8 : 1;
   unsigned int neednop10 : 1;
+
+  unsigned int sched_early : 1;
 };
 
 extern struct haifa_insn_data *h_i_d;
+extern int sched_old_max_uid;
 
 /* Accessor macros for h_i_d.  There are more in haifa-sched.c and
    sched-rgn.c.  */
@@ -251,6 +254,7 @@ extern struct haifa_insn_data *h_i_d;
 /* CELL LOCAL */
 #define INSN_NEEDNOP8(INSN)	(h_i_d[INSN_UID (INSN)].neednop8)
 #define INSN_NEEDNOP10(INSN)    (h_i_d[INSN_UID (INSN)].neednop10)
+#define INSN_SCHED_EARLY(INSN)    (h_i_d[INSN_UID (INSN)].sched_early)
 
 extern FILE *sched_dump;
 extern int sched_verbose;

@@ -627,6 +627,13 @@ rtl_merge_blocks (basic_block a, basic_block b)
       set_block_for_insn (b_end, a);
 
       a_end = b_end;
+
+      /* Pragmas are attached to stmt_list.  Perhaps we should search a
+       * and b for pragmas and keep the one that has it.  For now, we
+       * only know about loop pragma which is attached to loop exit,
+       * which will always be b. */
+      if (b->stmt_list)
+	a->stmt_list = b->stmt_list;
     }
 
   BB_END (a) = a_end;

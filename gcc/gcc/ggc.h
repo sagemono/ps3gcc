@@ -311,10 +311,6 @@ extern void *ggc_alloc_zone_stat (size_t, struct alloc_zone * MEM_STAT_DECL);
 # define ggc_alloc_zone(s, z) ggc_alloc (s)
 # define ggc_alloc_zone_pass_stat(s, z) ggc_alloc_stat (s PASS_MEM_STAT)
 
-#if defined(_WIN32) && ! defined(__CYGWIN__) && ! defined (_UWIN)
-#define getpagesize() 4096
-#endif
-
 #endif
 
 #endif

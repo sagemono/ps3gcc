@@ -315,5 +315,6 @@ struct powerpc_macro
 
 extern const struct powerpc_macro powerpc_macros[];
 extern const int powerpc_num_macros;
+extern int bfd_opcode_ppc_direct_call_or_jump_p (const struct powerpc_opcode *op);
 
 #endif /* PPC_H */

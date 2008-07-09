@@ -207,7 +207,8 @@ unroll_and_peel_loops (struct loops *loops, int flags)
 	      gcc_unreachable ();
 	    case LPT_PEEL_SIMPLE:
 	      if (pli->info)
-		inform ("Loop peeled %d times", loop->lpt_decision.times);
+		inform ("%HLoop peeled %d times", EXPR_LOCUS (pli->stmt),
+			loop->lpt_decision.times);
 	      if (pli->min > 0)
 		pli->min -= loop->lpt_decision.times;
 	      if (pli->multiple > 0 && loop->lpt_decision.times % pli->multiple != 0)
@@ -217,7 +218,8 @@ unroll_and_peel_loops (struct loops *loops, int flags)
 	    case LPT_UNROLL_RUNTIME:
 	    case LPT_UNROLL_STUPID:
 	      if (pli->info)
-		inform ("Loop unrolled %d times", loop->lpt_decision.times + 1);
+		inform ("%HLoop unrolled %d times", EXPR_LOCUS (pli->stmt),
+			loop->lpt_decision.times + 1);
 	      if (pli->min > 0)
 		pli->min /= loop->lpt_decision.times + 1;
 	      if (pli->multiple > 0)
@@ -2379,8 +2381,11 @@ pragma_loop_find (struct loop *loop)
     curr = edges[0]->src->stmt_list->stmt_list.head;
     
   while (curr && curr->stmt) {
-    if (TREE_PRAGMA_LOOP_INFO (curr->stmt))
-      return TREE_PRAGMA_LOOP_INFO (curr->stmt);
+    if (EXPR_P (curr->stmt) && TREE_PRAGMA_LOOP_INFO (curr->stmt))
+      {
+	TREE_PRAGMA_LOOP_INFO (curr->stmt)->stmt = curr->stmt;
+	return TREE_PRAGMA_LOOP_INFO (curr->stmt);
+      }
     curr = curr->next;
   }
   return 0;

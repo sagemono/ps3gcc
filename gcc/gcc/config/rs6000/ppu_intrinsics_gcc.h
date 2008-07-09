@@ -375,7 +375,7 @@ typedef int __V4SI __attribute__((vector_size(16)));
   ({unsigned long long __macro_result;				\
     typedef  struct {char a[8];} doublewordsize;	\
     doublewordsize *ptrp = (doublewordsize*)(void*)(base);	\
-  __asm__ ("stdcx. %2,%y1\n"				\
+  __asm__ volatile ("stdcx. %2,%y1\n"				\
 	   "\tmfocrf %0,0x80"				\
 	   : "=r" (__macro_result),				\
 	     "=Z" (*ptrp)				\

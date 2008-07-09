@@ -1,4 +1,4 @@
-/* { dg-do compile { target powerpc*-*-linux* ppu-*-lv2 } } */
+/* { dg-do compile } */
 /* { dg-require-effective-target lp64 } */
 /* { dg-options "-maltivec" } */
 

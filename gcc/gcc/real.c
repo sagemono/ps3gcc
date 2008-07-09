@@ -2574,6 +2574,15 @@ real_value_truncate (enum machine_mode mode, REAL_VALUE_TYPE a)
   return r;
 }
 
+REAL_VALUE_TYPE
+real_value_truncate2 (enum machine_mode mode, REAL_VALUE_TYPE a,
+		      enum machine_mode from_mode)
+{
+  REAL_VALUE_TYPE r;
+  real_convert2 (&r, mode, &a, from_mode);
+  return r;
+}
+
 /* Return true if truncating to MODE is exact.  */
 
 bool

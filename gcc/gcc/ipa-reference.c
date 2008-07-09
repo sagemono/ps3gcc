@@ -974,8 +974,8 @@ static_execute (void)
 	      fprintf (dump_file, "read-only var %s\n", 
 		       get_static_name (index));
 	  }
-	if (DECL_INITIAL (var)
-	    && is_gimple_min_invariant (DECL_INITIAL (var)))
+	if (!DECL_INITIAL (var)
+	    || is_gimple_min_invariant (DECL_INITIAL (var)))
 	  {
  	    bitmap_set_bit (module_statics_const, index);
 	    if (dump_file)

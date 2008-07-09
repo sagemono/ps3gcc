@@ -1870,7 +1870,8 @@ estimate_num_insns_1 (tree *tp, int *walk_subtrees, void *data)
     case FLOOR_MOD_EXPR:
     case ROUND_MOD_EXPR:
     case RDIV_EXPR:
-      *count += 10;
+      /* If we are optimizing for size, reduce the case to 1, the same as a normal instruction cost.   */
+      *count += optimize_size ? 1 : 10;
       break;
     case CALL_EXPR:
       {

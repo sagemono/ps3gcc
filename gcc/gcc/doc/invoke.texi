@@ -234,6 +234,7 @@ Objective-C and Objective-C++ Dialects}.
 -Wmain  -Wmissing-braces  -Wmissing-field-initializers @gol
 -Wmissing-format-attribute  -Wmissing-include-dirs @gol
 -Wmissing-noreturn @gol
+-Wframe-larger-than=@var{len} @gol
 -Wno-multichar  -Wnonnull  -Wpacked  -Wpadded @gol
 -Wparentheses  -Wpointer-arith  -Wno-pointer-to-int-cast @gol
 -Wredundant-decls @gol
@@ -3033,6 +3034,17 @@ global variable or whenever a built-in function is shadowed.
 @item -Wlarger-than-@var{len}
 @opindex Wlarger-than
 Warn whenever an object of larger than @var{len} bytes is defined.
+
+@item -Wframe-larger-than=@var{len}
+@opindex Wframe-larger-than
+Warn if the size of a function frame is larger than @var{len} bytes.
+The computation done to determine the stack frame size is approximate
+and not conservative.
+The actual requirements may be somewhat greater than @var{len}
+even if you do not get a warning.  In addition, any space allocated
+via @code{alloca}, variable-length arrays, or related constructs
+is not included by the compiler when determining
+whether or not to issue a warning.
 
 @item -Wunsafe-loop-optimizations
 @opindex Wunsafe-loop-optimizations
@@ -6126,6 +6138,12 @@ The @option{reorder-block-duplicate-feedback} is used only when profile
 feedback is available and may be set to higher values than
 @option{reorder-block-duplicate} since information about the hot spots is more
 accurate.
+
+@item max-sched-ready-insns
+The maximum number of instructions ready to be issued the scheduler should
+consider at any given time during the first scheduling pass.  Increasing
+values mean more thorough searches, making the compilation time increase
+with probably little benefit.  The default value is 100.
 
 @item max-sched-region-blocks
 The maximum number of blocks in a region to be considered for

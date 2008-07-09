@@ -66,3 +66,11 @@ Invoke SN linker instead of GNU binutils LD. This is default.
 mforce-prx-fixup
 Target Rerpot RejectNegative
 Invoke ppu-lv2-fixup instead of oneramp linking built in SN LD. This is for debug perpose.
+
+mppuguid
+Target Report RejectNegative
+Embed PPU GUID after linking.
+
+mno-ppuguid
+Target Report RejectNegative
+Does not embed PPU GUID after linking.

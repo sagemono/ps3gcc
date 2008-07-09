@@ -195,7 +195,7 @@ gcov_exit (void)
     }
 
 #if defined(__PPU__) && defined(__CELLOS_LV2__)
-  gcov_prefix = "/host_root";
+  gcov_prefix = "/host_root/";
   prefix_length = strlen (gcov_prefix);
 #else
 

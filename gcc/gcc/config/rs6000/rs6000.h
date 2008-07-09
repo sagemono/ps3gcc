@@ -1489,6 +1489,8 @@ typedef struct rs6000_args
   int sysv_gregno;		/* next available GP register */
   int intoffset;		/* running offset in struct (darwin64) */
   int use_stack;		/* any part of struct on stack (darwin64) */
+  int floats_in_gpr;		/* count of SFmode floats taking up
+				   GPR space (darwin64) */
   int named;			/* false for varargs params */
   int greg_unused_mask;		/* 1<<n means reg GP_ARG_MIN_REG+n is unused */
 } CUMULATIVE_ARGS;
@@ -1903,6 +1905,10 @@ do {								\
    in one reasonably fast instruction.  */
 #define MOVE_MAX (! TARGET_POWERPC64 ? 4 : 8)
 #define MAX_MOVE_MAX 8
+
+/* On average, we can do a 5 pieces move faster and smaller than doing a block
+   move for the PowerPC even if it is aligned (LHS).  */
+#define MOVE_RATIO 5
 
 /* Nonzero if access to memory by bytes is no faster than for words.
    Also nonzero if doing byte operations (specifically shifts) in registers
@@ -2342,9 +2348,9 @@ extern char rs6000_reg_names[][8];	/* register names (0 vs. %r0).  */
 /* #define  MACHINE_no_sched_speculative_load */
 
 /* General flags.  */
-extern int flag_pic;
+/* extern int flag_pic; */
 extern int optimize;
-extern int flag_expensive_optimizations;
+/*extern int flag_expensive_optimizations; */
 extern int frame_pointer_needed;
 
 enum rs6000_builtins

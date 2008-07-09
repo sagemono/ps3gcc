@@ -7079,6 +7079,14 @@ declspecs_add_type (struct c_declspecs *specs, struct c_typespec spec)
 			     "declaration specifiers");
 		      break;
 		    }
+                  else if (specs->vecreg_p
+                           && !build_vecreg_type (long_long_integer_type_node))
+                    {
+                      error ("both %<long long%> and %<vecreg%> in "
+                             "declaration specifiers");
+                      break;
+                    }
+
 		  if (pedantic && !flag_isoc99 && !in_system_header
 		      && warn_long_long)
 		    pedwarn ("ISO C90 does not support %<long long%>");
@@ -7193,6 +7201,14 @@ declspecs_add_type (struct c_declspecs *specs, struct c_typespec spec)
 	      else if (specs->complex_p)
 		error ("both %<complex%> and %<vecreg%> in "
 		       "declaration specifiers");
+	      else if (specs->long_long_p
+		       && !build_vecreg_type (long_long_integer_type_node))
+		error ("both %<long long%> and %<vecreg%> in "
+		       "declaration specifiers");
+	      else if (specs->typespec_word == cts_double
+		       && !build_vecreg_type (double_type_node))
+		error ("both %<double%> and %<vecreg%> in "
+		       "declaration specifiers");
 	      else
 		specs->vecreg_p = true;
 	      break;
@@ -7233,7 +7249,15 @@ declspecs_add_type (struct c_declspecs *specs, struct c_typespec spec)
 		error ("both %<complex%> and %<void%> in "
 		       "declaration specifiers");
 	      else
-		specs->typespec_word = cts_void;
+		{
+		  if (specs->vecreg_p)
+		    {
+		      error ("both %<vecreg%> and %<void%> in "
+			     "declaration specifiers");
+		      specs->vecreg_p = false;
+		    }
+		  specs->typespec_word = cts_void;
+		}
 	      return specs;
 	    case RID_BOOL:
 	      if (specs->long_p)
@@ -7297,7 +7321,12 @@ declspecs_add_type (struct c_declspecs *specs, struct c_typespec spec)
 		error ("both %<unsigned%> and %<double%> in "
 		       "declaration specifiers");
 	      else
-		specs->typespec_word = cts_double;
+		{
+		  if (specs->vecreg_p && !build_vecreg_type (double_type_node))
+		    error ("both %<vecreg%> and %<double%> in "
+			   "declaration specifiers");
+		  specs->typespec_word = cts_double;
+		}
 	      return specs;
 	    default:
 	      /* ObjC reserved word "id", handled below.  */
@@ -7453,6 +7482,8 @@ declspecs_add_attrs (struct c_declspecs *specs, tree attrs)
 struct c_declspecs *
 finish_declspecs (struct c_declspecs *specs)
 {
+  tree type;
+
   /* If a type was specified as a whole, we have no modifiers and are
      done.  */
   if (specs->type != NULL_TREE)
@@ -7583,8 +7614,8 @@ finish_declspecs (struct c_declspecs *specs)
       gcc_unreachable ();
     }
   /* BEGIN CELL VECREG */
-  if (specs->vecreg_p)
-    specs->type = build_vecreg_type (specs->type);
+  if (specs->vecreg_p && (type = build_vecreg_type (specs->type)))
+    specs->type = type;
   /* END CELL VECREG */
 
   return specs;
