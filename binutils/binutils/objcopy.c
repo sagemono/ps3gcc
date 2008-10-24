@@ -216,6 +216,12 @@ static char *prefix_symbols_string = 0;
 static char *prefix_sections_string = 0;
 static char *prefix_alloc_sections_string = 0;
 
+/* begin sce local, bugzilla 52093 */
+/* If this is TRUE, we do not mark the output object
+   as dead-stripping compatible */
+static bfd_boolean no_ef_ppc64_rel24 = FALSE;
+/* end sce local */
+
 /* 150 isn't special; it's just an arbitrary non-ASCII char value.  */
 enum command_line_switch
   {
@@ -263,7 +269,10 @@ enum command_line_switch
     OPTION_PURE,
     OPTION_IMPURE,
     OPTION_SET_SECTION_ALIGN,
-    OPTION_SET_SECTION_PAD
+    OPTION_SET_SECTION_PAD,
+    /* begin sce local, bugzilla 52093 */
+    OPTION_NO_EF_PPC64_REL24
+    /* end sce local */
   };
 
 /* Options to handle if running as "strip".  */
@@ -375,6 +384,9 @@ static struct option copy_options[] =
   {"weaken-symbols", required_argument, 0, OPTION_WEAKEN_SYMBOLS},
   {"wildcard", no_argument, 0, 'w'},
   {"writable-text", no_argument, 0, OPTION_WRITABLE_TEXT},
+  /* begin sce local, bugzilla 52093 */
+  {"no-ef-ppc64-rel24", no_argument, 0, OPTION_NO_EF_PPC64_REL24},
+  /* end sce local */
   {0, no_argument, 0, 0}
 };
 
@@ -1923,6 +1935,20 @@ copy_file (const char *input_filename, const char *output_filename,
       if (obfd == NULL)
 	RETURN_NONFATAL (output_filename);
 
+      /* begin sce local, bugzilla 52093 */
+      /* EF_PPC64_REL24 bit when ppu-lv2-objcopy converts SPU ELF into PPU obj */
+      if (!no_ef_ppc64_rel24 && input_target && output_target
+          && strncmp (input_target, "binary\0", 7) == 0
+          && strncmp (output_target, "elf64-powerpc-celloslv2\0", 24) == 0)
+	{
+	  /* In copy_object() below, ppc64_elf_post_process_headers() is called.
+	     When -2 is specified as usrdata, EF_PPC64_REL24 bit is set by
+	     the ppc64_elf_post_process_headers(). */
+	  /* FIXME: I want more elegant hack! */
+	  bfd_usrdata(obfd) = (void *)-2;
+	}
+      /* end sce local, bugzilla 52093 */
+
       if (! copy_object (ibfd, obfd))
 	status = 1;
 
@@ -3203,6 +3229,12 @@ copy_main (int argc, char *argv[])
 	  bfd_flags_to_clear |= D_PAGED;
 	  bfd_flags_to_set &= ~D_PAGED;
 	  break;
+
+    /* begin sce local, bugzilla 52093 */
+	case OPTION_NO_EF_PPC64_REL24:
+	  no_ef_ppc64_rel24 = TRUE;
+	  break;
+    /* end sce local */
 
 	case 0:
 	  /* We've been given a long option.  */

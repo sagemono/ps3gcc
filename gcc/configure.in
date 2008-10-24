@@ -709,13 +709,14 @@ case "${target}" in
   powerpc-*-eabi* | powerpcle-*-eabi* | powerpc-*-rtems* )
     ;;
   ppu-*-lv2)
+    target_configdirs="$target_configdirs target-libsupcxx"
     skipdirs="target-libiberty target-libstdc++-v3"
-    noconfigdirs="$noconfigdirs target-libssp"
     ;;
   ppu-*-*)
     skipdirs="target-libiberty target-libstdc++-v3"
     ;;
   spu-*-lv2)
+    target_configdirs="$target_configdirs target-libsupcxx"
     skipdirs="target-libiberty target-libstdc++-v3"
     noconfigdirs="$noconfigdirs target-libssp"
     ;;
@@ -2055,6 +2056,12 @@ CFLAGS_FOR_BUILD=${CFLAGS_FOR_BUILD-${CFLAGS}}
 if test "${build}" = "${host}" && test -d ${srcdir}/gcc; then
   # Search for pre-installed headers if nothing else fits.
   FLAGS_FOR_TARGET=$FLAGS_FOR_TARGET' -B$(build_tooldir)/bin/ -B$(build_tooldir)/lib/ -isystem $(build_tooldir)/include -isystem $(build_tooldir)/sys-include'
+  # for LV2, add the libsupcxx directory
+  case "${target}" in
+  *-*-lv2)
+    FLAGS_FOR_TARGET=$FLAGS_FOR_TARGET' -B$$r/$(TARGET_SUBDIR)/ -B$$r/$(TARGET_SUBDIR)/libsupcxx'
+    ;;
+  esac
 fi
 
 if test "x${use_gnu_ld}" = x &&
@@ -2244,12 +2251,20 @@ RAW_CXX_FOR_TARGET="$CXX_FOR_TARGET"
 GCC_TARGET_TOOL(ar, AR_FOR_TARGET, AR, [binutils/ar])
 GCC_TARGET_TOOL(as, AS_FOR_TARGET, AS, [gas/as-new])
 GCC_TARGET_TOOL(cc, CC_FOR_TARGET, CC, [gcc/xgcc -B$$r/$(HOST_SUBDIR)/gcc/])
-GCC_TARGET_TOOL(c++, CXX_FOR_TARGET, CXX,
-		[gcc/g++ -B$$r/$(HOST_SUBDIR)/gcc/ -nostdinc++ `test ! -f $$r/$(TARGET_SUBDIR)/libstdc++-v3/scripts/testsuite_flags || $(SHELL) $$r/$(TARGET_SUBDIR)/libstdc++-v3/scripts/testsuite_flags --build-includes` -L$$r/$(TARGET_SUBDIR)/libstdc++-v3/src -L$$r/$(TARGET_SUBDIR)/libstdc++-v3/src/.libs],
-		c++)
-GCC_TARGET_TOOL(c++ for libstdc++, RAW_CXX_FOR_TARGET, CXX,
-		[gcc/xgcc -shared-libgcc -B$$r/$(HOST_SUBDIR)/gcc -nostdinc++ -L$$r/$(TARGET_SUBDIR)/libstdc++-v3/src -L$$r/$(TARGET_SUBDIR)/libstdc++-v3/src/.libs],
-		c++)
+
+case "${target}" in
+  ppu-*-lv2 | spu-*-lv2)
+    ;;
+  *)
+    GCC_TARGET_TOOL(c++, CXX_FOR_TARGET, CXX,
+		    [gcc/g++ -B$$r/$(HOST_SUBDIR)/gcc/ -nostdinc++ `test ! -f $$r/$(TARGET_SUBDIR)/libstdc++-v3/scripts/testsuite_flags || $(SHELL) $$r/$(TARGET_SUBDIR)/libstdc++-v3/scripts/testsuite_flags --build-includes` -L$$r/$(TARGET_SUBDIR)/libstdc++-v3/src -L$$r/$(TARGET_SUBDIR)/libstdc++-v3/src/.libs],
+		    c++)
+    GCC_TARGET_TOOL(c++ for libstdc++, RAW_CXX_FOR_TARGET, CXX,
+		    [gcc/xgcc -shared-libgcc -B$$r/$(HOST_SUBDIR)/gcc -nostdinc++ -L$$r/$(TARGET_SUBDIR)/libstdc++-v3/src -L$$r/$(TARGET_SUBDIR)/libstdc++-v3/src/.libs],
+		    c++)
+    ;;
+esac
+
 GCC_TARGET_TOOL(dlltool, DLLTOOL_FOR_TARGET, DLLTOOL, [binutils/dlltool])
 GCC_TARGET_TOOL(gcc, GCC_FOR_TARGET, , [gcc/xgcc -B$$r/$(HOST_SUBDIR)/gcc/])
 GCC_TARGET_TOOL(gcj, GCJ_FOR_TARGET, GCJ,

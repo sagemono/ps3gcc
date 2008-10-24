@@ -13,7 +13,7 @@ install directory and the rebuild working directory by setting
 environment variables.  See comments in script files for details.
 Example:
     mkdir work/src
-    unzip toolchain-src-2.4.0-GCC411.zip -d work/src
+    unzip toolchain-src-2.5.0-GCC411.zip -d work/src
     mkdir work/build
     cd work/build
     ../src/build.sh
@@ -47,7 +47,6 @@ diff-from-gcc           differences from GCC 4.1.1 and Binutils 2.17
                         Only the changes made by our company are included.
 binutils/               GNU development tools source file
 gcc/                    GNU Compiler Collection (GCC) source file
-libsupcxx/              new abi support
 mingw/                  place for downloaded MinGW runtime
 
 ----------------------------------------------------------------------

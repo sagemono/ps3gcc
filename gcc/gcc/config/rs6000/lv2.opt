@@ -67,10 +67,37 @@ mforce-prx-fixup
 Target Rerpot RejectNegative
 Invoke ppu-lv2-fixup instead of oneramp linking built in SN LD. This is for debug perpose.
 
+; Bz50260
 mppuguid
-Target Report RejectNegative
+Target Report
 Embed PPU GUID after linking.
 
-mno-ppuguid
+; Bz51659
+;  - Supress NOP to restore TOC
+mno-nop-after-bl
+Target Report RejectNegative Undocumented Var(lv2_no_nop_after_bl) Init (0)
+Does not generate nop after bl. This option should be used only for a single TOC executable.
+
+; Bz51659
+;  - Supress STD/LD to save/restore R2 (TOC base)
+mno-save-restore-tocbase
+Target Report RejectNegative Undocumented Var(lv2_no_save_restore_tocbase) Init (0)
+Does not save/restore TOC base. This option should be used only for a single TOC executable.
+
+; Bz51659
+;  - Enable the following options:
+;      -mno-nop-after-bl
+;      -mno-save-restore-tocbase
+;      -falign-functions=1
+;      -falign-jumps=1
+;      -falign-labels=1
+;      -falign-loops=1
+mcellos-kernel
+Target Report RejectNegative Undocumented
+For Cell OS kernel
+
+; Bz50853
+;  - Link libcs
+mfast-libc
 Target Report RejectNegative
-Does not embed PPU GUID after linking.
+Link with libcs.a instead of libc.a from the point of view of performance.

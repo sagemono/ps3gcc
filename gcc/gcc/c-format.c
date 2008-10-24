@@ -283,6 +283,15 @@ typedef struct format_wanted_type
 
 static const format_length_info printf_length_specs[] =
 {
+  { "hhv", FMT_LEN_vhh, STD_EXT, NULL, 0, 0 },
+  { "hv", FMT_LEN_vh, STD_EXT, NULL, 0, 0 },
+  { "lv", FMT_LEN_vl, STD_EXT, NULL, 0, 0 },
+  { "llv", FMT_LEN_vll, STD_EXT, NULL, 0, 0 },
+  { "Lv", FMT_LEN_vL, STD_EXT, NULL, 0, 0 },
+  { "vh", FMT_LEN_vh, STD_EXT, "vhh", FMT_LEN_vhh, STD_EXT },
+  { "vl", FMT_LEN_vl, STD_EXT, "vll", FMT_LEN_vll, STD_EXT },
+  { "vL", FMT_LEN_vL, STD_EXT, NULL, 0, 0 },
+  { "v", FMT_LEN_v, STD_EXT, NULL, 0, 0 },
   { "h", FMT_LEN_h, STD_C89, "hh", FMT_LEN_hh, STD_C99 },
   { "l", FMT_LEN_l, STD_C89, "ll", FMT_LEN_ll, STD_C9L },
   { "q", FMT_LEN_ll, STD_EXT, NULL, 0, 0 },
@@ -356,6 +365,10 @@ static const format_flag_spec printf_flag_specs[] =
   { 'w',  0, 0, N_("field width"),     N_("field width in printf format"),     STD_C89 },
   { 'p',  0, 0, N_("precision"),       N_("precision in printf format"),       STD_C89 },
   { 'L',  0, 0, N_("length modifier"), N_("length modifier in printf format"), STD_C89 },
+  { ',',  0, 0, N_("',' flag"),        N_("the ',' printf flag"),              STD_EXT },
+  { ':',  0, 0, N_("':' flag"),        N_("the ':' printf flag"),              STD_EXT },
+  { ';',  0, 0, N_("';' flag"),        N_("the ';' printf flag"),              STD_EXT },
+  { '_',  0, 0, N_("'_' flag"),        N_("the '_' printf flag"),              STD_EXT },
   { 0, 0, 0, NULL, NULL, 0 }
 };
 
@@ -495,34 +508,34 @@ static const format_flag_pair strfmon_flag_pairs[] =
 static const format_char_info print_char_table[] =
 {
   /* C89 conversion specifiers.  */
-  { "di",  0, STD_C89, { T89_I,   T99_SC,  T89_S,   T89_L,   T9L_LL,  TEX_LL,  T99_SST, T99_PD,  T99_IM  }, "-wp0 +'I",  "i",  NULL },
-  { "oxX", 0, STD_C89, { T89_UI,  T99_UC,  T89_US,  T89_UL,  T9L_ULL, TEX_ULL, T99_ST,  T99_UPD, T99_UIM }, "-wp0#",     "i",  NULL },
-  { "u",   0, STD_C89, { T89_UI,  T99_UC,  T89_US,  T89_UL,  T9L_ULL, TEX_ULL, T99_ST,  T99_UPD, T99_UIM }, "-wp0'I",    "i",  NULL },
-  { "fgG", 0, STD_C89, { T89_D,   BADLEN,  BADLEN,  T99_D,   BADLEN,  T89_LD,  BADLEN,  BADLEN,  BADLEN  }, "-wp0 +#'I", "",   NULL },
-  { "eE",  0, STD_C89, { T89_D,   BADLEN,  BADLEN,  T99_D,   BADLEN,  T89_LD,  BADLEN,  BADLEN,  BADLEN  }, "-wp0 +#I",  "",   NULL },
-  { "c",   0, STD_C89, { T89_I,   BADLEN,  BADLEN,  T94_WI,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "-w",        "",   NULL },
-  { "s",   1, STD_C89, { T89_C,   BADLEN,  BADLEN,  T94_W,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "-wp",       "cR", NULL },
-  { "p",   1, STD_C89, { T89_V,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "-w",        "c",  NULL },
-  { "n",   1, STD_C89, { T89_I,   T99_SC,  T89_S,   T89_L,   T9L_LL,  BADLEN,  T99_SST, T99_PD,  T99_IM  }, "",          "W",  NULL },
+  { "di",  0, STD_C89, { T89_I,   T99_SC,  T89_S,   T89_L,   T9L_LL,  TEX_LL,  T99_SST, T99_PD,  T99_IM, VECLEN_S }, "-wp0 +'I,:;_",  "i",  NULL },
+  { "oxX", 0, STD_C89, { T89_UI,  T99_UC,  T89_US,  T89_UL,  T9L_ULL, TEX_ULL, T99_ST,  T99_UPD, T99_UIM, VECLEN_U }, "-wp0#,:;_",     "i",  NULL },
+  { "u",   0, STD_C89, { T89_UI,  T99_UC,  T89_US,  T89_UL,  T9L_ULL, TEX_ULL, T99_ST,  T99_UPD, T99_UIM, VECLEN_U }, "-wp0'I,:;_",    "i",  NULL },
+  { "fgG", 0, STD_C89, { T89_D,   BADLEN,  BADLEN,  T99_D,   BADLEN,  T89_LD,  BADLEN,  BADLEN,  BADLEN, VECLEN_F  }, "-wp0 +#'I,:;_", "",   NULL },
+  { "eE",  0, STD_C89, { T89_D,   BADLEN,  BADLEN,  T99_D,   BADLEN,  T89_LD,  BADLEN,  BADLEN,  BADLEN, VECLEN_F  }, "-wp0 +#I,:;_",  "",   NULL },
+  { "c",   0, STD_C89, { T89_I,   BADLEN,  BADLEN,  T94_WI,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN, VECLEN_C  }, "-w,:;_",        "",   NULL },
+  { "s",   1, STD_C89, { T89_C,   BADLEN,  BADLEN,  T94_W,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "-wp",       "cR", NULL },
+  { "p",   1, STD_C89, { T89_V,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "-w",        "c",  NULL },
+  { "n",   1, STD_C89, { T89_I,   T99_SC,  T89_S,   T89_L,   T9L_LL,  BADLEN,  T99_SST, T99_PD,  T99_IM, NOVECLEN  }, "",          "W",  NULL },
   /* C99 conversion specifiers.  */
-  { "F",   0, STD_C99, { T99_D,   BADLEN,  BADLEN,  T99_D,   BADLEN,  T99_LD,  BADLEN,  BADLEN,  BADLEN  }, "-wp0 +#'I", "",   NULL },
-  { "aA",  0, STD_C99, { T99_D,   BADLEN,  BADLEN,  T99_D,   BADLEN,  T99_LD,  BADLEN,  BADLEN,  BADLEN  }, "-wp0 +#",   "",   NULL },
+  { "F",   0, STD_C99, { T99_D,   BADLEN,  BADLEN,  T99_D,   BADLEN,  T99_LD,  BADLEN,  BADLEN,  BADLEN, VECLEN_F  }, "-wp0 +#'I,:;_", "",   NULL },
+  { "aA",  0, STD_C99, { T99_D,   BADLEN,  BADLEN,  T99_D,   BADLEN,  T99_LD,  BADLEN,  BADLEN,  BADLEN, VECLEN_F  }, "-wp0 +#,:;_",   "",   NULL },
   /* X/Open conversion specifiers.  */
-  { "C",   0, STD_EXT, { TEX_WI,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "-w",        "",   NULL },
-  { "S",   1, STD_EXT, { TEX_W,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "-wp",       "R",  NULL },
+  { "C",   0, STD_EXT, { TEX_WI,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "-w",        "",   NULL },
+  { "S",   1, STD_EXT, { TEX_W,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "-wp",       "R",  NULL },
   /* GNU conversion specifiers.  */
-  { "m",   0, STD_EXT, { T89_V,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "-wp",       "",   NULL },
+  { "m",   0, STD_EXT, { T89_V,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "-wp",       "",   NULL },
   { NULL,  0, 0, NOLENGTHS, NULL, NULL, NULL }
 };
 
 static const format_char_info asm_fprintf_char_table[] =
 {
   /* C89 conversion specifiers.  */
-  { "di",  0, STD_C89, { T89_I,   BADLEN,  BADLEN,  T89_L,   T9L_LL,  BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "-wp0 +",  "i", NULL },
-  { "oxX", 0, STD_C89, { T89_UI,  BADLEN,  BADLEN,  T89_UL,  T9L_ULL, BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "-wp0#",   "i", NULL },
-  { "u",   0, STD_C89, { T89_UI,  BADLEN,  BADLEN,  T89_UL,  T9L_ULL, BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "-wp0",    "i", NULL },
-  { "c",   0, STD_C89, { T89_I,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "-w",       "", NULL },
-  { "s",   1, STD_C89, { T89_C,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "-wp",    "cR", NULL },
+  { "di",  0, STD_C89, { T89_I,   BADLEN,  BADLEN,  T89_L,   T9L_LL,  BADLEN,  BADLEN,  BADLEN,  BADLEN, VECLEN_S  }, "-wp0 +",  "i", NULL },
+  { "oxX", 0, STD_C89, { T89_UI,  BADLEN,  BADLEN,  T89_UL,  T9L_ULL, BADLEN,  BADLEN,  BADLEN,  BADLEN, VECLEN_U  }, "-wp0#",   "i", NULL },
+  { "u",   0, STD_C89, { T89_UI,  BADLEN,  BADLEN,  T89_UL,  T9L_ULL, BADLEN,  BADLEN,  BADLEN,  BADLEN, VECLEN_U  }, "-wp0",    "i", NULL },
+  { "c",   0, STD_C89, { T89_I,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN, VECLEN_F  }, "-w",       "", NULL },
+  { "s",   1, STD_C89, { T89_C,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "-wp",    "cR", NULL },
 
   /* asm_fprintf conversion specifiers.  */
   { "O",   0, STD_C89, NOARGUMENTS, "",      "",   NULL },
@@ -530,7 +543,7 @@ static const format_char_info asm_fprintf_char_table[] =
   { "I",   0, STD_C89, NOARGUMENTS, "",      "",   NULL },
   { "L",   0, STD_C89, NOARGUMENTS, "",      "",   NULL },
   { "U",   0, STD_C89, NOARGUMENTS, "",      "",   NULL },
-  { "r",   0, STD_C89, { T89_I,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "",  "", NULL },
+  { "r",   0, STD_C89, { T89_I,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "",  "", NULL },
   { "@",   0, STD_C89, NOARGUMENTS, "",      "",   NULL },
   { NULL,  0, 0, NOLENGTHS, NULL, NULL, NULL }
 };
@@ -538,20 +551,20 @@ static const format_char_info asm_fprintf_char_table[] =
 static const format_char_info gcc_diag_char_table[] =
 {
   /* C89 conversion specifiers.  */
-  { "di",  0, STD_C89, { T89_I,   BADLEN,  BADLEN,  T89_L,   T9L_LL,  BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "q",  "",   NULL },
-  { "ox",  0, STD_C89, { T89_UI,  BADLEN,  BADLEN,  T89_UL,  T9L_ULL, BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "q",  "",   NULL },
-  { "u",   0, STD_C89, { T89_UI,  BADLEN,  BADLEN,  T89_UL,  T9L_ULL, BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "q",  "",   NULL },
-  { "c",   0, STD_C89, { T89_I,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "q",  "",   NULL },
-  { "s",   1, STD_C89, { T89_C,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "pq", "cR", NULL },
-  { "p",   1, STD_C89, { T89_V,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "q",  "c",  NULL },
+  { "di",  0, STD_C89, { T89_I,   BADLEN,  BADLEN,  T89_L,   T9L_LL,  BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "q",  "",   NULL },
+  { "ox",  0, STD_C89, { T89_UI,  BADLEN,  BADLEN,  T89_UL,  T9L_ULL, BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "q",  "",   NULL },
+  { "u",   0, STD_C89, { T89_UI,  BADLEN,  BADLEN,  T89_UL,  T9L_ULL, BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "q",  "",   NULL },
+  { "c",   0, STD_C89, { T89_I,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "q",  "",   NULL },
+  { "s",   1, STD_C89, { T89_C,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "pq", "cR", NULL },
+  { "p",   1, STD_C89, { T89_V,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "q",  "c",  NULL },
 
   /* Custom conversion specifiers.  */
 
   /* %H will require "location_t" at runtime.  */
-  { "H",   0, STD_C89, { T89_V,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "q",  "",   NULL },
+  { "H",   0, STD_C89, { T89_V,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "q",  "",   NULL },
 
   /* These will require a "tree" at runtime.  */
-  { "J", 0, STD_C89, { T89_V,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "q",    "",   NULL },
+  { "J", 0, STD_C89, { T89_V,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "q",    "",   NULL },
 
   { "<>'", 0, STD_C89, NOARGUMENTS, "",      "",   NULL },
   { "m",   0, STD_C89, NOARGUMENTS, "q",     "",   NULL },
@@ -561,20 +574,20 @@ static const format_char_info gcc_diag_char_table[] =
 static const format_char_info gcc_tdiag_char_table[] =
 {
   /* C89 conversion specifiers.  */
-  { "di",  0, STD_C89, { T89_I,   BADLEN,  BADLEN,  T89_L,   T9L_LL,  BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "q",  "",   NULL },
-  { "ox",  0, STD_C89, { T89_UI,  BADLEN,  BADLEN,  T89_UL,  T9L_ULL, BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "q",  "",   NULL },
-  { "u",   0, STD_C89, { T89_UI,  BADLEN,  BADLEN,  T89_UL,  T9L_ULL, BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "q",  "",   NULL },
-  { "c",   0, STD_C89, { T89_I,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "q",  "",   NULL },
-  { "s",   1, STD_C89, { T89_C,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "pq", "cR", NULL },
-  { "p",   1, STD_C89, { T89_V,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "q",  "c",  NULL },
+  { "di",  0, STD_C89, { T89_I,   BADLEN,  BADLEN,  T89_L,   T9L_LL,  BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "q",  "",   NULL },
+  { "ox",  0, STD_C89, { T89_UI,  BADLEN,  BADLEN,  T89_UL,  T9L_ULL, BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "q",  "",   NULL },
+  { "u",   0, STD_C89, { T89_UI,  BADLEN,  BADLEN,  T89_UL,  T9L_ULL, BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "q",  "",   NULL },
+  { "c",   0, STD_C89, { T89_I,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "q",  "",   NULL },
+  { "s",   1, STD_C89, { T89_C,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "pq", "cR", NULL },
+  { "p",   1, STD_C89, { T89_V,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "q",  "c",  NULL },
 
   /* Custom conversion specifiers.  */
 
   /* %H will require "location_t" at runtime.  */
-  { "H",   0, STD_C89, { T89_V,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "q",  "",   NULL },
+  { "H",   0, STD_C89, { T89_V,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "q",  "",   NULL },
 
   /* These will require a "tree" at runtime.  */
-  { "DFJT", 0, STD_C89, { T89_V,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "q+", "",   NULL },
+  { "DFJT", 0, STD_C89, { T89_V,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "q+", "",   NULL },
 
   { "<>'", 0, STD_C89, NOARGUMENTS, "",      "",   NULL },
   { "m",   0, STD_C89, NOARGUMENTS, "q",     "",   NULL },
@@ -584,20 +597,20 @@ static const format_char_info gcc_tdiag_char_table[] =
 static const format_char_info gcc_cdiag_char_table[] =
 {
   /* C89 conversion specifiers.  */
-  { "di",  0, STD_C89, { T89_I,   BADLEN,  BADLEN,  T89_L,   T9L_LL,  BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "q",  "",   NULL },
-  { "ox",  0, STD_C89, { T89_UI,  BADLEN,  BADLEN,  T89_UL,  T9L_ULL, BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "q",  "",   NULL },
-  { "u",   0, STD_C89, { T89_UI,  BADLEN,  BADLEN,  T89_UL,  T9L_ULL, BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "q",  "",   NULL },
-  { "c",   0, STD_C89, { T89_I,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "q",  "",   NULL },
-  { "s",   1, STD_C89, { T89_C,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "pq", "cR", NULL },
-  { "p",   1, STD_C89, { T89_V,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "q",  "c",  NULL },
+  { "di",  0, STD_C89, { T89_I,   BADLEN,  BADLEN,  T89_L,   T9L_LL,  BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "q",  "",   NULL },
+  { "ox",  0, STD_C89, { T89_UI,  BADLEN,  BADLEN,  T89_UL,  T9L_ULL, BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "q",  "",   NULL },
+  { "u",   0, STD_C89, { T89_UI,  BADLEN,  BADLEN,  T89_UL,  T9L_ULL, BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "q",  "",   NULL },
+  { "c",   0, STD_C89, { T89_I,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "q",  "",   NULL },
+  { "s",   1, STD_C89, { T89_C,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "pq", "cR", NULL },
+  { "p",   1, STD_C89, { T89_V,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "q",  "c",  NULL },
 
   /* Custom conversion specifiers.  */
 
   /* %H will require "location_t" at runtime.  */
-  { "H",   0, STD_C89, { T89_V,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "q",  "",   NULL },
+  { "H",   0, STD_C89, { T89_V,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "q",  "",   NULL },
 
   /* These will require a "tree" at runtime.  */
-  { "DEFJT", 0, STD_C89, { T89_V,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "q+", "",   NULL },
+  { "DEFJT", 0, STD_C89, { T89_V,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "q+", "",   NULL },
 
   { "<>'", 0, STD_C89, NOARGUMENTS, "",      "",   NULL },
   { "m",   0, STD_C89, NOARGUMENTS, "q",     "",   NULL },
@@ -607,23 +620,23 @@ static const format_char_info gcc_cdiag_char_table[] =
 static const format_char_info gcc_cxxdiag_char_table[] =
 {
   /* C89 conversion specifiers.  */
-  { "di",  0, STD_C89, { T89_I,   BADLEN,  BADLEN,  T89_L,   T9L_LL,  BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "q",  "",   NULL },
-  { "ox",  0, STD_C89, { T89_UI,  BADLEN,  BADLEN,  T89_UL,  T9L_ULL, BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "q",  "",   NULL },
-  { "u",   0, STD_C89, { T89_UI,  BADLEN,  BADLEN,  T89_UL,  T9L_ULL, BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "q",  "",   NULL },
-  { "c",   0, STD_C89, { T89_I,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "q",  "",   NULL },
-  { "s",   1, STD_C89, { T89_C,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "pq", "cR", NULL },
-  { "p",   1, STD_C89, { T89_V,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "q",  "c",  NULL },
+  { "di",  0, STD_C89, { T89_I,   BADLEN,  BADLEN,  T89_L,   T9L_LL,  BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "q",  "",   NULL },
+  { "ox",  0, STD_C89, { T89_UI,  BADLEN,  BADLEN,  T89_UL,  T9L_ULL, BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "q",  "",   NULL },
+  { "u",   0, STD_C89, { T89_UI,  BADLEN,  BADLEN,  T89_UL,  T9L_ULL, BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "q",  "",   NULL },
+  { "c",   0, STD_C89, { T89_I,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "q",  "",   NULL },
+  { "s",   1, STD_C89, { T89_C,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "pq", "cR", NULL },
+  { "p",   1, STD_C89, { T89_V,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "q",  "c",  NULL },
 
   /* Custom conversion specifiers.  */
 
   /* %H will require "location_t" at runtime.  */
-  { "H",   0, STD_C89, { T89_V,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "q",  "",   NULL },
+  { "H",   0, STD_C89, { T89_V,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "q",  "",   NULL },
 
   /* These will require a "tree" at runtime.  */
-  { "ADEFJTV",0,STD_C89,{ T89_V,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "q+#",   "",   NULL },
+  { "ADEFJTV",0,STD_C89,{ T89_V,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "q+#",   "",   NULL },
 
   /* These accept either an 'int' or an 'enum tree_code' (which is handled as an 'int'.)  */
-  { "CLOPQ",0,STD_C89, { T89_I,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "q",  "",   NULL },
+  { "CLOPQ",0,STD_C89, { T89_I,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "q",  "",   NULL },
 
   { "<>'", 0, STD_C89, NOARGUMENTS, "",      "",   NULL },
   { "m",   0, STD_C89, NOARGUMENTS, "q",     "",   NULL },
@@ -633,16 +646,16 @@ static const format_char_info gcc_cxxdiag_char_table[] =
 static const format_char_info gcc_gfc_char_table[] =
 {
   /* C89 conversion specifiers.  */
-  { "di",  0, STD_C89, { T89_I,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "", "", NULL },
-  { "c",   0, STD_C89, { T89_I,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "", "", NULL },
-  { "s",   1, STD_C89, { T89_C,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "", "cR", NULL },
+  { "di",  0, STD_C89, { T89_I,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "", "", NULL },
+  { "c",   0, STD_C89, { T89_I,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "", "", NULL },
+  { "s",   1, STD_C89, { T89_C,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "", "cR", NULL },
 
   /* gfc conversion specifiers.  */
 
   { "C",   0, STD_C89, NOARGUMENTS, "",      "",   NULL },
 
   /* This will require a "locus" at runtime.  */
-  { "L",   0, STD_C89, { T89_V,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "", "R", NULL },
+  { "L",   0, STD_C89, { T89_V,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "", "R", NULL },
 
   { NULL,  0, 0, NOLENGTHS, NULL, NULL, NULL }
 };
@@ -650,20 +663,20 @@ static const format_char_info gcc_gfc_char_table[] =
 static const format_char_info scan_char_table[] =
 {
   /* C89 conversion specifiers.  */
-  { "di",    1, STD_C89, { T89_I,   T99_SC,  T89_S,   T89_L,   T9L_LL,  TEX_LL,  T99_SST, T99_PD,  T99_IM  }, "*w'I", "W",   NULL },
-  { "u",     1, STD_C89, { T89_UI,  T99_UC,  T89_US,  T89_UL,  T9L_ULL, TEX_ULL, T99_ST,  T99_UPD, T99_UIM }, "*w'I", "W",   NULL },
-  { "oxX",   1, STD_C89, { T89_UI,  T99_UC,  T89_US,  T89_UL,  T9L_ULL, TEX_ULL, T99_ST,  T99_UPD, T99_UIM }, "*w",   "W",   NULL },
-  { "efgEG", 1, STD_C89, { T89_F,   BADLEN,  BADLEN,  T89_D,   BADLEN,  T89_LD,  BADLEN,  BADLEN,  BADLEN  }, "*w'",  "W",   NULL },
-  { "c",     1, STD_C89, { T89_C,   BADLEN,  BADLEN,  T94_W,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "*w",   "cW",  NULL },
-  { "s",     1, STD_C89, { T89_C,   BADLEN,  BADLEN,  T94_W,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "*aw",  "cW",  NULL },
-  { "[",     1, STD_C89, { T89_C,   BADLEN,  BADLEN,  T94_W,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "*aw",  "cW[", NULL },
-  { "p",     2, STD_C89, { T89_V,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "*w",   "W",   NULL },
-  { "n",     1, STD_C89, { T89_I,   T99_SC,  T89_S,   T89_L,   T9L_LL,  BADLEN,  T99_SST, T99_PD,  T99_IM  }, "",     "W",   NULL },
+  { "di",    1, STD_C89, { T89_I,   T99_SC,  T89_S,   T89_L,   T9L_LL,  TEX_LL,  T99_SST, T99_PD,  T99_IM, NOVECLEN  }, "*w'I", "W",   NULL },
+  { "u",     1, STD_C89, { T89_UI,  T99_UC,  T89_US,  T89_UL,  T9L_ULL, TEX_ULL, T99_ST,  T99_UPD, T99_UIM, NOVECLEN }, "*w'I", "W",   NULL },
+  { "oxX",   1, STD_C89, { T89_UI,  T99_UC,  T89_US,  T89_UL,  T9L_ULL, TEX_ULL, T99_ST,  T99_UPD, T99_UIM, NOVECLEN }, "*w",   "W",   NULL },
+  { "efgEG", 1, STD_C89, { T89_F,   BADLEN,  BADLEN,  T89_D,   BADLEN,  T89_LD,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "*w'",  "W",   NULL },
+  { "c",     1, STD_C89, { T89_C,   BADLEN,  BADLEN,  T94_W,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "*w",   "cW",  NULL },
+  { "s",     1, STD_C89, { T89_C,   BADLEN,  BADLEN,  T94_W,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "*aw",  "cW",  NULL },
+  { "[",     1, STD_C89, { T89_C,   BADLEN,  BADLEN,  T94_W,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "*aw",  "cW[", NULL },
+  { "p",     2, STD_C89, { T89_V,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "*w",   "W",   NULL },
+  { "n",     1, STD_C89, { T89_I,   T99_SC,  T89_S,   T89_L,   T9L_LL,  BADLEN,  T99_SST, T99_PD,  T99_IM, NOVECLEN  }, "",     "W",   NULL },
   /* C99 conversion specifiers.  */
-  { "FaA",   1, STD_C99, { T99_F,   BADLEN,  BADLEN,  T99_D,   BADLEN,  T99_LD,  BADLEN,  BADLEN,  BADLEN  }, "*w'",  "W",   NULL },
+  { "FaA",   1, STD_C99, { T99_F,   BADLEN,  BADLEN,  T99_D,   BADLEN,  T99_LD,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "*w'",  "W",   NULL },
   /* X/Open conversion specifiers.  */
-  { "C",     1, STD_EXT, { TEX_W,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "*w",   "W",   NULL },
-  { "S",     1, STD_EXT, { TEX_W,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN  }, "*aw",  "W",   NULL },
+  { "C",     1, STD_EXT, { TEX_W,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "*w",   "W",   NULL },
+  { "S",     1, STD_EXT, { TEX_W,   BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN,  BADLEN, NOVECLEN  }, "*aw",  "W",   NULL },
   { NULL, 0, 0, NOLENGTHS, NULL, NULL, NULL }
 };
 
@@ -696,7 +709,7 @@ static const format_char_info time_char_table[] =
 
 static const format_char_info monetary_char_table[] =
 {
-  { "in", 0, STD_C89, { T89_D, BADLEN, BADLEN, BADLEN, BADLEN, T89_LD, BADLEN, BADLEN, BADLEN }, "=^+(!-w#p", "", NULL },
+  { "in", 0, STD_C89, { T89_D, BADLEN, BADLEN, BADLEN, BADLEN, T89_LD, BADLEN, BADLEN, BADLEN, NOVECLEN }, "=^+(!-w#p", "", NULL },
   { NULL, 0, 0, NOLENGTHS, NULL, NULL, NULL }
 };
 
@@ -705,7 +718,7 @@ static const format_char_info monetary_char_table[] =
 static const format_kind_info format_types_orig[] =
 {
   { "printf",   printf_length_specs,  print_char_table,
-    " +#0-'" TARGET_EXTRA_PRINTF_FLAG_CHARS, NULL, 
+    " +#0-',:;_" TARGET_EXTRA_PRINTF_FLAG_CHARS, NULL, 
     printf_flag_specs, printf_flag_pairs,
     FMT_FLAG_ARG_CONVERT|FMT_FLAG_DOLLAR_MULTIPLE|FMT_FLAG_USE_DOLLAR|FMT_FLAG_EMPTY_PREC_OK,
     'w', 0, 'p', 0, 'L',
@@ -1474,8 +1487,6 @@ check_format_info_main (format_check_results *res,
       int aflag = 0;
       const char *format_start = format_chars;
       int vector_fmt = FALSE;
-      const	/* CELL LOCAL */
-      char *pfmt = NULL;
 
       if (*format_chars == 0)
 	{
@@ -1746,16 +1757,18 @@ check_format_info_main (format_check_results *res,
 	    fli++;
 	  if (fli->name != 0)
 	    {
-	      format_chars += strlen (fli->name);
-	      if (fli->double_name != 0 && fli->name[0] == *format_chars)
+	      if (fli->double_name != 0
+		  && !strncmp (fli->double_name, format_chars,
+			       strlen (fli->double_name)))
 		{
-		  format_chars++;
+		  format_chars += strlen (fli->double_name);
 		  length_chars = fli->double_name;
 		  length_chars_val = fli->double_index;
 		  length_chars_std = fli->double_std;
 		}
 	      else
 		{
+		  format_chars += strlen (fli->name);
 		  length_chars = fli->name;
 		  length_chars_val = fli->index;
 		  length_chars_std = fli->std;
@@ -1764,6 +1777,15 @@ check_format_info_main (format_check_results *res,
 	      flag_chars[i++] = fki->length_code_char;
 	      flag_chars[i] = 0;
 	    }
+
+	  if (length_chars_val == FMT_LEN_v
+	      || length_chars_val == FMT_LEN_vhh
+	      || length_chars_val == FMT_LEN_vh
+	      || length_chars_val == FMT_LEN_vl
+	      || length_chars_val == FMT_LEN_vll
+	      || length_chars_val == FMT_LEN_vL)
+	    vector_fmt = TRUE;
+
 	  if (pedantic)
 	    {
 	      /* Warn if the length modifier is non-standard.  */
@@ -1814,22 +1836,6 @@ check_format_info_main (format_check_results *res,
 	    }
 	}
 
-      /* Altivec-style vector print formats can have the following element 
-       * separator characters. */
-      if (strchr(",:;_", *format_chars))
-        {
-          pfmt = format_chars;
-          format_chars++;
-        }
-      if (*format_chars == 'v') 
-        {
-	  vector_fmt = TRUE;
-          format_chars++;
-        }
-      else if (pfmt) /* The format characters are not vector separators. */
-        {
-           format_chars = pfmt;
-        }
       format_char = *format_chars;
       if (format_char == 0
 	  || (!(fki->flags & (int) FMT_FLAG_FANCY_PERCENT_OK)
@@ -1870,7 +1876,9 @@ check_format_info_main (format_check_results *res,
 	    flag_chars[i - d] = flag_chars[i];
 	    if (flag_chars[i] == fki->length_code_char)
 	      continue;
-	    if (strchr (fci->flag_chars, flag_chars[i]) == 0)
+	    if (strchr (fci->flag_chars, flag_chars[i]) == 0
+		|| (!vector_fmt && strchr (",:;_", flag_chars[i])
+		    && !strncmp (fki->name, "printf", strlen ("printf"))))
 	      {
 		warning (OPT_Wformat, "%s used with %<%%%c%> %s format",
 			 _(s->name), format_char, fki->name);
@@ -2094,7 +2102,6 @@ check_format_info_main (format_check_results *res,
                             (int)arg_num);
                         }
                    }
-                 continue;
               }
 
 	      wanted_type_ptr->wanted_type = wanted_type;

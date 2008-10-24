@@ -1471,13 +1471,14 @@ get_indirect_ref_operands (tree stmt, tree expr, int flags)
 	     aliasing again.  */
 	  if (dump_file
 	      && TREE_CODE (ptr) == SSA_NAME
-	      && pi == NULL)
+	      && (pi == NULL
+	          || pi->name_mem_tag == NULL_TREE))
 	    {
 	      fprintf (dump_file,
 		  "NOTE: no flow-sensitive alias info for ");
 	      print_generic_expr (dump_file, ptr, dump_flags);
 	      fprintf (dump_file, " in ");
-	      print_generic_stmt (dump_file, stmt, dump_flags);
+	      print_generic_stmt (dump_file, stmt, 0);
 	    }
 
 	  if (TREE_CODE (ptr) == SSA_NAME)

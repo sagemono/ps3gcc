@@ -108,6 +108,10 @@ MV
 C ObjC C++ ObjC++
 When generating make dependencies use a format that works with Visual Studio
 
+MC
+C ObjC C++ ObjC++ Undocumented
+When generating make dependencies use a drive letter that works with Cygwin's Make 
+
 P
 C ObjC C++ ObjC++
 Do not generate #line directives
@@ -176,6 +180,10 @@ Warn about compile-time integer division by zero
 Weffc++
 C++ ObjC++ Var(warn_ecpp)
 Warn about violations of Effective C++ style rules
+
+Wempty-body
+C ObjC C++ ObjC++ Var(warn_empty_body) Init(-1)
+Warn about an empty body in an if or else statement
 
 Wendif-labels
 C ObjC C++ ObjC++
@@ -905,5 +913,13 @@ Enable verbose output
 w
 C ObjC C++ ObjC++
 ; Documented in common.opt
+
+WnonPOD-varargs
+C++ ObjC++ Var(nonPOD_varags) Init(1)
+Warning on passing non-POD objects to varargs
+
+Werror=-WnonPOD-varargs
+C++ ObjC++ Var(error_nonPOD_varags) Init(0)
+Warning on passing non-POD objects to varargs should result in an error
 
 ; This comment is to ensure we retain the blank line above.

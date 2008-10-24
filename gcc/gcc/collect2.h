@@ -36,6 +36,7 @@ extern int file_exists (const char *);
 
 extern const char *ldout;
 extern const char *lderrout;
+extern const char *full_ld_suffix;
 extern const char *c_file_name;
 extern struct obstack temporary_obstack;
 extern char *temporary_firstobj;

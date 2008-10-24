@@ -12024,7 +12024,16 @@ ppc64_elf_post_process_headers (abfd, link_info)
 	  if (keep == TRUE)
 	    out_ehdrp->e_flags |= EF_PPC64_REL24;
 	}
-      /* begin sce local bugzilla 45657 */
+      /* end sce local bugzilla 45657 */
+
+      /* begin sce local, bugzilla 52093 */
+      /* Set EF_PPC64_REL24 bit when ppu-lv2-objcopy converts SPU ELF into PPU obj */
+      if (bfd_usrdata(abfd) == (void *)-2)
+    {
+	    out_ehdrp->e_flags |= EF_PPC64_REL24;
+    }
+      /* end sce local, bugzilla 52093 */
+
     }
   else
     {

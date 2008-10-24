@@ -41,6 +41,26 @@
 
 using namespace __cxxabiv1;
 
+// SCE LOCAL bz56626
+#if defined(__PPU__)
+namespace __sce_local
+{
+  __cxa_eh_globals* get_global() throw()
+  {
+    static __thread __cxa_eh_globals global;
+    return &global;
+  }
+}
+
+extern "C" __cxa_eh_globals*
+__cxxabiv1::__cxa_get_globals_fast() throw()
+{ return __sce_local::get_global(); }
+
+extern "C" __cxa_eh_globals*
+__cxxabiv1::__cxa_get_globals() throw()
+{ return __sce_local::get_global(); }
+
+#else // defined(__PPU__)
 
 // Single-threaded fallback buffer.
 static __cxa_eh_globals globals_static;
@@ -132,3 +152,5 @@ __cxxabiv1::__cxa_get_globals () throw()
   return &globals_static;
 #endif
 }
+
+#endif // defined(__PPU__)

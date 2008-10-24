@@ -195,24 +195,6 @@ merge_alias_info (tree orig, tree new)
   gcc_assert (lang_hooks.types_compatible_p (TREE_TYPE (orig),
 					     TREE_TYPE (new)));
 
-  /* If the pointed-to alias sets are different, these two pointers
-     would never have the same memory tag.  In this case, NEW should
-     not have been propagated into ORIG.  */
-  gcc_assert (get_alias_set (TREE_TYPE (TREE_TYPE (new_sym)))
-	      == get_alias_set (TREE_TYPE (TREE_TYPE (orig_sym))));
-#endif
-
-  /* Synchronize the type tags.  If both pointers had a tag and they
-     are different, then something has gone wrong.  Type tags can
-     always be merged because they are flow insensitive, all the SSA
-     names of the same base DECL share the same type tag.  */
-  if (new_ann->type_mem_tag == NULL_TREE)
-    new_ann->type_mem_tag = orig_ann->type_mem_tag;
-  else if (orig_ann->type_mem_tag == NULL_TREE)
-    orig_ann->type_mem_tag = new_ann->type_mem_tag;
-  else
-    gcc_assert (new_ann->type_mem_tag == orig_ann->type_mem_tag);
-
   /* Check that flow-sensitive information is compatible.  Notice that
      we may not merge flow-sensitive information here.  This function
      is called when propagating equivalences dictated by the IL, like
@@ -248,6 +230,32 @@ merge_alias_info (tree orig, tree new)
 	  && new_ptr_info->pt_vars)
 	gcc_assert (bitmap_intersect_p (new_ptr_info->pt_vars,
 					orig_ptr_info->pt_vars));
+    }
+#endif
+
+  /* Synchronize the symbol tags.  If both pointers had a tag and they
+     are different, then something has gone wrong.  Symbol tags can
+     always be merged because they are flow insensitive, all the SSA
+     names of the same base DECL share the same symbol tag.  */
+  if (new_ann->type_mem_tag == NULL_TREE)
+    new_ann->type_mem_tag = orig_ann->type_mem_tag;
+  else if (orig_ann->type_mem_tag == NULL_TREE)
+    orig_ann->type_mem_tag = new_ann->type_mem_tag;
+  else
+    gcc_assert (new_ann->type_mem_tag == orig_ann->type_mem_tag);
+
+  /* Copy flow-sensitive alias information in case that NEW_NAME
+     didn't get a NMT but was set to pt_anything for optimization
+     purposes.  In case ORIG_NAME has a NMT we can safely use its
+     flow-sensitive alias information as a conservative estimate.  */
+  if (SSA_NAME_PTR_INFO (orig)
+      && SSA_NAME_PTR_INFO (orig)->name_mem_tag
+      && (!SSA_NAME_PTR_INFO (new)
+	  || !SSA_NAME_PTR_INFO (new)->name_mem_tag))
+    {
+      struct ptr_info_def *orig_ptr_info = SSA_NAME_PTR_INFO (orig);
+      struct ptr_info_def *new_ptr_info = get_ptr_info (new);
+      memcpy (new_ptr_info, orig_ptr_info, sizeof (struct ptr_info_def));
     }
 }   
 

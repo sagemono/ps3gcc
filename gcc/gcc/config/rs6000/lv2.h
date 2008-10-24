@@ -694,7 +694,13 @@ enum { SIGNAL_FRAMESIZE = 128 };
 	"%{!fno-strict-aligned:-fstrict-aligned} " \
         "%{mlp64:-funsigned-char} " \
         "%{!mvrsave:-mno-vrsave} " \
-        "%{!mtraceback=*:-mtraceback=none} "
+        "%{!mtraceback=*:-mtraceback=none} " \
+        "%{mcellos-kernel:-mno-nop-after-bl} " \
+        "%{mcellos-kernel:-mno-save-restore-tocbase} " \
+        "%{mcellos-kernel:-falign-functions=1} " \
+        "%{mcellos-kernel:-falign-jumps=1} " \
+        "%{mcellos-kernel:-falign-labels=1} " \
+        "%{mcellos-kernel:-falign-loops=1} "
 
 /*  Macro: CC1PLUS_SPEC
 
@@ -769,8 +775,8 @@ enum { SIGNAL_FRAMESIZE = 128 };
   "%{YP,*} %{R*} "					 \
   "%{Qy:} %{!Qn:-Qy} "					 \
   "%{mlp64:-melf64ppc} "						\
-  "%{mno-sn-ld|mprx|mprx-with-runtime: ; : " \
-  "  %{!mlp64:--alternative-ld=ps3ppuld --gnu-mode %{!mno-prxfixup: %{!mforce-prx-fixup:--prx-fixup}} %{mprx|mprx-with-runtime:--no-check-unresolved} " \
+  "%{mno-sn-ld|mno-prxfixup: ; : " \
+  "  %{!mlp64:--alternative-ld=ps3ppuld --gnu-mode %{!mno-prxfixup: %{!mforce-prx-fixup: %{!r: --prx-fixup}}} %{mprx|mprx-with-runtime:--no-check-unresolved} " \
   "    %{mppuguid: %{!r:-ppuguid}} " \
   "    %{r|mno-ppuguid:-no-ppuguid} } } " \
   "%{shared}"
@@ -789,7 +795,7 @@ enum { SIGNAL_FRAMESIZE = 128 };
     - for incremental linking: "-r" == "-Wl,-r -mno-prxfixup -mlv2-stub" */
 #define LIB_SPEC \
   "%{!mno-sn-ld: -L%R/lib} " \
-  "--start-group -lc -lgcc -lstdc++ -lsupc++ %:if-file-exist(%:prepend-cmddir(../../../target/ppu/lib/libsnc.a) -lsnc)" \
+  "--start-group %{mfast-libc: -lcs; :-lc} -lgcc -lstdc++ -lsupc++ %:if-file-exist(%:prepend-cmddir(../../../target/ppu/lib/libsnc.a) -lsnc)" \
   " %{mlv2-stub|!mno-prxfixup:-llv2_stub; :-llv2} -lsyscall --end-group" \
   " %{r|mno-prxfixup|T: ; : -T %R/lib/elf64_lv2_prx.x} "
 /* TRANSMETA end */
@@ -876,6 +882,7 @@ enum { SIGNAL_FRAMESIZE = 128 };
    after linking. */
 /* Bugzilla 13302  implement -mprx option.
    FIXME: Please someone clean up following spec defs. */
+/* Bugzilla 50260  PPU GUID option for sys/trunk PRX */
 #undef	SUBTARGET_EXTRA_SPECS
 #define        SUBTARGET_EXTRA_SPECS \
   { "prx_fixup",       PRX_FIXUP_COMMAND_SPEC },       \
@@ -892,7 +899,7 @@ enum { SIGNAL_FRAMESIZE = 128 };
 "%{s} %{t} %{u*} %{x} %{z} %{Z} %{!A:%{!nostdlib:%{!nostartfiles:%S}}} " \
 "%{static:} %{L*} %(mfwrap) %(link_libgcc) %o %(mflib) " \
 "%{fprofile-arcs|fprofile-generate|coverage:-lgcov} " \
-"%{!nostdlib:%{!nodefaultlibs:%(link_gcc_c_sequence)}} " \
+"%{!nostdlib:%{!nodefaultlibs:%(link_ssp) %(link_gcc_c_sequence)}} " \
 "%{!A:%{!nostdlib:%{!nostartfiles:%E}}} %{T*} " \
 "  %{r|mno-prxfixup: ; :" \
 "     \n " \
@@ -1064,7 +1071,7 @@ enum { SIGNAL_FRAMESIZE = 128 };
   { GCC_INCLUDE_DIR, "GCC", 0, 0, 0 },     \
   { "/include", STANDARD_INCLUDE_COMPONENT, 0, 0, 1 }, \
   { "/../common/include", STANDARD_INCLUDE_COMPONENT, 0, 0, 1 }, \
-  { 0, 0, 0, 0 }			   \
+  { 0, 0, 0, 0, 0 }			   \
 }
 
 #undef DRIVER_SELF_SPECS
@@ -1116,6 +1123,36 @@ enum { SIGNAL_FRAMESIZE = 128 };
    default one.*/
 #define MD_SPEC_FILE "prxspec"
 /* end sce local bugzilla 23831 */
+
+/* begin sce local bugzilla 51659 */
+/* WARNING! This macro is one of SCE extention. No such macro in FSF GCC.
+
+   Macro: TARGET_CELLPPU_LV2
+   This macro is used in "rs6000.md" to distinguish Cell OS Lv-2 from others.
+*/
+#define	TARGET_CELLPPU_LV2
+/* end sce local bugzilla 51659 */
+
+/* begin sce local bugzilla 55066 */
+#define T_VC  &V16QI_type_node
+#define TEX_VC        { STD_EXT, "vector signed char", T_VC }
+#define T_VUC &unsigned_V16QI_type_node
+#define TEX_VUC       { STD_EXT, "vector unsigned char", T_VUC }
+#define T_VS  &V8HI_type_node
+#define TEX_VS        { STD_EXT, "vector signed short", T_VS }
+#define T_VUS &unsigned_V8HI_type_node
+#define TEX_VUS       { STD_EXT, "vector unsigned short", T_VUS }
+#define T_VI  &V4SI_type_node
+#define TEX_VI        { STD_EXT, "vector signed int", T_VI }
+#define T_VUI &unsigned_V4SI_type_node
+#define TEX_VUI       { STD_EXT, "vector unsigned int", T_VUI }
+#define T_VL  &V4SI_type_node
+#define TEX_VL        { STD_EXT, "vector signed long", T_VL }
+#define T_VUL &unsigned_V4SI_type_node
+#define TEX_VUL       { STD_EXT, "vector unsigned long", T_VUL }
+#define T_VF  &V4SF_type_node
+#define TEX_VF        { STD_EXT, "vector float", T_VF }
+/* end sce local bugzilla 55066 */
 
 /* begin sce local bugzilla 37796 */
 /* Bugzilla 51422 : '--sysroot' is not specified when linking PRX */

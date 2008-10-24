@@ -1925,7 +1925,8 @@ fold_convert_const (enum tree_code code, tree type, tree arg1)
 	}
     }
   /* END CELL VECREG */
-  if (POINTER_TYPE_P (type) || INTEGRAL_TYPE_P (type))
+  if (POINTER_TYPE_P (type) || INTEGRAL_TYPE_P (type)
+      || TREE_CODE (type) == OFFSET_TYPE)
     {
       if (TREE_CODE (arg1) == INTEGER_CST)
 	return fold_convert_const_int_from_int (type, arg1);

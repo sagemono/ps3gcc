@@ -114,6 +114,7 @@ host_modules= { module= utils; no_check=true; };
 host_modules= { module= gnattools; };
 
 target_modules = { module= libstdc++-v3; lib_path=.libs; raw_cxx=true; };
+target_modules = { module= libsupcxx; lib_path=.libs; raw_cxx=true; no_check=true; };
 target_modules = { module= libmudflap; lib_path=.libs; };
 target_modules = { module= libssp; lib_path=.libs; };
 target_modules = { module= newlib; };
@@ -416,6 +417,7 @@ lang_env_dependencies = { module=libmudflap; };
 lang_env_dependencies = { module=libobjc; };
 lang_env_dependencies = { module=libssp; };
 lang_env_dependencies = { module=libstdc++-v3; };
+lang_env_dependencies = { module=libsupcxx; };
 lang_env_dependencies = { module=zlib; };
 
 dependencies = { module=configure-target-boehm-gc; on=configure-target-qthreads; };
@@ -433,6 +435,11 @@ dependencies = { module=all-target-libjava; on=all-target-qthreads; };
 dependencies = { module=all-target-libjava; on=all-target-libffi; };
 dependencies = { module=all-target-libobjc; on=all-target-libiberty; };
 dependencies = { module=all-target-libstdc++-v3; on=all-target-libiberty; };
+dependencies = { module=all-target-libsupcxx; on=all-target-libiberty; };
+
+// For LV2, libsupcxx has to be built before any other target
+dependencies = { module=configure-target-libssp; on=all-target-libsupcxx; };
+dependencies = { module=configure-target-libmudflap; on=all-target-libsupcxx; };
 
 // Target modules in the 'src' repository.
 lang_env_dependencies = { module=examples; };

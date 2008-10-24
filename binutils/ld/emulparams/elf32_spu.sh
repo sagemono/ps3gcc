@@ -1,5 +1,7 @@
 SCRIPT_NAME=elf
 TEMPLATE_NAME=elf32
+GENERATE_SHLIB_SCRIPT=yes
+GENERATE_PIE_SCRIPT=yes
 EXTRA_EM_FILE=spu32elf
 OUTPUT_FORMAT="elf32-spu"
 ARCH=spu
@@ -12,6 +14,7 @@ NO_SMALL_DATA=true
 EMBEDDED=true
 MAXPAGESIZE=0x80
 DATA_ADDR="ALIGN(${MAXPAGESIZE})"
+SHLIB_DATA_ADDR="ALIGN(${MAXPAGESIZE})"
 OTHER_SECTIONS=".note.spu_name 0 : { KEEP(*(.note.spu_name)) }"
 GENERATE_SHLIB_SCRIPT=yes
 OTHER_GOT_SECTIONS=".toe ALIGN(128) : { *(.toe) } = 0"
@@ -24,7 +27,7 @@ OTHER_GOT_SECTIONS=".toe ALIGN(128) : { *(.toe) } = 0"
 #
 # bugzilla 30757
 # Add new section .before_text.
-SPECIAL_SECTION_BEFORE_TEXT_SECTION="
+INITIAL_READONLY_SECTIONS="
   .SpuGUID ALIGN(128) : ONLY_IF_SPUGUID
   {
         PROVIDE (__SPU_GUID = .);
@@ -41,3 +44,10 @@ SPECIAL_SECTION_BEFORE_TEXT_SECTION="
 # to indentify where is the readonly segment.
 SYMBOL_READONLY_SEGMENT_START="  PROVIDE (__ro_segment_start = .); "
 SYMBOL_READONLY_SEGMENT_END="  PROVIDE (__ro_segment_end = .); "
+
+TEXT_DYNAMIC=
+OTHER_READONLY_SECTIONS="
+  .fixup ${RELOCATING-0} : {
+    ${RELOCATING+__fixup_start = .;}
+    *(.fixup)
+  }"

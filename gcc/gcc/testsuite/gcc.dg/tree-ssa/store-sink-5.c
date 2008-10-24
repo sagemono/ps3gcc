@@ -34,7 +34,7 @@ foo (int m, int n, int tmp1, int tmp2)
     }
 }
 
-/* { dg-final { scan-tree-dump-times "going to perform sinking of this set of stores" 1 "sink1" { xfail *-*-* } } } */
-/* { dg-final { cleanup-tree-dump "sink*" } } */
+/* { dg-final { scan-tree-dump-times "going to perform sinking of this set of stores" 1 "sink" { xfail *-*-* } } } */
+/* { dg-final { cleanup-tree-dump "sink" } } */
 
 

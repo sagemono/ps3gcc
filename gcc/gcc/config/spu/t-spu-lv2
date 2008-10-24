@@ -66,16 +66,12 @@ CRTSTUFF_T_CFLAGS =
 MULTILIB_OPTIONS=fPIC
 MULTILIB_DIRNAMES=pic
 MULTILIB_EXCEPTIONS=
-MULTILIB_MATCHES=fPIC=fpic
-
-# This selects versions of multilib that we don't want to build, but we
-# still support as a multilib in the driver. 
-MULTILIB_BUILD_EXCEPTIONS=pic
+MULTILIB_MATCHES=fPIC=fpic fPIC=shared fPIC=mfixups
 
 # Neither gcc or newlib seem to have a standard way to generate multiple
 # crt*.o files.  So we don't use the standard crt0.o name anymore.
-
-EXTRA_MULTILIB_PARTS = crtbegin.o crtend.o crti.o crtn.o crt1.o crt2.o crt3.o crt4.o spurs_task.o crtend1.o
+EXTRA_MULTILIB_PARTS = crti.o crtn.o crt1.o crt2.o crt3.o crt4.o spurs_task.o crtend1.o \
+                       init_fixups.o init_crtend.o fini_crtbegin.o
 
 LIBGCC = stmp-multilib
 INSTALL_LIBGCC = install-multilib
@@ -88,39 +84,57 @@ $(T)crti.o: $(srcdir)/config/spu/crti.asm $(GCC_PASSES)
 	$(GCC_FOR_TARGET) $(GCC_CFLAGS) $(MULTILIB_CFLAGS) $(INCLUDES) \
 	-c -o $(T)crti.o -x assembler-with-cpp $(srcdir)/config/spu/crti.asm
 
+# Make sure spu.c never has warnings.  
+spu.o-warn = -Werror -Wno-format -Wno-missing-format-attribute
+
 $(T)crtn.o: $(srcdir)/config/spu/crtn.asm $(GCC_PASSES)
 	$(GCC_FOR_TARGET) $(GCC_CFLAGS) $(MULTILIB_CFLAGS) $(INCLUDES) \
 	-c -o $(T)crtn.o -x assembler-with-cpp $(srcdir)/config/spu/crtn.asm
 
 $(T)crt1.o: $(srcdir)/config/spu/crt0.c $(GCC_PASSES)
 	$(GCC_FOR_TARGET) $(GCC_CFLAGS) $(MULTILIB_CFLAGS) $(INCLUDES) \
-	-O2 -D_SPU_THREAD \
+	-Os -D_SPU_THREAD \
 	-c -o $(T)crt1.o $(srcdir)/config/spu/crt0.c
 
 $(T)crt2.o: $(srcdir)/config/spu/crt0.c $(GCC_PASSES)
 	$(GCC_FOR_TARGET) $(GCC_CFLAGS) $(MULTILIB_CFLAGS) $(INCLUDES) \
-	-O2 -D_STD_MAIN \
+	-Os -D_STD_MAIN \
 	-c -o $(T)crt2.o $(srcdir)/config/spu/crt0.c
 
 $(T)crt3.o: $(srcdir)/config/spu/crt0.c $(GCC_PASSES)
 	$(GCC_FOR_TARGET) $(GCC_CFLAGS) $(MULTILIB_CFLAGS) $(INCLUDES) \
-	-O2 -D_RAW_SPU \
+	-Os -D_RAW_SPU \
 	-c -o $(T)crt3.o $(srcdir)/config/spu/crt0.c
 
 $(T)crt4.o: $(srcdir)/config/spu/crt0.c $(GCC_PASSES)
 	$(GCC_FOR_TARGET) $(GCC_CFLAGS) $(MULTILIB_CFLAGS) $(INCLUDES) \
-	-O2 -D_ISO_SPU \
+	-Os -D_ISO_SPU \
 	-c -o $(T)crt4.o $(srcdir)/config/spu/crt0.c
 
 $(T)spurs_task.o: $(srcdir)/config/spu/crt0.c $(GCC_PASSES)
 	$(GCC_FOR_TARGET) $(GCC_CFLAGS) $(MULTILIB_CFLAGS) $(INCLUDES) \
-	-O2 -D_SPURS_TASK \
+	-Os -D_SPURS_TASK \
 	-c -o $(T)spurs_task.o $(srcdir)/config/spu/crt0.c
 
 $(T)crtend1.o: $(srcdir)/config/spu/crtend.c $(GCC_PASSES)
 	$(GCC_FOR_TARGET) $(GCC_CFLAGS) $(MULTILIB_CFLAGS) $(INCLUDES) \
-	-O2 \
+	-Os \
 	-c -o $(T)crtend1.o $(srcdir)/config/spu/crtend.c
+
+$(T)init_fixups.o: $(srcdir)/config/spu/init_fixups.c $(GCC_PASSES)
+	$(GCC_FOR_TARGET) $(GCC_CFLAGS) $(MULTILIB_CFLAGS) $(INCLUDES) \
+	-Os -ffixed-79 \
+	-c -o $(T)init_fixups.o $(srcdir)/config/spu/init_fixups.c
+
+$(T)init_crtend.o: $(srcdir)/config/spu/init_crtend.c $(GCC_PASSES)
+	$(GCC_FOR_TARGET) $(GCC_CFLAGS) $(MULTILIB_CFLAGS) $(INCLUDES) \
+	-Os -ffixed-79 \
+	-c -o $(T)init_crtend.o $(srcdir)/config/spu/init_crtend.c
+
+$(T)fini_crtbegin.o: $(srcdir)/config/spu/fini_crtbegin.c $(GCC_PASSES)
+	$(GCC_FOR_TARGET) $(GCC_CFLAGS) $(MULTILIB_CFLAGS) $(INCLUDES) \
+	-Os -ffixed-79 \
+	-c -o $(T)fini_crtbegin.o $(srcdir)/config/spu/fini_crtbegin.c
 
 spu-c.o: $(srcdir)/config/spu/spu-c.c \
     $(srcdir)/config/spu/spu-protos.h \

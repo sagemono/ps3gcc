@@ -525,6 +525,7 @@ init_optimization_passes (void)
   NEXT_PASS (pass_dce);
   NEXT_PASS (pass_dse);
   NEXT_PASS (pass_may_alias);
+  NEXT_PASS (pass_promote_vector);
   NEXT_PASS (pass_forwprop);
   NEXT_PASS (pass_phiopt);
   NEXT_PASS (pass_object_sizes);

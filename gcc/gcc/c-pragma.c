@@ -911,7 +911,7 @@ handle_pragma_option (cpp_reader * ARG_UNUSED (dummy))
   else if (strcmp (cmdstr, "pop") == 0)
     {
       if (c_lex (&second_arg) != CPP_EOF)
-	warning (OPT_Wpragmas, "junk at end of %<#pragma pack%>");
+	warning (OPT_Wpragmas, "junk at end of %<#pragma option%>");
 
       if (option_stack_top != NULL)
 	pop_option_stack();

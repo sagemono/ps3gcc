@@ -31,9 +31,11 @@
 #    the executable file might be covered by the GNU General Public License.
 # 
 
-# This file just makes sure that the .fini and .init sections do in
-# fact return.  Users may put any desired instructions in those sections.
-# This file is the last thing linked into any executable.
+# This file contains the epilogue part of the special __init() and
+# __fini() functions.  .init and .fini sections written by a user must
+# not use non-volatile registers that aren't saved here, and they must
+# not clobber the stack space allocated here.  This file must be the
+# last thing linked into any executable.
 
 	# Note - this macro is complimented by the FUNC_START macro
 	# in crti.asm.  If you change this macro you must also change
@@ -44,8 +46,11 @@
 	# simple.  Restore all the save resgisters, including the link
 	# register and then perform the correct function return instruction.
 .macro FUNC_END
-	lqd	$lr, 0($sp)
-	ai	$sp, $sp, 16
+	lqd	$lr, 96($sp)
+	lqd	$80, 32($sp)
+	lqd	$81, 48($sp)
+	lqd	$126, 64($sp)
+	ai	$sp, $sp, 80
 	bi	$lr
 .endm
 		

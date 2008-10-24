@@ -307,13 +307,13 @@ powerpc*-*-*)
 	;;
 ppu-*-lv2)
 	cpu_type=rs6000
-	extra_headers="ppc-asm.h altivec.h spe.h si2vmx.h si2vmx_gcc.h spu2vmx.h spu2vmx_gcc.h ppu_intrinsics.h ppu_intrinsics_gcc.h vec_types.h"
+	extra_headers="ppc-asm.h altivec.h spe.h si2vmx.h si2vmx_gcc.h spu2vmx.h spu2vmx_gcc.h ppu_intrinsics.h vec_types.h"
 	need_64bit_hwint=yes
 	cpu_is_64bit=yes
 	;;
 ppu-*-tb)
 	cpu_type=rs6000
-	extra_headers="ppc-asm.h altivec.h spe.h si2vmx.h si2vmx_gcc.h spu2vmx.h spu2vmx_gcc.h ppu_intrinsics.h ppu_intrinsics_gcc.h vec_types.h"
+	extra_headers="ppc-asm.h altivec.h spe.h si2vmx.h si2vmx_gcc.h spu2vmx.h spu2vmx_gcc.h ppu_intrinsics.h vec_types.h"
 	need_64bit_hwint=yes
 	cpu_is_64bit=yes
 	;;

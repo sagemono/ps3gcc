@@ -797,7 +797,7 @@ static const char *cpp_unique_options =
  %{!Q:-quiet} %{nostdinc*} %{C} %{CC} %{v} %{I*&F*} %{P} %I\
  %{MD:-MD %{!o:%b.d}%{o*:%.d%*}}\
  %{MMD:-MMD %{!o:%b.d}%{o*:%.d%*}}\
- %{M} %{MM} %{MF*} %{MG} %{MP} %{MQ*} %{MT*} %{MV} \
+ %{M} %{MM} %{MF*} %{MG} %{MP} %{MQ*} %{MT*} %{MV} %{MC} \
  %{!E:%{!M:%{!MM:%{MD|MMD:%{o*:-MQ %*}}}}}\
  %{remap} %{g3:-dD} %{H} %C %{D*&U*&A*} %{i*} %Z %i\
  %{fmudflap:-D_MUDFLAP -include mf-runtime.h}\

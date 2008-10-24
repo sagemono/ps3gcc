@@ -483,6 +483,8 @@ dump_generic_node (pretty_printer *buffer, tree node, int spc, int flags,
 
 	  if (TYPE_REF_CAN_ALIAS_ALL (node))
 	    pp_string (buffer, " {ref-all}");
+	  if (TYPE_MODE (node) != ptr_mode)
+	    pp_string (buffer, " {Pmode}");
 	}
       break;
 

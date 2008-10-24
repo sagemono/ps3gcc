@@ -43,9 +43,12 @@ struct deps
   unsigned int vpaths_size;
 
   int visual_studio;
+  /* begin sce local, bugzilla 51130 */
+  int cygwin_make;
+  /* end sce local */
 };
 
-static const char *munge (const char *, int);
+static const char *munge (const char *, struct deps *);
 
 /* Given a filename, quote characters in that filename which are
    significant to Make.  Note that it's not possible to quote all such
@@ -55,9 +58,9 @@ static const char *munge (const char *, int);
    3.76.1.)  */
 
 static const char *
-munge (const char *filename, int vs_quote)
+munge (const char *filename, struct deps *d)
 {
-  int len, do_vs_quote = 0;
+  int len, do_vs_quote = 0, do_cygdrive = 0;
   const char *p, *q;
   char *dst, *buffer;
 
@@ -67,7 +70,7 @@ munge (const char *filename, int vs_quote)
 	{
 	case ' ':
 	case '\t':
-	  if (vs_quote)
+	  if (d->visual_studio)
 	    {
 	      do_vs_quote = 1;
 	      break;
@@ -92,6 +95,17 @@ munge (const char *filename, int vs_quote)
 
   if (do_vs_quote)
     len += 2;
+  /* begin sce local, bugzilla 51130 */
+  else if (
+      d->cygwin_make && 3 < strlen(filename)
+      && filename[1] == ':' && filename[2] == '/'
+      && ( (filename[0] >= 'A' && filename[0] <= 'Z') || (filename[0] >= 'a' && filename[0] <= 'z') )
+  )
+    {
+      do_cygdrive = 1;
+      len += 9; /* 2(c:) -> 11(/cygdrive/c) */
+    }
+  /* end sce local */
 
   /* Now we know how big to make the buffer.  */
   buffer = XNEWVEC (char, len + 1);
@@ -100,6 +114,15 @@ munge (const char *filename, int vs_quote)
   dst = buffer;
   if (do_vs_quote)
     *dst++ = '"';
+  /* begin sce local, bugzilla 51130 */
+  else if (do_cygdrive)
+   {
+    strncpy(dst, "/cygdrive/", 10);
+    dst+=10;
+    *dst++ = filename[0];
+    p+=2;
+   }
+  /* end sce local */
   for ( ; *p; p++, dst++)
     {
       switch (*p)
@@ -175,6 +198,9 @@ deps_init (cpp_reader *pfile)
   if (d)
     {
       d->visual_studio = CPP_OPTION (pfile, deps.visual_studio);
+      /* begin sce local, bugzilla 51130 */
+      d->cygwin_make = CPP_OPTION (pfile, deps.cygwin_make);
+      /* end sce local */
     }
   return d;
 }
@@ -221,8 +247,14 @@ deps_add_target (struct deps *d, const char *t, int quote)
     }
 
   t = apply_vpath (d, t);
+
+  /* begin sce local, bugzilla 51130 */
+  if (d->cygwin_make)
+    quote = 1;
+  /* end sce local */
+
   if (quote)
-    t = munge (t, d->visual_studio);  /* Also makes permanent copy.  */
+    t = munge (t, d);  /* Also makes permanent copy.  */
   else
     t = xstrdup (t);
 
@@ -265,7 +297,7 @@ deps_add_default_target (struct deps *d, const char *tgt)
 void
 deps_add_dep (struct deps *d, const char *t)
 {
-  t = munge (apply_vpath (d, t), d->visual_studio);  /* Also makes permanent copy.  */
+  t = munge (apply_vpath (d, t), d);  /* Also makes permanent copy.  */
 
   if (d->ndeps == d->deps_size)
     {

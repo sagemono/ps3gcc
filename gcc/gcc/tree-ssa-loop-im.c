@@ -581,6 +581,7 @@ static tree
 rewrite_reciprocal (block_stmt_iterator *bsi)
 {
   tree stmt, lhs, rhs, stmt1, stmt2, var, name, tmp;
+  tree real_one;
 
   stmt = bsi_stmt (*bsi);
   lhs = TREE_OPERAND (stmt, 0);
@@ -589,9 +590,25 @@ rewrite_reciprocal (block_stmt_iterator *bsi)
   /* stmt must be MODIFY_EXPR.  */
   var = create_tmp_var (TREE_TYPE (rhs), "reciptmp");
   add_referenced_tmp_var (var);
+ DECL_GIMPLE_REG_P (var) = 1;
+
+  /* For vectors, create a VECTOR_CST full of 1's.  */
+  if (TREE_CODE (TREE_TYPE (rhs)) == VECTOR_TYPE)
+    {
+      tree vector_type = TREE_TYPE (rhs);
+      int i, len;
+      tree list = NULL_TREE;
+      real_one = build_real (TREE_TYPE (vector_type), dconst1);
+      len = TYPE_VECTOR_SUBPARTS (vector_type);
+      for (i = 0; i < len; i++)
+	list = tree_cons (NULL, real_one, list);
+      real_one = build_vector (vector_type, list);
+    }
+  else
+    real_one = build_real (TREE_TYPE (rhs), dconst1);
 
   tmp = build2 (RDIV_EXPR, TREE_TYPE (rhs),
-		build_real (TREE_TYPE (rhs), dconst1),
+		real_one,
 		TREE_OPERAND (rhs, 1));
   stmt1 = build2 (MODIFY_EXPR, TREE_TYPE (var), var, tmp);
   name = make_ssa_name (var, stmt1);

@@ -1658,10 +1658,16 @@ find_interesting_uses_stmt (struct ivopts_data *data, tree stmt)
 	  return;
 
 	case tcc_reference:
-	  find_interesting_uses_address (data, stmt, &TREE_OPERAND (stmt, 1));
-	  if (REFERENCE_CLASS_P (lhs))
-	    find_interesting_uses_address (data, stmt, &TREE_OPERAND (stmt, 0));
-	  return;
+	  /* Don't look at the case where we might have a VIEW_CONVERT_EXPR
+	     of a SSA_NAME which is not really a reference but a conversion. */
+	  if (TREE_CODE (rhs) != VIEW_CONVERT_EXPR
+	      || TREE_CODE (TREE_OPERAND (rhs, 0)) != SSA_NAME)
+	    {
+	      find_interesting_uses_address (data, stmt, &TREE_OPERAND (stmt, 1));
+	      if (REFERENCE_CLASS_P (lhs))
+		find_interesting_uses_address (data, stmt, &TREE_OPERAND (stmt, 0));
+	      return;
+	    }
 
 	default: ;
 	}

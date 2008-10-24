@@ -82,6 +82,7 @@ static int get_pipe				(rtx);
 static tree spu_handle_fndecl_attribute 	(tree *node, tree name, tree args, int flags, bool *no_add_attrs);
 static tree spu_handle_vector_attribute 	(tree *node, tree name, tree args, int flags, bool *no_add_attrs);
 static int spu_naked_function_p 		(tree func);
+static int spu_init_fini_function_p 		(tree func);
 static int mem_is_padded_component_ref		(rtx x);
 static int reg_aligned_for_addr			(rtx x, int aligned);
 
@@ -1435,7 +1436,8 @@ get_pic_reg (void)
   rtx pic_reg = pic_offset_table_rtx;
   if (!reload_completed && !reload_in_progress)
     abort();
-  if (current_function_is_leaf && !regs_ever_live[LAST_ARG_REGNUM])
+  if (current_function_is_leaf && !regs_ever_live[LAST_ARG_REGNUM]
+      && !fixed_regs[LAST_ARG_REGNUM] && !TARGET_FIXED_PIC_REG)
     pic_reg = gen_rtx_REG(SImode, LAST_ARG_REGNUM);
   return pic_reg;
 }
@@ -1581,8 +1583,10 @@ need_to_save_reg (int regno)
   if (flag_pic
       && regno == PIC_OFFSET_TABLE_REGNUM 
       && (current_function_uses_pic_offset_table)
+      && !TARGET_FIXED_PIC_REG
       && (!current_function_is_leaf
-	  || regs_ever_live[LAST_ARG_REGNUM]))
+	  || regs_ever_live[LAST_ARG_REGNUM]
+	  || fixed_regs[LAST_ARG_REGNUM]))
     return 1;
   return 0;
 }
@@ -1655,7 +1659,8 @@ direct_return (void)
 	      + get_frame_size()
 	      + current_function_outgoing_args_size
 	      + current_function_pretend_args_size == 0)
-          &&  current_function_is_leaf)
+          &&  current_function_is_leaf
+          && !spu_naked_function_p (current_function_decl))
 	return 1;
     }
 
@@ -1745,11 +1750,41 @@ spu_expand_prologue (void)
      the "toplevel" insn chain.  */
   emit_note (NOTE_INSN_DELETED);
 
-  if (spu_naked_function_p (current_function_decl))
-    return;
-
   scratch_reg_0 = get_scratch_reg(0);
   scratch_reg_1 = get_scratch_reg(scratch_reg_0);
+
+  if (spu_naked_function_p (current_function_decl))
+    {
+      if (spu_init_fini_function_p (current_function_decl))
+	{
+	  /* The special __init() and __fini() functions only save
+	   * registers $80, $81 and $126.  Make sure other non-volatile
+	   * registers are not used. */
+	  for (regno = 81; regno < FIRST_PSEUDO_REGISTER; ++regno)
+	    if (regno != PIC_OFFSET_TABLE_REGNUM && need_to_save_reg (regno))
+	      break;
+	  if (regno < FIRST_PSEUDO_REGISTER)
+	    error ("%qD, in section `%s', must not use registers $82 or higher",
+		   current_function_decl,
+		   TREE_STRING_POINTER (DECL_SECTION_NAME (current_function_decl)));
+	  if (current_function_calls_alloca || size > 0)
+	    error ("%qD, in section `%s', must not use the stack",
+		   current_function_decl,
+		   TREE_STRING_POINTER (DECL_SECTION_NAME (current_function_decl)));
+	}
+      if (flag_pic && current_function_uses_pic_offset_table
+	  && !TARGET_FIXED_PIC_REG)
+	{
+	  rtx pic_reg = get_pic_reg();
+	  insn = emit_insn(gen_load_pic_offset(pic_reg, scratch_reg_0));
+	  REG_NOTES(insn) = gen_rtx_EXPR_LIST (REG_MAYBE_DEAD, const0_rtx,
+					       REG_NOTES (insn));
+	  insn = emit_insn(gen_subsi3(pic_reg, pic_reg, scratch_reg_0));
+	  REG_NOTES(insn) = gen_rtx_EXPR_LIST (REG_MAYBE_DEAD, const0_rtx,
+					       REG_NOTES (insn));
+	}
+      return;
+    }
 
   saved_regs_size = spu_saved_regs_size ();
   total_size = size + saved_regs_size
@@ -1781,7 +1816,8 @@ spu_expand_prologue (void)
 	  }
     }
 
-  if (flag_pic && current_function_uses_pic_offset_table)
+  if (flag_pic && current_function_uses_pic_offset_table
+      && !TARGET_FIXED_PIC_REG)
     {
       rtx pic_reg = get_pic_reg();
       insn = emit_insn(gen_load_pic_offset(pic_reg, scratch_reg_0));
@@ -2317,8 +2353,8 @@ pad_bb(void)
 	    }
 	}
       else if (GET_MODE (insn) == TImode
-	  && next_insn
-	  && GET_MODE (next_insn) != TImode
+	  && ((next_insn && GET_MODE (next_insn) != TImode)
+	      || get_attr_type (insn) == TYPE_MULTI0)
 	  && ((addr + length) & 7) != 0)
 	{
 	  /* prev_insn will always be set because the first insn is
@@ -2750,7 +2786,7 @@ spu_machine_dependent_reorg (void)
   int branch_addr = 0, insn_addr, required_dist = 0;
   int i, max;
   unsigned int j;
-  struct rtx_def *save_var_loc; // sce local , Bz #20822
+  struct rtx_def *save_var_loc; /* sce local , Bz #20822 */
 
   if (!TARGET_BRANCH_HINTS || optimize == 0)
     {
@@ -3314,7 +3350,7 @@ spu_sched_reorder (FILE *file ATTRIBUTE_UNUSED, int verbose ATTRIBUTE_UNUSED,
 {
   int i, nready = *nreadyp;
   int pipe_0, pipe_1, pipe_hbrp, pipe_ls, schedule_i, pipe_early;
-  rtx insn, set;
+  rtx insn;
 
   if (nready <= 0 || pipe1_clock >= clock)
     return 0;
@@ -4248,10 +4284,25 @@ spu_naked_function_p (tree func)
   tree a;
 
   if (TREE_CODE (func) != FUNCTION_DECL)
-    abort ();
+    return 0;
   
   a = lookup_attribute ("naked", DECL_ATTRIBUTES (func));
-  return a != NULL_TREE;
+  return (a != NULL_TREE || spu_init_fini_function_p (func));
+}
+
+/* Return non-zero if FUNC is marked with section(".init") or
+ * section(".fini"). */
+static int
+spu_init_fini_function_p (tree func)
+{
+  const char *name;
+  if (!func || TREE_CODE (func) != FUNCTION_DECL
+      || !DECL_SECTION_NAME (func))
+    return 0;
+  name = TREE_STRING_POINTER (DECL_SECTION_NAME (func));
+  return ((strncmp (name, ".init", 5) == 0
+	   || strncmp (name, ".fini", 5) == 0)
+	  && (name[5] == 0 || name[5] == '.'));
 }
 
 int
@@ -5498,12 +5549,12 @@ spu_rtx_costs (rtx x, int code, int outer_code ATTRIBUTE_UNUSED,
    */
 
   /* Use defaults for float operations.  Not accurate but good enough. */
-  if (mode == DFmode)
+  if (mode == DFmode || mode == V2DFmode)
     {
       *total = COSTS_N_INSNS (13);
       return true;
     }
-  if (mode == SFmode)
+  if (mode == SFmode || mode == V4SFmode)
     {
       *total = COSTS_N_INSNS (6);
       return true;
@@ -6413,6 +6464,9 @@ spu_eh_return_filter_mode (void)
 static bool
 spu_function_ok_for_sibcall (tree decl, tree exp ATTRIBUTE_UNUSED)
 {
+  if (spu_init_fini_function_p (decl))
+    return false;
+
   if (TARGET_LARGE_MEM)
     return false;
 

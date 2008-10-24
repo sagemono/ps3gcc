@@ -2718,8 +2718,54 @@ gimplify_init_ctor_eval (tree object, VEC(constructor_elt,gc) *elts,
 				 pre_p, cleared);
       else
 	{
-	  init = build2 (INIT_EXPR, TREE_TYPE (cref), cref, value);
-	  gimplify_and_add (init, pre_p);
+	  if ((array_elt_type) && (TREE_CODE (value) == STRING_CST))
+          {
+            int i;
+            int n = TREE_STRING_LENGTH (value) - 1;
+
+            /* Initialize the scalar elements of the array with the
+               relevant characters of the string its been initialized
+               with; I.e.
+
+               char str[2][34] = {"a","b"};
+
+               ==>
+
+               str = {};
+               str[0][0] = 97;
+               str[1][0] = 98;  */
+
+            for (i = 0; i < n; i++)
+              {
+                tree idx, cref_elm, str_elm;
+
+                /* As the array is first zero out; do not copy
+                   the string terminator but we could have an embedded
+		    null character so just skip it.  */
+                if ((int) TREE_STRING_POINTER (value)[i] == '\0')
+                  continue;
+
+                idx = build_int_cst (TREE_TYPE (purpose), i);
+                cref_elm =
+                  build4 (ARRAY_REF, char_type_node, unshare_expr (cref), idx,
+                          NULL_TREE, NULL_TREE);
+
+                str_elm =
+                  build_int_cst (integer_type_node,
+                                 (int) TREE_STRING_POINTER (value)[i]);
+
+                init =
+                  build2 (INIT_EXPR, TREE_TYPE (cref_elm), cref_elm, str_elm);
+                gimplify_and_add (init, pre_p);
+              }
+	 }
+        else
+          {
+            init = build2 (INIT_EXPR, TREE_TYPE (cref), cref, value);
+            gimplify_and_add (init, pre_p);
+          }
+
+
 	}
     }
 }

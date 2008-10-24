@@ -140,3 +140,11 @@ mwarn-stop0
 Target Report Mask(WARN_STOP0)
 Warn when using 0 as an argument to the stop instruction or intrinsics
 
+mfixed-pic-reg
+Target Report Mask(FIXED_PIC_REG)
+Assume $126 has been initialized as the PIC base register
+
+mfixups
+Target 
+Create fixups at link time for PIC
+

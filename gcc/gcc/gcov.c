@@ -309,6 +309,11 @@ static int flag_function_summary = 0;
 
 static char *object_directory = 0;
 
+/* Source file directory file prefix.  This is the directory where the
+   source files are looked for, if nonzero.  */
+
+static char *source_directory = 0;
+
 /* Preserve all pathname components. Needed when object files and
    source files are in subdirectories. '/' is mangled as '#', '.' is
    elided and '..' mangled to '^'.  */
@@ -400,6 +405,7 @@ print_usage (int error_p)
   fnotice (file, "  -o, --object-directory DIR|FILE Search for object files in DIR or called FILE\n");
   fnotice (file, "  -p, --preserve-paths            Preserve all pathname components\n");
   fnotice (file, "  -u, --unconditional-branches    Show unconditional branch counts too\n");
+  fnotice (file, "  -s, --source-directory DIR      Search for source files in DIR\n");
   fnotice (file, "\nFor bug reporting instructions, please see:\n%s.\n",
 	   bug_report_url);
   exit (status);
@@ -434,6 +440,7 @@ static const struct option options[] =
   { "object-directory",     required_argument, NULL, 'o' },
   { "object-file",          required_argument, NULL, 'o' },
   { "unconditional-branches", no_argument,     NULL, 'u' },
+  { "source-directory",     required_argument, NULL, 's' },
   { 0, 0, 0, 0 }
 };
 
@@ -444,7 +451,7 @@ process_args (int argc, char **argv)
 {
   int opt;
 
-  while ((opt = getopt_long (argc, argv, "abcfhlno:puv", options, NULL)) != -1)
+  while ((opt = getopt_long (argc, argv, "abcfhlno:ps:uv", options, NULL)) != -1)
     {
       switch (opt)
 	{
@@ -474,6 +481,9 @@ process_args (int argc, char **argv)
 	  break;
 	case 'p':
 	  flag_preserve_paths = 1;
+	  break;
+	case 's':
+	  source_directory = optarg;
 	  break;
 	case 'u':
 	  flag_unconditional = 1;
@@ -626,7 +636,7 @@ create_file_names (const char *file_name)
 
       base = !stat (object_directory, &status) && S_ISDIR (status.st_mode);
       strcat (name, object_directory);
-      if (base && name[strlen (name) - 1] != '/')
+      if (base && !IS_DIR_SEPARATOR (name[strlen (name) - 1]))
 	strcat (name, "/");
     }
   else
@@ -639,7 +649,7 @@ create_file_names (const char *file_name)
   if (base)
     {
       /* Append source file name.  */
-      cptr = strrchr (file_name, '/');
+      cptr = ldirseparator (file_name);
       strcat (name, cptr ? cptr + 1 : file_name);
     }
 
@@ -1423,13 +1433,13 @@ make_gcov_file_name (const char *input_name, const char *src_name)
   if (flag_long_names && strcmp (src_name, input_name))
     {
       /* Generate the input filename part.  */
-      cptr = flag_preserve_paths ? NULL : strrchr (input_name, '/');
+      cptr = flag_preserve_paths ? NULL : ldirseparator (input_name);
       strcat (name, cptr ? cptr + 1 : input_name);
       strcat (name, "##");
     }
 
   /* Generate the source filename part.  */
-  cptr = flag_preserve_paths ? NULL : strrchr (src_name, '/');
+  cptr = flag_preserve_paths ? NULL : ldirseparator (src_name);
   strcat (name, cptr ? cptr + 1 : src_name);
 
   if (flag_preserve_paths)
@@ -1778,18 +1788,32 @@ output_lines (FILE *gcov_file, const source_t *src)
   char string[STRING_SIZE];     /* line buffer.  */
   char const *retval = "";	/* status of source file reading.  */
   function_t *fn = NULL;
+  char *name;
 
-  fprintf (gcov_file, "%9s:%5d:Source:%s\n", "-", 0, src->name);
+  if (source_directory && source_directory[0])
+    {
+      char *cptr = ldirseparator (src->name);
+      name = XNEWVEC (char, strlen (source_directory) + 2
+		      + strlen (src->name) + 1);
+      strcpy (name, source_directory);
+      if (!IS_DIR_SEPARATOR(name[strlen (source_directory) - 1]))
+	strcat (name, "/");
+      strcat (name, cptr ? cptr + 1 : src->name);
+    }
+  else
+    name = src->name;
+
+  fprintf (gcov_file, "%9s:%5d:Source:%s\n", "-", 0, name);
   fprintf (gcov_file, "%9s:%5d:Graph:%s\n", "-", 0, bbg_file_name);
   fprintf (gcov_file, "%9s:%5d:Data:%s\n", "-", 0, da_file_name);
   fprintf (gcov_file, "%9s:%5d:Runs:%u\n", "-", 0,
 	   object_summary.ctrs[GCOV_COUNTER_ARCS].runs);
   fprintf (gcov_file, "%9s:%5d:Programs:%u\n", "-", 0, program_count);
 
-  source_file = fopen (src->name, "r");
+  source_file = fopen (name, "r");
   if (!source_file)
     {
-      fnotice (stderr, "%s:cannot open source file\n", src->name);
+      fnotice (stderr, "%s:cannot open source file\n", name);
       retval = NULL;
     }
   else
@@ -1805,6 +1829,9 @@ output_lines (FILE *gcov_file, const source_t *src)
 		   "-", 0);
 	}
     }
+
+  if (source_directory)
+    free (name);
 
   if (flag_branches)
     fn = src->functions;

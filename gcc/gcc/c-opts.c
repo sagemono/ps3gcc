@@ -373,7 +373,16 @@ c_common_handle_option (size_t scode, const char *arg, int value)
 
     case OPT_MV:
       cpp_opts->deps.visual_studio = true;
+      cpp_opts->deps.cygwin_make = false;
       break;
+
+    /* begin sce local, bugzilla 51130 */
+    case OPT_MC:
+      /* -MV and -MC are mutually exclusive. */
+      cpp_opts->deps.visual_studio = false;
+      cpp_opts->deps.cygwin_make = true;
+      break;
+    /* end sce local */
 
     case OPT_P:
       flag_no_line_commands = 1;
@@ -1024,8 +1033,11 @@ c_common_post_options (const char **pfilename)
   if (flag_objc_exceptions && !flag_objc_sjlj_exceptions)
     flag_exceptions = 1;
 
-  /* -Wextra implies -Wsign-compare and -Wmissing-field-initializers,
+  /* -Wextra implies  -Wempty-body, -Wsign-compare,
+     and -Wmissing-field-initializers,
      but not if explicitly overridden.  */
+  if (warn_empty_body == -1)
+    warn_empty_body = extra_warnings;
   if (warn_sign_compare == -1)
     warn_sign_compare = extra_warnings;
   if (warn_missing_field_initializers == -1)

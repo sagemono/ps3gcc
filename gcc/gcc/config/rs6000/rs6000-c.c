@@ -1681,7 +1681,7 @@ const struct altivec_builtin_types altivec_overloaded_builtins[] = {
     RS6000_BTI_bool_V8HI, RS6000_BTI_bool_V8HI, RS6000_BTI_INTSI, 0 },
   { ALTIVEC_BUILTIN_VEC_SPLAT, ALTIVEC_BUILTIN_VSPLTH,
     RS6000_BTI_pixel_V8HI, RS6000_BTI_pixel_V8HI, RS6000_BTI_INTSI, 0 },
-  { ALTIVEC_BUILTIN_VEC_SPLAT, ALTIVEC_BUILTIN_VSPLTW,
+  { ALTIVEC_BUILTIN_VEC_SPLAT, ALTIVEC_BUILTIN_VSPLTSF,
     RS6000_BTI_V4SF, RS6000_BTI_V4SF, RS6000_BTI_INTSI, 0 },
   { ALTIVEC_BUILTIN_VEC_SPLAT, ALTIVEC_BUILTIN_VSPLTW,
     RS6000_BTI_V4SI, RS6000_BTI_V4SI, RS6000_BTI_INTSI, 0 },
@@ -1689,7 +1689,9 @@ const struct altivec_builtin_types altivec_overloaded_builtins[] = {
     RS6000_BTI_unsigned_V4SI, RS6000_BTI_unsigned_V4SI, RS6000_BTI_INTSI, 0 },
   { ALTIVEC_BUILTIN_VEC_SPLAT, ALTIVEC_BUILTIN_VSPLTW,
     RS6000_BTI_bool_V4SI, RS6000_BTI_bool_V4SI, RS6000_BTI_INTSI, 0 },
-  { ALTIVEC_BUILTIN_VEC_VSPLTW, ALTIVEC_BUILTIN_VSPLTW,
+  { ALTIVEC_BUILTIN_VEC_VSPLTSF, ALTIVEC_BUILTIN_VSPLTSF,
+    RS6000_BTI_V4SF, RS6000_BTI_V4SF, RS6000_BTI_INTSI, 0 },
+  { ALTIVEC_BUILTIN_VEC_VSPLTW, ALTIVEC_BUILTIN_VSPLTSF,
     RS6000_BTI_V4SF, RS6000_BTI_V4SF, RS6000_BTI_INTSI, 0 },
   { ALTIVEC_BUILTIN_VEC_VSPLTW, ALTIVEC_BUILTIN_VSPLTW,
     RS6000_BTI_V4SI, RS6000_BTI_V4SI, RS6000_BTI_INTSI, 0 },
@@ -2853,8 +2855,12 @@ rs6000_builtin_type_compatible (tree t, int id)
   builtin_type = rs6000_builtin_type (id);
   if (INTEGRAL_TYPE_P (t) && INTEGRAL_TYPE_P (builtin_type))
     return true;
-  else
-    return lang_hooks.types_compatible_p (t, builtin_type);
+
+  /* When a vecreg is used it must be promoted to a vector type for it to be
+     in the same format as those of the builtin's parameters */
+  if (TREE_CODE (t) == VECTOR_TYPE && TYPE_VECREG (t))
+    t = build_vector_type (TREE_TYPE (t), TYPE_VECTOR_SUBPARTS (t));
+  return lang_hooks.types_compatible_p (t, builtin_type);
 }
 
 

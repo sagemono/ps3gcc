@@ -3,7 +3,7 @@
 # Copyright(C) 2008 Sony Computer Entertainment Inc.
 # All Rights Reserved.
 
-# This script builds and installs ppu-lv2 toolchain for SDK2.4.0-GCC411.  The
+# This script builds and installs ppu-lv2 toolchain for SDK2.5.0-GCC411.  The
 # existing toolchain directory is backed up as "host-linux/ppu.~N~" where
 # N is a generated number.
 # If environment variable CELLSDK is set, it should be the directory where
@@ -63,36 +63,6 @@ set inc = `ppu-lv2-gcc -print-file-name=include`
 foreach h (float.h math.h spe.h stdbool.h stdlib.h varargs.h iso646.h \
 	stddef.h syslimits.h limits.h stdarg.h stdio.h)
   rm -f $inc/$h || exit 1
-end
-cd ../..
-
-mkdir -p ppu-lv2/libsupcxx || exit 1
-cd ppu-lv2/libsupcxx || exit 1
-ppu-lv2-g++ -c -O2 -g -mno-altivec -I $SRC/libsupcxx \
-	$SRC/libsupcxx/*.cc || exit 1
-ppu-lv2-ar cr libsupc++.a *.o || exit 1
-foreach d (fno-exceptions fno-exceptions/fno-rtti)
-  mkdir -p $d || exit 1
-  pushd $d || exit 1
-  set options = -fno-exceptions
-  set files = (eh_alloc.cc eh_aux_runtime.cc eh_catch.cc eh_globals.cc \
-	eh_personality.cc eh_terminate.cc eh_throw.cc pure.cc tinfo.cc tinfo2.cc \
-	vec.cc guard.cc)
-  if($d != fno-exceptions) then
-    set options = (-fno-exceptions -fno-rtti)
-    set files = ($files[-9] $files[11-]) # remove tinfo2.cc
-  endif
-  foreach f ($files)
-    ppu-lv2-g++ $options -c -O2 -g -mno-altivec -I $SRC/libsupcxx \
-	$SRC/libsupcxx/$f || exit 1
-  end
-  ppu-lv2-ar cr libsupc++.a *.o || exit 1
-  popd
-end
-set incdir = `ppu-lv2-gcc -print-file-name=include`
-cp -af $SRC/libsupcxx/cxxabi.h $incdir/ || exit 1
-foreach d (. fno-exceptions fno-exceptions/fno-rtti)
-  cp -af $d/libsupc++.a $incdir/../$d || exit 1
 end
 cd ../..
 

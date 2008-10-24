@@ -2576,11 +2576,13 @@ Warn whenever a function is defined with a return-type that defaults to
 @code{int}.  Also warn about any @code{return} statement with no
 return-value in a function whose return-type is not @code{void}.
 
-For C, also warn if the return type of a function has a type qualifier
-such as @code{const}.  Such a type qualifier has no effect, since the
-value returned by a function is not an lvalue.  ISO C prohibits
-qualified @code{void} return types on function definitions, so such
-return types always receive a warning even without this option.
+Also warn if the return type of a function has a type qualifier
+such as @code{const}.  For ISO C such a type qualifier has no effect,
+since the value returned by a function is not an lvalue.
+For C++, the warning is only emitted for scalar types or @code{void}.
+ISO C prohibits qualified @code{void} return types on function
+definitions, so such return types always receive a warning
+even without this option.
 
 For C++, a function without return type always produces a diagnostic
 message, even when @option{-Wno-return-type} is specified.  The only
@@ -2854,7 +2856,8 @@ void foo(bar) @{ @}
 @end smallexample
 
 @item
-An empty body occurs in an @samp{if} or @samp{else} statement.
+An empty body occurs in an @samp{if} or @samp{else} statement. This
+warning can be independently controlled by @option{-Wempty-body}.
 
 @item
 A pointer is compared against integer zero with @samp{<}, @samp{<=},
@@ -4541,7 +4544,7 @@ caller even if they are not marked @code{inline}.  If a call to a given
 function is integrated, then the function is not output as assembler code
 in its own right.
 
-Enabled if @option{-funit-at-a-time} is enabled.
+Enabled by default.
 
 @item -fearly-inlining
 @opindex fearly-inlining
@@ -4559,8 +4562,7 @@ By default, GCC limits the size of functions that can be inlined.  This flag
 allows the control of this limit for functions that are explicitly marked as
 inline (i.e., marked with the inline keyword or defined within the class
 definition in c++).  @var{n} is the size of functions that can be inlined in
-number of pseudo instructions (not counting parameter handling).  The default
-value of @var{n} is 600.
+number of pseudo instructions (not counting parameter handling).
 Increasing this value can result in more inlined code at
 the cost of compilation time and memory consumption.  Decreasing usually makes
 the compilation faster and less code will be inlined (which presumably
@@ -4577,10 +4579,6 @@ as follows:
   is set to @var{n}/2.
  @item max-inline-insns-auto
   is set to @var{n}/2.
- @item min-inline-insns
-  is set to 130 or @var{n}/4, whichever is smaller.
- @item max-inline-insns-rtl
-  is set to @var{n}.
 @end table
 
 See below for a documentation of the individual
@@ -5918,7 +5916,7 @@ For functions declared inline @option{--param max-inline-recursive-depth} is
 taken into acount.  For function not declared inline, recursive inlining
 happens only when @option{-finline-functions} (included in @option{-O3}) is
 enabled and @option{--param max-inline-recursive-depth-auto} is used.  The
-default value is 450.
+default value is 8.
 
 @item min-inline-recursive-probability
 Recursive inlining is profitable only for function having deep recursion

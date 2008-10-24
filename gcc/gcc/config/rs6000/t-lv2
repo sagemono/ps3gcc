@@ -43,6 +43,8 @@ MULTILIB_OPTIONS        = fno-exceptions fno-rtti
 MULTILIB_DIRNAMES	= fno-exceptions fno-rtti
 LIBGCC = stmp-multilib
 INSTALL_LIBGCC    = install-multilib
+#  plain -fno-rtti is not valid multilib
+MULTILIB_EXCEPTIONS=fno-rtti
 
 # We want fine grained libraries, so use the new code to build the
 # floating point emulation libraries.

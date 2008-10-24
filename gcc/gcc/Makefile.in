@@ -973,6 +973,7 @@ OBJS-common = \
  tree-ssa-loop-manip.o tree-ssa-threadupdate.o				   \
  tree-vectorizer.o tree-vect-analyze.o tree-vect-transform.o		   \
  tree-vect-patterns.o                                                      \
+ tree-ssa-promote-vector.o						   \
  tree-ssa-loop-ivcanon.o tree-ssa-propagate.o tree-ssa-address.o	   \
  tree-ssa-math-opts.o							   \
  tree-ssa-loop-ivopts.o tree-if-conv.o tree-ssa-loop-unswitch.o		   \
@@ -1367,7 +1368,6 @@ libgcc.mk: config.status Makefile mklibgcc $(LIB2ADD) $(LIB2ADD_ST) specs \
 	TPBIT_FUNCS='$(TPBIT_FUNCS)' \
 	MULTILIBS=`$(GCC_FOR_TARGET) --print-multi-lib` \
 	EXTRA_MULTILIB_PARTS='$(EXTRA_MULTILIB_PARTS)' \
-	MULTILIB_BUILD_EXCEPTIONS='$(MULTILIB_BUILD_EXCEPTIONS)' \
 	SHLIB_LINK='$(SHLIB_LINK)' \
 	SHLIB_INSTALL='$(SHLIB_INSTALL)' \
 	SHLIB_EXT='$(SHLIB_EXT)' \
@@ -1799,6 +1799,10 @@ tree-ssa-phiopt.o : tree-ssa-phiopt.c $(CONFIG_H) $(SYSTEM_H) coretypes.h \
    $(TM_H) $(GGC_H) $(TREE_H) $(RTL_H) $(TM_P_H) $(BASIC_BLOCK_H) \
    $(TREE_FLOW_H) tree-pass.h $(TREE_DUMP_H) langhooks.h $(FLAGS_H) \
    $(DIAGNOSTIC_H) $(TIMEVAR_H)
+tree-ssa-promote-vector.o : tree-ssa-promote-vector.c $(CONFIG_H) $(SYSTEM_H) coretypes.h \
+   $(TM_H) $(GGC_H) $(TREE_H) $(RTL_H) $(TM_P_H) $(BASIC_BLOCK_H) \
+   $(TREE_FLOW_H) tree-pass.h $(TREE_DUMP_H) langhooks.h $(FLAGS_H) \
+   $(DIAGNOSTIC_H) $(TIMEVAR_H) tree-ssa-propagate.h $(OPTABS_H)
 tree-nrv.o : tree-nrv.c $(CONFIG_H) $(SYSTEM_H) coretypes.h \
    $(TM_H) $(TREE_H) $(RTL_H) $(FUNCTION_H) $(BASIC_BLOCK_H) $(EXPR_H) \
    $(DIAGNOSTIC_H) $(TREE_FLOW_H) $(TIMEVAR_H) $(TREE_DUMP_H) tree-pass.h \

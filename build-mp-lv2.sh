@@ -3,7 +3,7 @@
 # Copyright(C) 2008 Sony Computer Entertainment Inc.
 # All Rights Reserved.
 
-# This script builds and installs mingw->ppu-lv2 toolchain for SDK2.4.0-GCC411.  The
+# This script builds and installs mingw->ppu-lv2 toolchain for SDK2.5.0-GCC411.  The
 # existing toolchain directory is backed up as "host-win32/ppu.~N~" where
 # N is a generated number.
 # If environment variable CELLSDK is set, it should be the directory where
@@ -76,12 +76,6 @@ foreach h (float.h spe.h stdbool.h varargs.h iso646.h \
 	stddef.h syslimits.h limits.h stdarg.h)
   rm -f $incd/$h || exit 1
 end
-set libsupsrc = $incs:h
-set libsupdst = $incd:h
-foreach d (. fno-exceptions fno-exceptions/fno-rtti)
-  cp -af $libsupsrc/$d/libsupc++.a $libsupdst/$d/libsupc++.a || exit 1
-end
-cp -af $incs/cxxabi.h $incd/cxxabi.h || exit 1
 cd ../..
 
 cp -af $SRC/gcc/COPYING{,.LIB} $TOOLCHAIN_PREFIX/ || exit 1

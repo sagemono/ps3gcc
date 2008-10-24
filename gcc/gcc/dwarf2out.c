@@ -12353,6 +12353,9 @@ gen_inheritance_die (tree binfo, tree access, dw_die_ref context_die)
     add_AT_unsigned (die, DW_AT_accessibility, DW_ACCESS_public);
   else if (access == access_protected_node)
     add_AT_unsigned (die, DW_AT_accessibility, DW_ACCESS_protected);
+  else if (access == access_private_node)
+    add_AT_unsigned (die, DW_AT_accessibility, DW_ACCESS_private);
+
 }
 
 /* Generate a DIE for a class member.  */
@@ -14124,11 +14127,13 @@ prune_unused_decls_walk (dw_die_ref die)
 
   if (die_of_unused_decl (die))
     return;
-
-  /* We remove all declarations.  Ideally we keep the ones that are
-   * being used, but we have no way of knowing at this point. */
+   
+  /* We remove all declarations that don't have a specificcation.
+     Ideally we keep the ones that are being used, but we have no
+     way of knowing at this point. */
   if (die->die_tag == DW_TAG_subprogram
       && get_AT (die, DW_AT_declaration)
+      && !get_AT (die, DW_AT_specification)
       && die->die_parent
       && (die->die_parent->die_tag == DW_TAG_compile_unit
           || die->die_parent->die_tag == DW_TAG_namespace))

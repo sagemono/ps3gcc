@@ -3,7 +3,7 @@
 # Copyright(C) 2008 Sony Computer Entertainment Inc.
 # All Rights Reserved.
 
-# This script builds and installs spu-lv2 toolchain for SDK2.4.0-GCC411.  The
+# This script builds and installs spu-lv2 toolchain for SDK2.5.0-GCC411.  The
 # existing toolchain directory is backed up as "host-linux/spu.~N~" where
 # N is a generated number.
 # If environment variable CELLSDK is set, it should be the directory where
@@ -66,20 +66,6 @@ foreach h (float.h math.h stdbool.h stdlib.h varargs.h iso646.h \
 	stddef.h syslimits.h limits.h stdarg.h stdio.h)
   rm -f $inc/$h || exit 1
 end
-cd ../..
-
-mkdir -p spu-lv2/libsupcxx || exit 1
-cd spu-lv2/libsupcxx || exit 1
-# The -D is to work around a bug in dinkumware
-# The -frtti is so it works with earlier compilers
-foreach f (pure.cc tinfo.cc tinfo2.cc eh_aux_runtime.cc)
-  spu-lv2-g++ -c -O2 -g -D__cxxabivl=__cxxabiv1 -frtti -I $SRC/libsupcxx \
-	$SRC/libsupcxx/$f || exit 1
-end
-spu-lv2-ar cr libsupc++.a *.o || exit 1
-set incdir = `spu-lv2-gcc -print-file-name=include`
-cp -af $SRC/libsupcxx/cxxabi.h $incdir/ || exit 1
-cp -af libsupc++.a $incdir/../ || exit 1
 cd ../..
 
 cp -af $SRC/gcc/COPYING{,.LIB} $TOOLCHAIN_PREFIX/ || exit 1

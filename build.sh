@@ -3,7 +3,7 @@
 # Copyright(C) 2008 Sony Computer Entertainment Inc.
 # All Rights Reserved.
 
-# This script builds the following toolchain for SDK2.4.0-GCC411.
+# This script builds the following toolchain for SDK2.5.0-GCC411.
 #  ppu-lv2, spu-lv2
 # See each build script for details.
 $0:h/build-ppu-lv2.sh || exit 1

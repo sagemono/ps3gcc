@@ -848,14 +848,9 @@ build_gcov_info (void)
   field = build_decl (FIELD_DECL, NULL_TREE, string_type);
   TREE_CHAIN (field) = fields;
   fields = field;
-  filename = getpwd ();
-  filename = (filename && da_file_name[0] != '/'
-	      ? concat (filename, "/", da_file_name, NULL)
-	      : da_file_name);
+  filename = da_file_name;
   filename_len = strlen (filename);
   filename_string = build_string (filename_len + 1, filename);
-  if (filename != da_file_name)
-    free (filename);
   TREE_TYPE (filename_string) = build_array_type
     (char_type_node, build_index_type
      (build_int_cst (NULL_TREE, filename_len)));
@@ -1077,7 +1072,27 @@ create_coverage (void)
 void
 coverage_init (const char *filename)
 {
-  int len = strlen (filename);
+  int len;
+  /* Generate the aboslute path for filename.  */
+  filename = lrealpath (filename);
+  /* lreapath can fail if the file does not exist so try
+     to generate the full path but not for WIN32 as that
+     will always generate an absolute path and win32 paths
+     don't always start with '/' or '\\'.  */
+#ifndef _WIN32
+  {
+  char *pwd = getpwd ();
+  if (pwd && filename[0] != '/')
+    {
+      const char *oldfilename = filename;
+      filename = concat (pwd, "/", filename, NULL);
+      free (oldfilename);
+    }
+  }
+#endif
+
+
+  len = strlen (filename);
 
 
   if (flag_profile_pgo

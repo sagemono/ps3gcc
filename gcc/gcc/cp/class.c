@@ -149,7 +149,7 @@ static void build_base_fields (record_layout_info, splay_tree, tree *);
 static void check_methods (tree);
 static void remove_zero_width_bit_fields (tree);
 static void check_bases (tree, int *, int *);
-static void check_bases_and_members (tree);
+static tree check_bases_and_members (tree);
 static tree create_vtable_ptr (tree, tree *);
 static void include_empty_classes (record_layout_info);
 static void layout_class_type (tree, tree *);
@@ -1170,8 +1170,6 @@ handle_using_decl (tree using_decl, tree t)
       else
 	old_value = NULL_TREE;
     }
-
-  cp_emit_debug_info_for_using (decl, USING_DECL_SCOPE (using_decl));
 
   if (is_overloaded_fn (decl))
     flist = decl;
@@ -4067,7 +4065,7 @@ type_requires_array_cookie (tree type)
    CLASSTYPE_NON_POD_T) for T.  This routine works purely at the C++
    level: i.e., independently of the ABI in use.  */
 
-static void
+static tree
 check_bases_and_members (tree t)
 {
   /* Nonzero if the implicitly generated copy constructor should take
@@ -4076,7 +4074,7 @@ check_bases_and_members (tree t)
   /* Nonzero if the implicitly generated assignment operator
      should take a non-const reference argument.  */
   int no_const_asn_ref;
-  tree access_decls;
+  tree access_decls, ad;
 
   /* By default, we use const reference arguments and generate default
      constructors.  */
@@ -4128,8 +4126,8 @@ check_bases_and_members (tree t)
   clone_constructors_and_destructors (t);
 
   /* Process the using-declarations.  */
-  for (; access_decls; access_decls = TREE_CHAIN (access_decls))
-    handle_using_decl (TREE_VALUE (access_decls), t);
+  for (ad = access_decls; ad; ad = TREE_CHAIN (ad))
+    handle_using_decl (TREE_VALUE (ad), t);
 
   /* Build and sort the CLASSTYPE_METHOD_VEC.  */
   finish_struct_methods (t);
@@ -4138,6 +4136,7 @@ check_bases_and_members (tree t)
      allocating an array of this type.  */
   TYPE_LANG_SPECIFIC (t)->u.c.vec_new_uses_cookie
     = type_requires_array_cookie (t);
+  return access_decls;
 }
 
 /* If T needs a pointer to its virtual function table, set TYPE_VFIELD
@@ -4928,6 +4927,7 @@ determine_key_method (tree type)
 void
 finish_struct_1 (tree t)
 {
+  tree access_decls;
   tree x;
   /* A TREE_LIST.  The TREE_VALUE of each node is a FUNCTION_DECL.  */
   tree virtuals = NULL_TREE;
@@ -4956,7 +4956,7 @@ finish_struct_1 (tree t)
 
   /* Do end-of-class semantic processing: checking the validity of the
      bases and members and add implicitly generated methods.  */
-  check_bases_and_members (t);
+  access_decls = check_bases_and_members (t);
 
   /* Find the key method.  */
   if (TYPE_CONTAINS_VPTR_P (t))
@@ -5106,6 +5106,19 @@ finish_struct_1 (tree t)
 
   /* Finish debugging output for this type.  */
   rest_of_type_compilation (t, ! LOCAL_CLASS_P (t));
+
+  /* Output debug info for using decls in a class */
+  {
+    location_t saved_loc = input_location;
+    for (; access_decls; access_decls = TREE_CHAIN (access_decls))
+      {
+	tree using_decl = TREE_VALUE (access_decls);
+	input_location = DECL_SOURCE_LOCATION (using_decl);
+	cp_emit_debug_info_for_using (USING_DECL_DECLS (using_decl), DECL_CONTEXT (using_decl));
+      }
+    input_location = saved_loc;
+  }
+
 }
 
 /* When T was built up, the member declarations were added in reverse

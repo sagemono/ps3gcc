@@ -1908,7 +1908,7 @@ do {								\
 
 /* On average, we can do a 5 pieces move faster and smaller than doing a block
    move for the PowerPC even if it is aligned (LHS).  */
-#define MOVE_RATIO 5
+#define MOVE_RATIO (optimize_size && TARGET_STRING ? 2 : 5)
 
 /* Nonzero if access to memory by bytes is no faster than for words.
    Also nonzero if doing byte operations (specifically shifts) in registers
@@ -2479,6 +2479,7 @@ enum rs6000_builtins
   ALTIVEC_BUILTIN_VSPLTB,
   ALTIVEC_BUILTIN_VSPLTH,
   ALTIVEC_BUILTIN_VSPLTW,
+  ALTIVEC_BUILTIN_VSPLTSF,
   ALTIVEC_BUILTIN_VSPLTISB,
   ALTIVEC_BUILTIN_VSPLTISH,
   ALTIVEC_BUILTIN_VSPLTISW,
@@ -2784,6 +2785,7 @@ enum rs6000_builtins
   ALTIVEC_BUILTIN_VEC_VSPLTB,
   ALTIVEC_BUILTIN_VEC_VSPLTH,
   ALTIVEC_BUILTIN_VEC_VSPLTW,
+  ALTIVEC_BUILTIN_VEC_VSPLTSF,
   ALTIVEC_BUILTIN_VEC_VSRAB,
   ALTIVEC_BUILTIN_VEC_VSRAH,
   ALTIVEC_BUILTIN_VEC_VSRAW,

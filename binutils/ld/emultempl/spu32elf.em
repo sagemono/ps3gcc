@@ -13,7 +13,11 @@ static int stack_analysis = 0;
 static int emit_stack_syms = 0;
 
 /* Whether to emit an error when non-PIC objects are linked */
-static int flag_pic;
+static int flag_warn_pic;
+
+/* Whether to save R_SPU_GLOB_DAT relocs in .fixup when
+   creating an executable. */
+static int emit_fixups;
 
 /* Range of valid addresses for loadable sections.  */
 static bfd_vma local_store_lo = 0;
@@ -36,8 +40,7 @@ spu_after_open (void)
   if (is_spu_target ()
       && !link_info.relocatable
       && link_info.input_bfds != NULL
-      && !spu_elf_create_sections (output_bfd, &link_info,
-				   stack_analysis, emit_stack_syms, flag_pic))
+      && !spu_elf_create_sections (output_bfd, &link_info))
     einfo ("%X%P: can not create note section: %E\n");
 
   gld${EMULATION_NAME}_after_open ();
@@ -82,6 +85,18 @@ spu_finish (void)
     }
 }
 
+/* This is a convenitent point to tell BFD about target specific flags.
+   After the output has been created, but before inputs are read.  */
+static void
+spu_create_output_section_statements (void)
+{
+  spu_elf_set_link_options (&link_info,
+			    stack_analysis,
+			    emit_stack_syms,
+			    flag_warn_pic,
+			    emit_fixups);
+}
+
 EOF
 
 # Define some shell vars to insert bits of code into the standard elf
@@ -94,6 +109,7 @@ PARSE_AND_LIST_PROLOGUE='
 #define OPTION_SPU_STACK_SYMS		(OPTION_SPU_STACK_ANALYSIS + 1)
 #define OPTION_SPU_WARN_PIC_ALL		(OPTION_SPU_STACK_SYMS + 1)
 #define OPTION_SPU_WARN_PIC_CODE	(OPTION_SPU_WARN_PIC_ALL + 1)
+#define OPTION_SPU_EMIT_FIXUPS		(OPTION_SPU_WARN_PIC_CODE + 1)
 '
 
 PARSE_AND_LIST_LONGOPTS='
@@ -103,6 +119,7 @@ PARSE_AND_LIST_LONGOPTS='
   { "emit-stack-syms", no_argument, NULL, OPTION_SPU_STACK_SYMS },
   { "warn-pic-all", no_argument, NULL, OPTION_SPU_WARN_PIC_ALL },
   { "warn-pic-code", no_argument, NULL, OPTION_SPU_WARN_PIC_CODE },
+  { "emit-fixups", no_argument, NULL, OPTION_SPU_EMIT_FIXUPS },
 '
 
 PARSE_AND_LIST_OPTIONS='
@@ -112,7 +129,8 @@ PARSE_AND_LIST_OPTIONS='
   --stack-analysis      Estimate maximum stack requirement.\n\
   --emit-stack-syms     Add __stack_func giving stack needed for each func.\n\
   --warn-pic-all        Warn about non-PIC references in code or data.\n\
-  --warn-pic-code       Warn about non-PIC references in code.\n"
+  --warn-pic-code       Warn about non-PIC references in code.\n\
+  --emit-fixups         Emit fixups in .fixup.\n"
 		   ));
 '
 
@@ -144,14 +162,19 @@ PARSE_AND_LIST_ARGS_CASES='
       break;
 
     case OPTION_SPU_WARN_PIC_ALL:
-      flag_pic = 2;
+      flag_warn_pic = 2;
       break;
 
     case OPTION_SPU_WARN_PIC_CODE:
-      flag_pic = 1;
+      flag_warn_pic = 1;
+      break;
+
+    case OPTION_SPU_EMIT_FIXUPS:
+      emit_fixups = 1;
       break;
 '
 
 LDEMUL_AFTER_OPEN=spu_after_open
 LDEMUL_BEFORE_ALLOCATION=spu_before_allocation
 LDEMUL_FINISH=spu_finish
+LDEMUL_CREATE_OUTPUT_SECTION_STATEMENTS=spu_create_output_section_statements

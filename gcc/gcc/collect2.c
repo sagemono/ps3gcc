@@ -196,6 +196,7 @@ static const char *export_file;	        /* <xxx>.x for AIX export list.  */
 #endif
 const char *ldout;			/* File for ld stdout.  */
 const char *lderrout;			/* File for ld stderr.  */
+const char *full_ld_suffix;
 static const char *output_file;		/* Output file for ld.  */
 static const char *nm_file_name;	/* pathname of nm */
 #ifdef LDD_SUFFIX
@@ -766,7 +767,7 @@ main (int argc, char **argv)
      But it we look for a program in the system directories, we need to
      qualify the program name with the target machine.  */
 
-  const char * full_ld_suffix =
+  full_ld_suffix =
     concat(target_machine, "-", ld_suffix, NULL);
   const char *const full_nm_suffix =
     concat (target_machine, "-", nm_suffix, NULL);
@@ -781,7 +782,7 @@ main (int argc, char **argv)
   const char *const full_gstrip_suffix =
     concat (target_machine, "-", gstrip_suffix, NULL);
 #else
-  const char * full_ld_suffix	= ld_suffix;
+  full_ld_suffix	= ld_suffix;
   const char *const full_nm_suffix	= nm_suffix;
   const char *const full_gnm_suffix	= gnm_suffix;
 #ifdef LDD_SUFFIX
@@ -1517,7 +1518,7 @@ main (int argc, char **argv)
   do_tlink (ld2_argv, object_lst);
 #else
   /* Otherwise, simply call ld because tlink is already done.  */
-  fork_execute ("ld", ld2_argv);
+  fork_execute (full_ld_suffix, ld2_argv);
 
   /* Let scan_prog_file do any final mods (OSF/rose needs this for
      constructors/destructors in shared libraries.  */

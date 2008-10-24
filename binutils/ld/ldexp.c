@@ -859,6 +859,21 @@ exp_nameop (int code, const char *name)
 
   new = stat_alloc (sizeof (new->name));
   memcpy (new, &value, sizeof (new->name));
+
+  /* begin sce local bz53338
+     Register an entry referred to by --deysym option only when --gc-sections
+     is specified. */
+  if (parsing_defsym == 1 
+      && strcmp (name, ".") != 0 /* this condition seems to be reduntant.*/
+      )
+    {
+      /* FIXME  we never free sc. */
+      struct bfd_sym_chain * sc = stat_alloc (sizeof (struct bfd_sym_chain));
+      sc->name = xstrdup (name);
+      sc->next = link_info.gc_sym_list;
+      link_info.gc_sym_list = sc;
+    }
+  /* end sce local bz53338 */
   return new;
 
 }

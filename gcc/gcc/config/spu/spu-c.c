@@ -153,7 +153,16 @@ spu_resolve_overloaded_builtin (tree fndecl, tree fnargs)
 	    if (INTEGRAL_TYPE_P(arg_type))
 	      arg_type = (*lang_hooks.types.type_for_mode)(TYPE_MODE (arg_type), TYPE_UNSIGNED (arg_type));
 
-	    /* The intrinsics spec does not specify precisely how to
+	    /* When a vecreg is used it must be promoted to a vector type to
+ 	       be in the same format as the builtin's parameters */	    
+
+	    if (TREE_CODE (arg_type) == VECTOR_TYPE && TYPE_VECREG (arg_type)
+	         && TREE_CODE (param_type) == VECTOR_TYPE)
+	    {	
+		arg_type = build_vector_type (TREE_TYPE (arg_type),TYPE_VECTOR_SUBPARTS (arg_type));
+	    }
+
+	       /* The intrinsics spec does not specify precisely how to
 	       resolve generic intrinsics.  We require an exact match
 	       for vector types and let C do it's usual parameter type
 	       checking/promotions for scalar arguments, except for the

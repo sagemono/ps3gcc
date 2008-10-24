@@ -6652,7 +6652,8 @@ tsubst_decl (tree t, tree args, tsubst_flags_t complain)
 
 	if (TREE_CODE (t) == TYPE_DECL)
 	  {
-	    type = tsubst (TREE_TYPE (t), args, complain, in_decl);
+	    type = DECL_ORIGINAL_TYPE (t) ? DECL_ORIGINAL_TYPE (t) : TREE_TYPE (t);
+	    type = tsubst (type, args, complain, in_decl);
 	    if (TREE_CODE (type) == TEMPLATE_TEMPLATE_PARM
 		|| t == TYPE_MAIN_DECL (TREE_TYPE (t)))
 	      {
@@ -6738,6 +6739,16 @@ tsubst_decl (tree t, tree args, tsubst_flags_t complain)
 	if (CODE_CONTAINS_STRUCT (TREE_CODE (t), TS_DECL_WRTL))
 	  SET_DECL_RTL (r, NULL_RTX);
 	DECL_SIZE (r) = DECL_SIZE_UNIT (r) = 0;
+
+	if (TREE_CODE (r) == TYPE_DECL && DECL_ORIGINAL_TYPE (t) 
+	    && type != error_mark_node)
+	  {
+	    DECL_ORIGINAL_TYPE (r) = type;
+	    type = build_variant_type_copy (type);
+	    TYPE_STUB_DECL (type) = TYPE_STUB_DECL (DECL_ORIGINAL_TYPE (r));
+	    TYPE_NAME (type) = r;
+	    TREE_TYPE (r) = type;
+	  }
 
 	if (!local_p)
 	  {
@@ -12463,6 +12474,21 @@ value_dependent_expression_p (tree expression)
 	  }
 
 	return value_dependent_expression_p (args);
+      }
+      
+    /* Handle CONSTRUCTOR seperately as it has a special repsentation.  */
+    case CONSTRUCTOR:
+      {
+	unsigned HOST_WIDE_INT idx;
+	tree value;
+	VEC(constructor_elt,gc) *v = CONSTRUCTOR_ELTS (expression);
+
+	FOR_EACH_CONSTRUCTOR_VALUE (v, idx, value)
+	  {
+	    if (value_dependent_expression_p (value))
+	      return true;
+	  }
+	return false;
       }
 
     default:

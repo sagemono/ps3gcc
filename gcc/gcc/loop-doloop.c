@@ -544,7 +544,7 @@ doloop_modify (struct loop *loop, struct niter_desc *desc,
     }
 
   /* Update the REG_BR_PROB note.  */
-  if (inc_first && true_prob_val)
+  if (true_prob_val)
     {
       /* Seems safer to use the branch probability.  */ 
       REG_NOTES (jump_insn) = 

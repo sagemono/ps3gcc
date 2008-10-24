@@ -561,8 +561,24 @@ read_file_guts (cpp_reader *pfile, _cpp_file *file)
     cpp_error (pfile, CPP_DL_WARNING,
 	       "%s is shorter than expected", file->path);
 
-  file->buffer = _cpp_convert_input (pfile, CPP_OPTION (pfile, input_charset),
-				     buf, size, total, &file->st.st_size);
+  /* begin sce local bugzilla 53810 */
+  {
+    const char * guessed_charset = _cpp_guess_input_charset (buf, &total);
+    if (guessed_charset != NULL
+	&& strcmp (_cpp_default_encoding (), guessed_charset) != 0
+	&& strcmp (CPP_OPTION (pfile, input_charset), guessed_charset) != 0)
+      {
+	cpp_error (pfile, CPP_DL_WARNING,
+		   "encoding is %s. Converting to %s",
+		   guessed_charset,
+		   _cpp_default_encoding ());
+      }
+
+    file->buffer = _cpp_convert_input (pfile, guessed_charset ? guessed_charset
+					 : CPP_OPTION (pfile, input_charset),
+				       buf, size, total, &file->st.st_size);
+  }
+  /* end sce local bugzilla 53810 */
   file->buffer_valid = true;
 
   return true;

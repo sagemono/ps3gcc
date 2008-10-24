@@ -46,7 +46,8 @@
 	"%{!fno-aggressive-cmov:-faggressive-cmov} " \
 	"%{!fno-strict-aligned:-fstrict-aligned} " \
 	"%{Os:%{!mhint-max-nops*:-mhint-max-nops=0} %{!mdual-nops:-mno-dual-nops}} " \
-	"%{mspurs-job-initialize: %{!mwarn-reloc: -mno-warn-reloc}}"
+	"%{mspurs-job-initialize|shared|mfixups: %{!merror-reloc:%{!mwarn-reloc: -mno-warn-reloc}}} " \
+	"%{shared|mfixups: -fPIC} "
 
 #undef CC1PLUS_SPEC
 #define CC1PLUS_SPEC \
@@ -64,23 +65,32 @@
 #define ASM_ONLY_SPEC  "%{mwarn-stop0:-mwarn-stop0}"
 
 #undef  STARTFILE_SPEC
-#define STARTFILE_SPEC	"%{cstdmain:crt2%O%s; " \
-                        "  mraw|mapusim:crt3%O%s; " \
-                        "  mcellsim|mspusim:cs-crt0%O%s; " \
-                        "  mis:crt4%O%s; " \
-                        "  mspurs-job:job_start_gcc%O%s; " \
+#define STARTFILE_SPEC	"%{mspurs-job:job_start_gcc%O%s; " \
                         "  mspurs-job-initialize:job_start_w_crt%O%s job_crt%O%s; " \
-                        "  mspurs-task:spurs_task%O%s; " \
-                        "  :crt1%O%s} "
+		        "  mcellsim|mspusim:cs-crt0%O%s; " \
+			"  :%{cstdmain:crt2%O%s; " \
+                           "  mraw|mapusim:crt3%O%s; " \
+                           "  mis:crt4%O%s; " \
+                           "  mspurs-task:spurs_task%O%s; " \
+                           "  shared:; " \
+                           "  :crt1%O%s} " \
+			   "crti%O%s %{mno-fixups:;shared|mfixups:init_fixups%O%s} init_crtend%O%s} "
+
+#undef  ENDFILE_SPEC
+#define ENDFILE_SPEC	"%{mspurs-job*|mcellsim|mspusim:crtend1%O%s; :fini_crtbegin%O%s crtn%O%s} "
 
 #undef LIB_SPEC
-#define LIB_SPEC "--start-group -lc -lgcc -lstdc++ -lsupc++ " \
+#define LIB_SPEC "--start-group %{!shared:-lc -lgcc -lstdc++ -lsupc++} " \
 		 "%{mspurs-task|mspurs-job|mspurs-job-initialize:-lspurs -lsync} " \
 		 "%{mraw:-lrawspu; mapusim:-lapusim; mcellsim|mspusim:-lcellsim; mis: ; :-lsputhread} " \
 		 "--end-group" \
-                 "%{mspurs-job|mspurs-job-initialize: %{fPIC:-Ttext=0x0; fpic:-Ttext=0x0; :-Ttext=0x4c00}} " \
-                 "%{!testing:%{fPIC|fpic:%{!mno-error-reloc:%{!mno-warn-reloc:%{mspurs-job-initialize:--warn-pic-code;:--warn-pic-all}}}}} " \
-                 "%{mspurs-task:-Ttext=0x3000} "
+
+#undef LINK_SPEC
+#define LINK_SPEC "%{mlarge-mem: --defsym __stack=0xfffffff0} " \
+                  "%{!Ttext*: %{mspurs-job*:%{fPIC|fpic:-Ttext=0x0; :-Ttext=0x4c00}; mspurs-task:-Ttext=0x3000}} " \
+                  "%{!testing:%{!mno-error-reloc:%{!mno-warn-reloc:%{mfixups|shared|fPIC|fpic:%{mspurs-job-initialize|mfixups|shared:--warn-pic-code; :--warn-pic-all}}}}} " \
+                  "%{shared} %{static} %{mfixups|shared:%{mno-fixups|nostartfiles:;:--emit-fixups}} " \
+                  "%{rdynamic: %{static|shared: ; : -export-dynamic}} "
 
 #undef LINK_GCC_C_SEQUENCE_SPEC 
 #define LINK_GCC_C_SEQUENCE_SPEC "%L"
@@ -146,3 +156,30 @@
 
 #undef  WINT_TYPE
 #define WINT_TYPE "int"
+
+/* begin sce local bugzilla 55066 */
+#define T_VC  &V16QI_type_node
+#define TEX_VC        { STD_EXT, "vector signed char", T_VC }
+#define T_VUC &unsigned_V16QI_type_node
+#define TEX_VUC       { STD_EXT, "vector unsigned char", T_VUC }
+#define T_VS  &V8HI_type_node
+#define TEX_VS        { STD_EXT, "vector signed short", T_VS }
+#define T_VUS &unsigned_V8HI_type_node
+#define TEX_VUS       { STD_EXT, "vector unsigned short", T_VUS }
+#define T_VI  &V4SI_type_node
+#define TEX_VI        { STD_EXT, "vector signed int", T_VI }
+#define T_VUI &unsigned_V4SI_type_node
+#define TEX_VUI       { STD_EXT, "vector unsigned int", T_VUI }
+#define T_VL  &V4SI_type_node
+#define TEX_VL        { STD_EXT, "vector signed long", T_VL }
+#define T_VUL &unsigned_V4SI_type_node
+#define TEX_VUL       { STD_EXT, "vector unsigned long", T_VUL }
+#define T_VLL &V2DI_type_node
+#define TEX_VLL       { STD_EXT, "vector signed long long", T_VLL }
+#define T_VULL &unsigned_V2DI_type_node
+#define TEX_VULL      { STD_EXT, "vector unsigned long long", T_VULL }
+#define T_VF  &V4SF_type_node
+#define TEX_VF        { STD_EXT, "vector float", T_VF }
+#define T_VD  &V2DF_type_node
+#define TEX_VD        { STD_EXT, "vector double", T_VD }
+/* end sce local bugzilla 55066 */

@@ -1022,6 +1022,10 @@ ftree-pre
 Common Report Var(flag_tree_pre)
 Enable SSA-PRE optimization on trees
 
+ftree-promote-vector
+Common Report Var(flag_promote_vector)
+Enable Promotion of scalar into vector
+
 ftree-salias
 Common Report Var(flag_tree_salias)
 Perform structural alias analysis

@@ -1584,7 +1584,8 @@ struct bom_table_t {
   const unsigned int len;	/* Length of BOM */
   const uchar  bom[4];		/* Byte sequence of BOM */
 };
-static const struct bom_table_t bom_table [] = {
+
+static const struct bom_table_t utf_bom_table [] = {
   {"UTF-8",    3, {0xef, 0xbb, 0xbf}},
   {"UTF-32BE", 4, {0x00, 0x00, 0xfe, 0xff}},
   {"UTF-32LE", 4, {0xff, 0xfe, 0x00, 0x00}},
@@ -1593,6 +1594,45 @@ static const struct bom_table_t bom_table [] = {
   {NULL, 0, {0}},
 };
 /* end sce local bugzilla 31210 */
+
+/* begin sce local bugzilla 53810 */
+/* Determine what code encoding is used in input source file.
+   At this point, Only UTF-8, UTF-16LE UTF-16BE, UTF-32LE and UTF-32BE
+   are supported.
+   If the input code is encoded in UTF* with BOM, BOM is removed by 
+   overwriting it with trailing bytes, and LEN is updated so that
+   LEN is equal to the new size of INPUT.
+
+   If the charset is hard to guess, NULL is returned. */
+const char *
+_cpp_guess_input_charset (uchar *input, size_t *len)
+{
+  const struct bom_table_t * e;
+
+  /* Skipping a Byte Order Mark (BOM) if the source is written in Unicode. */
+  for (e = utf_bom_table; e->code != NULL; ++e)
+    {
+      if (*len > e->len
+	  && memcmp (input, e->bom, e->len) == 0)
+	{
+	  *len -= e->len;
+	  /* Shift out the BOM from input buffer.
+	     FIXME: Moving INPUT pointer as like follows is much faster than
+	     calling memmove. 
+		 input = &input[e->len];
+	      But _cpp_strbuf is designed so that text member always points the
+	      head of buffer address. It prevents me from taking the easy-and-fast hack. */
+	   memmove (input, &input[e->len], *len);
+	   /* Filling the hole by the memmove with whitespace.
+	      FIXME: I'm afraid that leaving gabages in the buffer is harmful
+	      if no conversion occurs. */
+	   memset (&input[*len], ' ', e->len);
+	   return e->code;
+	}
+    }
+  return NULL;
+}
+/* end sce local bugzilla 53810 */
 
 /* Convert an input buffer (containing the complete contents of one
    source file) from INPUT_CHARSET to the source character set.  INPUT
@@ -1610,32 +1650,6 @@ _cpp_convert_input (cpp_reader *pfile, const char *input_charset,
 {
   struct cset_converter input_cset;
   struct _cpp_strbuf to;
-  const struct bom_table_t * e;
-
-  /* begin sce local bugzilla 31210 */
-  /* Skipping a Byte Order Mark (BOM) if the source is written in Unicode. */
-  for (e = bom_table; e->code != NULL; ++e)
-    {
-      if (strcasecmp (input_charset, e->code) == 0
-	  && len > e->len
-	  && memcmp (input, e->bom, e->len) == 0)
-	{
-	  len -= e->len;
-	  /* Shift out the BOM from input buffer.
-	     FIXME: Moving INPUT pointer as like follows is much faster than
-	     calling memmove. 
-		 input = &input[e->len];
-	      But _cpp_strbuf is designed so that text member always points the
-	      head of buffer address. It prevents the easy-and-fast hack. */
-	   memmove (input, &input[e->len], len);
-	   /* Filling the hole by the memmove with whitespace.
-	      FIXME: I'm afraid that leaving gabages in the buffer is harmful
-	      if no conversion occurs. */
-	   memset (&input[len], ' ', e->len);
-	   break;
-	}
-    }
-  /* end sce local bugzilla 31220 */
 
   input_cset = init_iconv_desc (pfile, SOURCE_CHARSET, input_charset);
   if (input_cset.func == convert_no_conversion)

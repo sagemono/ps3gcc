@@ -46,51 +46,85 @@ static reloc_howto_type elf_howto_table[] = {
   HOWTO (R_SPU_NONE,       0, 0,  0, FALSE,  0, complain_overflow_dont,
 	 bfd_elf_generic_reloc, "SPU_NONE",
 	 FALSE, 0, 0x00000000, FALSE),
+
+  /* lqd, stqd */
   HOWTO (R_SPU_ADDR10,     4, 2, 10, FALSE, 14, complain_overflow_signed,
 	 bfd_elf_generic_reloc, "SPU_ADDR10",
 	 FALSE, 0, 0x00ffc000, FALSE),
+
+  /* bra, brasl, lqa, hbra, stqa */
   HOWTO (R_SPU_ADDR16,     2, 2, 16, FALSE,  7, complain_overflow_bitfield,
 	 bfd_elf_generic_reloc, "SPU_ADDR16",
 	 FALSE, 0, 0x007fff80, FALSE),
+
+  /* ilhu */
   HOWTO (R_SPU_ADDR16_HI, 16, 2, 16, FALSE,  7, complain_overflow_bitfield,
 	 bfd_elf_generic_reloc, "SPU_ADDR16_HI",
 	 FALSE, 0, 0x007fff80, FALSE),
+
+  /* iohl */
   HOWTO (R_SPU_ADDR16_LO,  0, 2, 16, FALSE,  7, complain_overflow_dont,
 	 bfd_elf_generic_reloc, "SPU_ADDR16_LO",
 	 FALSE, 0, 0x007fff80, FALSE),
+
+  /* ila */
   HOWTO (R_SPU_ADDR18,     0, 2, 18, FALSE,  7, complain_overflow_bitfield,
 	 bfd_elf_generic_reloc, "SPU_ADDR18",
 	 FALSE, 0, 0x01ffff80, FALSE),
+
+  /* 32-bit address in data */
   HOWTO (R_SPU_GLOB_DAT,     0, 2, 32, FALSE,  0, complain_overflow_dont,
 	 bfd_elf_generic_reloc, "SPU_GLOB_DAT",
 	 FALSE, 0, 0xffffffff, FALSE),
+
+  /* br, brsl, lqr, hbrr, brz, brnz, brhz, brhnz, stqr */
   HOWTO (R_SPU_REL16,      2, 2, 16,  TRUE,  7, complain_overflow_bitfield,
 	 bfd_elf_generic_reloc, "SPU_REL16",
 	 FALSE, 0, 0x007fff80, TRUE),
+
+  /* c[bhwd]d, rot*i, shl*i */
   HOWTO (R_SPU_ADDR7,      0, 2,  7, FALSE, 14, complain_overflow_dont,
 	 bfd_elf_generic_reloc, "SPU_ADDR7",
 	 FALSE, 0, 0x001fc000, FALSE),
+
+  /* hbra, hbrr (location of branch instruction) */
   HOWTO (R_SPU_REL9,       2, 2,  9,  TRUE,  0, complain_overflow_signed,
 	 spu_elf_rel9,          "SPU_REL9",
 	 FALSE, 0, 0x0180007f, TRUE),
+
+  /* hbr (location of branch instruction */
   HOWTO (R_SPU_REL9I,      2, 2,  9,  TRUE,  0, complain_overflow_signed,
 	 spu_elf_rel9,          "SPU_REL9I",
 	 FALSE, 0, 0x0000c07f, TRUE),
+
+  /* and*i, or*i, xor*i, a*i, sf*i, cgt*i, clgt*i, ceq*i, hgt*i, hlgt*i,
+   * heq*i, mpy*i */
   HOWTO (R_SPU_ADDR10I,    0, 2, 10, FALSE, 14, complain_overflow_signed,
 	 bfd_elf_generic_reloc, "SPU_ADDR10I",
 	 FALSE, 0, 0x00ffc000, FALSE),
+
+  /* il, fsmbi, ilh, ilhu, iohl. (allows range of [-2^15..2^15-1]) */
   HOWTO (R_SPU_ADDR16I,    0, 2, 16, FALSE,  7, complain_overflow_signed,
 	 bfd_elf_generic_reloc, "SPU_ADDR16I",
 	 FALSE, 0, 0x007fff80, FALSE),
+
+  /* 32-bit relative address, used in debug information */
   HOWTO (R_SPU_REL32,      0, 2, 32, TRUE,  0, complain_overflow_dont,
 	 bfd_elf_generic_reloc, "SPU_REL32",
 	 FALSE, 0, 0xffffffff, TRUE),
+
+  /* Obsolete?  It seems that nothing generates this.  It is the same as
+   * R_SPU_ADDR16I, except with a different complain_overflow_*. */
   HOWTO (R_SPU_ADDR16X,    0, 2, 16, FALSE,  7, complain_overflow_bitfield,
 	 bfd_elf_generic_reloc, "SPU_ADDR16X",
 	 FALSE, 0, 0x007fff80, FALSE),
+
+  /* 32-bit address in main memory */
   HOWTO (R_SPU_PPU32,      0, 2, 32, FALSE,  0, complain_overflow_dont,
 	 bfd_elf_generic_reloc, "SPU_PPU32",
 	 FALSE, 0, 0xffffffff, FALSE),
+
+  /* 64-bit address in main memory */
   HOWTO (R_SPU_PPU64,      0, 4, 64, FALSE,  0, complain_overflow_dont,
 	 bfd_elf_generic_reloc, "SPU_PPU64",
 	 FALSE, 0, -1, FALSE),
@@ -234,11 +268,58 @@ spu_elf_new_section_hook (bfd *abfd, asection *sec)
   return _bfd_elf_new_section_hook (abfd, sec);
 }
 
+/* Keep track of the number of relocs that are copied as dynamic relocs
+   in check_relocs for each symbol, so we can later discard them if they
+   are found to be unnecessary.  */
+struct spu_elf_dyn_relocs
+{
+  struct spu_elf_dyn_relocs *next;
+
+  /* The input section of the reloc.  */
+  asection *sec;
+
+  /* Total number of relocs copied for the input section.  */
+  bfd_size_type count;
+  /* Number of relocs when generating a PIE and the symbol is not dynamic. */
+  bfd_size_type pie_count;
+};
+
+/* SPU ELF linker hash entry.  */
+
+struct spu_elf_link_hash_entry
+{
+  struct elf_link_hash_entry elf;
+
+  /* Track dynamic relocs copied for this symbol.  */
+  struct spu_elf_dyn_relocs *dyn_relocs;
+};
+
+#define spu_elf_hash_entry(ent) ((struct spu_elf_link_hash_entry *) (ent))
+
+/* SPU ELF fixup entry.  */
+
+struct spu_elf_fixup
+{
+  /* Record the symbol */
+  struct elf_link_hash_entry *h;
+
+  /* And the offset */
+  bfd_vma r_offset;
+};
+
+#define FIXUP_RECORD_SIZE 4
+
 /* SPU ELF linker hash table.  */
 
 struct spu_link_hash_table
 {
   struct elf_link_hash_table elf;
+
+  /* Small local sym to section mapping cache.  */
+  struct sym_sec_cache sym_sec;
+
+  /* Pointer to the fixup section */
+  asection *sfixup;
 
   /* Set if stack size analysis should be done.  */
   unsigned int stack_analysis : 1;
@@ -251,10 +332,41 @@ struct spu_link_hash_table
    *  1 - warn about references in code
    *  2 - warn about references in code and data */
   unsigned int warn_pic : 2;
+
+  /* Set when we want to save R_SPU_GLOB_DAT relocations in section
+   * .fixup when creating an executable.  */   
+  unsigned int emit_fixups : 1;
 };
 
 #define spu_hash_table(p) \
   ((struct spu_link_hash_table *) ((p)->hash))
+
+/* Create an entry in a SPU ELF linker hash table.  */
+
+static struct bfd_hash_entry *
+spu_elf_link_hash_newfunc (struct bfd_hash_entry *entry,
+			   struct bfd_hash_table *table,
+			   const char *string)
+{
+  /* Allocate the structure if it has not already been allocated by a
+     subclass.  */
+  if (entry == NULL)
+    {
+      entry = bfd_hash_allocate (table,
+				 sizeof (struct spu_elf_link_hash_entry));
+      if (entry == NULL)
+	return entry;
+    }
+
+  /* Call the allocation method of the superclass.  */
+  entry = _bfd_elf_link_hash_newfunc (entry, table, string);
+  if (entry != NULL)
+    {
+      spu_elf_hash_entry (entry)->dyn_relocs = NULL;
+    }
+
+  return entry;
+}
 
 /* Create a spu ELF linker hash table.  */
 
@@ -263,13 +375,13 @@ spu_elf_link_hash_table_create (bfd *abfd)
 {
   struct spu_link_hash_table *htab;
 
-  htab = bfd_malloc (sizeof (*htab));
+  htab = bfd_zmalloc (sizeof (*htab));
   if (htab == NULL)
     return NULL;
 
   if (!_bfd_elf_link_hash_table_init (&htab->elf, abfd,
-				      _bfd_elf_link_hash_newfunc,
-				      sizeof (struct elf_link_hash_entry)))
+				      spu_elf_link_hash_newfunc,
+				      sizeof (struct spu_elf_link_hash_entry)))
     {
       free (htab);
       return NULL;
@@ -371,23 +483,31 @@ get_sym_h (struct elf_link_hash_entry **hp,
   return TRUE;
 }
 
-/* Create the note section if not already present.  This is done early so
-   that the linker maps the sections to the right place in the output.  */
-
-bfd_boolean
-spu_elf_create_sections (bfd *output_bfd,
-			 struct bfd_link_info *info,
-			 int stack_analysis,
-			 int emit_stack_syms,
-			 int flag_pic)
+/* A convenient place for capturing cammand line options */
+void
+spu_elf_set_link_options (struct bfd_link_info *info,
+			  int stack_analysis,
+			  int emit_stack_syms,
+			  int flag_warn_pic,
+			  int emit_fixups)
 {
-  bfd *ibfd;
   struct spu_link_hash_table *htab = spu_hash_table (info);
 
   /* Stash some options away where we can get at them later.  */
   htab->stack_analysis = stack_analysis;
   htab->emit_stack_syms = emit_stack_syms;
-  htab->warn_pic = flag_pic;
+  htab->warn_pic = flag_warn_pic;
+  htab->emit_fixups = emit_fixups;
+}
+
+/* Create the note section if not already present.  This is done early so
+   that the linker maps the sections to the right place in the output.  */
+
+bfd_boolean
+spu_elf_create_sections (bfd *output_bfd ATTRIBUTE_UNUSED,
+			 struct bfd_link_info *info)
+{
+  bfd *ibfd;
 
   for (ibfd = info->input_bfds; ibfd != NULL; ibfd = ibfd->link_next)
     if (bfd_get_section_by_name (ibfd, SPU_PTNOTE_SPUNAME) != NULL)
@@ -1701,6 +1821,46 @@ is_picreg_insns (bfd *inbfd, bfd_byte *insn1, bfd_byte *insn2)
   return TRUE;
 }
 
+/* Functions for adding fixup records to .fixup */
+
+#define FIXUP_PUT(output_bfd,htab,index,addr) \
+	  bfd_put_32 (output_bfd, addr, \
+		      htab->sfixup->contents + FIXUP_RECORD_SIZE * (index))
+#define FIXUP_GET(output_bfd,htab,index) \
+	  bfd_get_32 (output_bfd, \
+		      htab->sfixup->contents + FIXUP_RECORD_SIZE * (index))
+
+/* Store OFFSET in .fixup.  This assumes it will be called with an
+ * increasing OFFSET.  When this OFFSET fits with the last base offset,
+ * it just sets a bit, otherwise it adds a new fixup record.  */
+static void
+spu_elf_emit_fixup (bfd *output_bfd, struct bfd_link_info *info,
+                    bfd_vma offset)
+{
+  struct spu_link_hash_table *htab = spu_hash_table (info);
+  asection *sfixup = htab->sfixup;
+  bfd_vma qaddr = offset & ~(bfd_vma)15;
+  bfd_vma bit = ((bfd_vma)8) >> ((offset & 15) >> 2);
+  if (sfixup->reloc_count == 0)
+    {
+      FIXUP_PUT (output_bfd, htab, 0, qaddr | bit);
+      sfixup->reloc_count++;
+    }
+  else
+    {
+      bfd_vma base = FIXUP_GET (output_bfd, htab, sfixup->reloc_count - 1);
+      if (qaddr != (base & ~(bfd_vma)15))
+	{
+	  if ((sfixup->reloc_count + 1) * FIXUP_RECORD_SIZE > sfixup->size)
+	    (*_bfd_error_handler) (_("fatal error while creating .fixup"));
+	  FIXUP_PUT (output_bfd, htab, sfixup->reloc_count, qaddr | bit);
+	  sfixup->reloc_count++;
+	}
+      else 
+	FIXUP_PUT (output_bfd, htab, sfixup->reloc_count - 1, base | bit);
+    }
+}
+
 /* Apply RELOCS to CONTENTS of INPUT_SECTION from INPUT_BFD.  */
 
 static bfd_boolean
@@ -1719,12 +1879,82 @@ spu_elf_relocate_section (bfd *output_bfd,
   struct spu_link_hash_table *htab;
   bfd_boolean ret = TRUE;
   bfd_boolean emit_these_relocs = FALSE;
-  int is_pic_object = 0;
-  int safe_addr18 = 0;
+  bfd_boolean is_nonpic_object = FALSE;
+  bfd_boolean computes_pic_base = FALSE;
+  asection *sreloc = NULL;
+  Elf_Internal_Rela outrel;
+  bfd_byte *loc;
+
+#ifdef DEBUG
+      info->callbacks->info ( _("spu_elf_relocate_section called for %B section %A, "
+		      "%ld relocations%s\n"),
+		      input_bfd, input_section,
+		      (long) input_section->reloc_count,
+		      (info->relocatable) ? " (relocatable)" : "");
+#endif
 
   htab = spu_hash_table (info);
   symtab_hdr = &elf_tdata (input_bfd)->symtab_hdr;
   sym_hashes = (struct elf_link_hash_entry **) (elf_sym_hashes (input_bfd));
+
+  if ((info->shared || htab->warn_pic || htab->emit_fixups)
+      && input_section->flags & SEC_LOAD)
+    {
+      rel = relocs;
+      relend = relocs + input_section->reloc_count;
+      for (; rel < relend; rel++)
+	{
+	  int r_type;
+	  unsigned long r_symndx;
+	  asection *sec;
+	  struct elf_link_hash_entry *h;
+	  bfd_vma relocation;
+
+	  r_symndx = ELF32_R_SYM (rel->r_info);
+	  r_type = ELF32_R_TYPE (rel->r_info);
+	  if (r_type != R_SPU_ADDR18 && r_type != R_SPU_REL16)
+	    continue;
+
+	  sec = NULL;
+	  relocation = 0;
+	  if (r_symndx < symtab_hdr->sh_info)
+	    {
+	      sec = local_sections[r_symndx];
+	    }
+	  else
+	    {
+	      if (sym_hashes == NULL)
+		return FALSE;
+	      h = sym_hashes[r_symndx - symtab_hdr->sh_info];
+	      while (h->root.type == bfd_link_hash_indirect
+		     || h->root.type == bfd_link_hash_warning)
+		h = (struct elf_link_hash_entry *) h->root.u.i.link;
+	      if (h->root.type == bfd_link_hash_defined
+		  || h->root.type == bfd_link_hash_defweak)
+		sec = h->root.u.def.section;
+	      relocation = h->root.u.def.value;
+	    }
+
+	  if (sec != input_section)
+	    continue;
+
+	  bfd_byte *insn1 = contents + rel->r_offset;
+	  bfd_byte *insn2 = contents + rel->r_addend - 4 + relocation;
+
+	  /* Determine if this section contains a code sequence that
+	   * loads the PIC base offset into a register.   This is true
+	   * when we see a brsl whose target is the next instruction. */
+	  if ((r_type == R_SPU_ADDR18
+	       && is_picreg_insns (input_bfd, insn1, insn2))
+	      || (r_type == R_SPU_REL16
+	          && insn1 == insn2
+		  && (bfd_get_32 (input_bfd, insn1) & 0xff800000) == 0x33000000)) /* brsl */
+	    {
+	      computes_pic_base = TRUE;
+	      break;
+	    }
+	}
+    }
 
   rel = relocs;
   relend = relocs + input_section->reloc_count;
@@ -1741,6 +1971,7 @@ spu_elf_relocate_section (bfd *output_bfd,
       bfd_vma addend;
       bfd_reloc_status_type r;
       bfd_boolean unresolved_reloc;
+      bfd_boolean is_nonpic_reloc;
       bfd_boolean warned;
 
       r_symndx = ELF32_R_SYM (rel->r_info);
@@ -1752,6 +1983,7 @@ spu_elf_relocate_section (bfd *output_bfd,
 	}
 
       howto = elf_howto_table + r_type;
+      is_nonpic_reloc = FALSE;
       unresolved_reloc = FALSE;
       warned = FALSE;
       h = NULL;
@@ -1787,20 +2019,8 @@ spu_elf_relocate_section (bfd *output_bfd,
       if (info->relocatable)
 	continue;
 
-      if (unresolved_reloc)
-	{
-	  (*_bfd_error_handler)
-	    (_("%B(%s+0x%lx): unresolvable %s relocation against symbol `%s'"),
-	     input_bfd,
-	     bfd_get_section_name (input_bfd, input_section),
-	     (long) rel->r_offset,
-	     howto->name,
-	     sym_name);
-	  ret = FALSE;
-	}
-
       /*  Determine if this section is contains non-PIC relocations */
-      if (htab->warn_pic > 0 && !is_pic_object
+      if ((info->shared || htab->warn_pic > 0 || htab->emit_fixups)
 	  && (input_section->flags & SEC_LOAD))
 	{
 	  /* Most absolute address relocations means this object is
@@ -1823,108 +2043,294 @@ spu_elf_relocate_section (bfd *output_bfd,
 	    {
 	    case R_SPU_ADDR10:    /* lqd/stqd */
 	    case R_SPU_ADDR16:    /* bra* */
-	    case R_SPU_ADDR16_LO: /* iohl */
-	    case R_SPU_ADDR16_HI: /* ilhu */
 	    case R_SPU_ADDR7:     /* rot*i/shl*i */
 	    case R_SPU_ADDR10I:   /* ai/sfi/etc... */
 	    case R_SPU_ADDR16I:   /* ilh/iohl */
-	      is_pic_object = 1;
+	      is_nonpic_reloc = is_nonpic_object = TRUE;
 	      break;
 	    case R_SPU_GLOB_DAT:  /* initializing global data */
 	      if (htab->warn_pic == 2)
-		is_pic_object = 1;
+		is_nonpic_object = TRUE;
 	      break;
+	    case R_SPU_ADDR16_LO: /* iohl */
+	    case R_SPU_ADDR16_HI: /* ilhu */
 	    case R_SPU_ADDR18:    /* ila/lqa/stqa */
-	      if (safe_addr18 < 2)
-		{
-		  bfd_byte *insn1 = contents + rel->r_offset;
-		  bfd_byte *insn2 = contents + rel->r_addend - 4
-				    + relocation
-				    - input_section->output_section->vma
-				    - input_section->output_offset;
-		  if (input_section == sec
-		      && is_picreg_insns (input_bfd, insn1, insn2))
-		    safe_addr18 = 2;
-		  else 
-		    safe_addr18 = 1;
-		}
-	      break;
-	    case R_SPU_REL16:    /* brsl */
-	      if (safe_addr18 < 2)
-		{
-		  /* When we see a brsl whose target is the next
-		     instruction, we assume all R_SPU_ADDR18 are part of
-		     a PIC reference. */
-		  bfd_byte *insn1 = contents + rel->r_offset;
-		  bfd_byte *insn2 = contents + rel->r_addend - 4
-				    + relocation
-				    - input_section->output_section->vma
-				    - input_section->output_offset;
-		  bfd_vma x = bfd_get_32 (input_bfd, insn1);
-		  if (input_section == sec
-		      && insn1 == insn2
-		      && (x & 0xff800000) == 0x33000000) /* brsl */
-		    safe_addr18 = 2;
-		}
+	      if (!computes_pic_base)
+		is_nonpic_reloc = is_nonpic_object = TRUE;
 	      break;
 	    }
-
 	}
 
       addend = rel->r_addend;
-      r = _bfd_final_link_relocate (howto,
-				    input_bfd,
-				    input_section,
-				    contents,
-				    rel->r_offset, relocation, addend);
 
-      if (r != bfd_reloc_ok)
+      switch (r_type)
 	{
-	  const char *msg = (const char *) 0;
+	case R_SPU_NONE:
+	case R_SPU_max:
+	  break;
 
-	  switch (r)
+	  /* These are handled above */
+	case R_SPU_PPU32:
+	case R_SPU_PPU64:
+	  break;
+
+	  /* These are always local */
+	case R_SPU_REL9:
+	case R_SPU_REL9I:
+	case R_SPU_REL32:
+	  break;
+
+	  /* These may be generated by PIC, but are adjusted at run-time
+	   * by an add instruction in the code.  When we propagate the
+	   * relocation we need to account for the existing adjustment.  
+	   * When they are in a non-PIC object, we must not account for
+	   * any adjustment. */
+	case R_SPU_ADDR18:
+	case R_SPU_ADDR16_LO:
+	case R_SPU_ADDR16_HI:
+
+	  /* This is for branches, loads and stores.  It should never
+	   * exist because R_SPU_REL16 should always get generated
+	   * instead. */
+	case R_SPU_ADDR16:
+
+	  /* These shouldn't exist in PIC, but can exist in a exe which
+	   * needs to be dynamically linked. */
+	case R_SPU_ADDR10:
+	case R_SPU_ADDR7:
+	case R_SPU_ADDR16I:
+	case R_SPU_ADDR10I:
+	case R_SPU_ADDR16X:
+
+	  /* Relocations that always need to be propagated if this is a shared
+	     object.  */
+	case R_SPU_REL16:
+	case R_SPU_GLOB_DAT:
+	  /* r_symndx will be zero only for relocs against symbols
+	     from removed linkonce sections, or sections discarded by
+	     a linker script.  */
+	  if (r_symndx == 0)
+	    break;
+	  /* Fall thru.  */
+
+	  if ((input_section->flags & SEC_ALLOC) == 0)
+	    break;
+	  /* Fall thru.  */
+
+	  if (((info->shared && !info->pie)
+	       && (h == NULL
+		   || ELF_ST_VISIBILITY (h->other) == STV_DEFAULT
+		   || h->root.type != bfd_link_hash_undefweak)
+	       && !SYMBOL_CALLS_LOCAL (info, h))
+	      || ((!info->shared || info->pie)
+		  && h != NULL
+		  && h->dynindx != -1
+		  && h->def_dynamic
+		  && !h->def_regular)
+	      || (info->pie
+		  && h != NULL
+		  && r_type == R_SPU_GLOB_DAT
+		  && SYMBOL_CALLS_LOCAL (info, h))
+	      || (htab->emit_fixups
+		  && r_type == R_SPU_GLOB_DAT))
 	    {
-	    case bfd_reloc_overflow:
-	      if (!((*info->callbacks->reloc_overflow)
-		    (info, (h ? &h->root : NULL), sym_name, howto->name,
-		     (bfd_vma) 0, input_bfd, input_section, rel->r_offset)))
-		return FALSE;
-	      break;
+	      int skip;
 
-	    case bfd_reloc_undefined:
-	      if (!((*info->callbacks->undefined_symbol)
-		    (info, sym_name, input_bfd, input_section,
-		     rel->r_offset, TRUE)))
-		return FALSE;
-	      break;
+#ifdef DEBUG
+	      info->callbacks->info (_("spu_elf_relocate_section needs to "
+		       "create relocation for %s\n"),
+		       (h && h->root.root.string
+			? h->root.root.string : "<unknown>"));
+#endif
 
-	    case bfd_reloc_outofrange:
-	      msg = _("internal error: out of range error");
-	      goto common_error;
+	      /* When generating a shared object, these relocations
+		 are copied into the output file to be resolved at run
+		 time.  */
+	      skip = 0;
 
-	    case bfd_reloc_notsupported:
-	      msg = _("internal error: unsupported relocation error");
-	      goto common_error;
+	      outrel.r_offset =
+		_bfd_elf_section_offset (output_bfd, info, input_section,
+					 rel->r_offset);
+	      if (outrel.r_offset == (bfd_vma) -1
+		  || outrel.r_offset == (bfd_vma) -2)
+		skip = (int) outrel.r_offset;
+	      outrel.r_offset += (input_section->output_section->vma
+				  + input_section->output_offset);
 
-	    case bfd_reloc_dangerous:
-	      msg = _("internal error: dangerous error");
-	      goto common_error;
+	      if (skip)
+		memset (&outrel, 0, sizeof outrel);
+	      else if (!SYMBOL_REFERENCES_LOCAL (info, h))
+		{
+		  unresolved_reloc = FALSE;
+		  outrel.r_info = ELF32_R_INFO (h->dynindx, r_type);
+		  outrel.r_addend = rel->r_addend;
+		}
+	      else
+		{
+		  long indx;
+		  outrel.r_addend = relocation + rel->r_addend;
 
-	    default:
-	      msg = _("internal error: unknown error");
-	      /* fall through */
+		  if (bfd_is_abs_section (sec))
+		    indx = 0;
+		  else if (sec == NULL || sec->owner == NULL)
+		    {
+		      bfd_set_error (bfd_error_bad_value);
+		      return FALSE;
+		    }
+		  else if (htab->emit_fixups)
+		    {
+#ifdef DEBUG
+		      info->callbacks->info (_("  fixup for name=%s section=%s offset=%v count=%d\n"),
+			      (h && h->root.root.string ? h->root.root.string : "<unknown>"),
+			      sec->name, 
+			      outrel.r_offset,
+			      htab->sfixup->reloc_count);
+#endif
+		      spu_elf_emit_fixup (output_bfd, info, outrel.r_offset);
+		      break;
+		    }
+		  else
+		    {
+		      asection *osec;
 
-	    common_error:
-	      if (!((*info->callbacks->warning)
-		    (info, msg, sym_name, input_bfd, input_section,
-		     rel->r_offset)))
-		return FALSE;
-	      break;
+		      /* We are turning this relocation into one
+			 against a section symbol.  It would be
+			 proper to subtract the symbol's value,
+			 osec->vma, from the emitted reloc addend,
+			 but ld.so expects buggy relocs.  */
+		      osec = sec->output_section;
+		      indx = elf_section_data (osec)->dynindx;
+		      BFD_ASSERT (indx > 0);
+#ifdef DEBUG
+		      if (indx <= 0)
+			info->callbacks->info (_("indx=%ld section=%s flags=%ld name=%s\n"),
+				indx, osec->name, osec->flags,
+				(h && h->root.root.string
+				 ? h->root.root.string : "<unknown>"));
+#endif
+		    }
+
+		  outrel.r_info = ELF32_R_INFO (indx, r_type);
+		}
+
+	      if (sreloc == NULL)
+		{
+		  const char *name;
+
+		  name = (bfd_elf_string_from_elf_section
+			  (input_bfd,
+			   elf_elfheader (input_bfd)->e_shstrndx,
+			   elf_section_data (input_section)->rel_hdr.sh_name));
+		  if (name == NULL)
+		    return FALSE;
+
+		  BFD_ASSERT (strncmp (name, ".rela", 5) == 0
+			      && strcmp (bfd_get_section_name (input_bfd,
+							       input_section),
+					 name + 5) == 0);
+
+		  sreloc = bfd_get_section_by_name (htab->elf.dynobj, name);
+		  BFD_ASSERT (sreloc != NULL);
+		}
+
+	      loc = sreloc->contents;
+	      loc += sreloc->reloc_count++ * sizeof (Elf32_External_Rela);
+	      bfd_elf32_swap_reloca_out (output_bfd, &outrel, loc);
+
+	      if (skip == -1)
+		continue;
+
+	      /* This reloc will be computed at runtime.  We clear the memory
+		 so that it contains predictable value.  */
+	      if (! skip
+		  && (input_section->flags & SEC_ALLOC) != 0)
+		{
+		  relocation = howto->pc_relative ? outrel.r_offset : 0;
+		  addend = 0;
+		  break;
+		}
 	    }
+	  break;
 	}
-    }
 
-  if (is_pic_object || safe_addr18 == 1)
+#ifdef DEBUG
+      info->callbacks->info (_( "\ttype = %s (%d), name = %s, symbol index = %ld, "
+	       "offset = %ld, addend = %ld\n"),
+	       howto->name,
+	       (int) r_type,
+	       sym_name,
+	       r_symndx,
+	       (long) rel->r_offset,
+	       (long) addend);
+#endif
+	if (((info->shared || htab->emit_fixups) && is_nonpic_reloc)
+	    || (unresolved_reloc && !h->def_dynamic))
+	  {
+	    (*_bfd_error_handler)
+	      (_("%B(%s+0x%lx):%s%s %s relocation against symbol `%s'"),
+	       input_bfd,
+	       bfd_get_section_name (input_bfd, input_section),
+	       (long) rel->r_offset,
+	       unresolved_reloc ? " unresolvable" : "",
+	       is_nonpic_reloc ? " non-PIC" : "",
+	       howto->name,
+	       sym_name);
+	    ret = FALSE;
+	  }
+
+	r = _bfd_final_link_relocate (howto,
+				      input_bfd,
+				      input_section,
+				      contents,
+				      rel->r_offset, relocation, addend);
+
+	if (r != bfd_reloc_ok)
+	  {
+	    const char *msg = (const char *) 0;
+
+	    switch (r)
+	      {
+	      case bfd_reloc_overflow:
+		if (!((*info->callbacks->reloc_overflow)
+		      (info, (h ? &h->root : NULL), sym_name, howto->name,
+		       (bfd_vma) 0, input_bfd, input_section, rel->r_offset)))
+		  return FALSE;
+		break;
+
+	      case bfd_reloc_undefined:
+		if (!((*info->callbacks->undefined_symbol)
+		      (info, sym_name, input_bfd, input_section,
+		       rel->r_offset, TRUE)))
+		  return FALSE;
+		break;
+
+	      case bfd_reloc_outofrange:
+		msg = _("internal error: out of range error");
+		goto common_error;
+
+	      case bfd_reloc_notsupported:
+		msg = _("internal error: unsupported relocation error");
+		goto common_error;
+
+	      case bfd_reloc_dangerous:
+		msg = _("internal error: dangerous error");
+		goto common_error;
+
+	      default:
+		msg = _("internal error: unknown error");
+		/* fall through */
+
+	      common_error:
+		if (!((*info->callbacks->warning)
+		      (info, msg, sym_name, input_bfd, input_section,
+		       rel->r_offset)))
+		  return FALSE;
+		break;
+	      }
+	  }
+      }
+
+  if (htab->warn_pic && is_nonpic_object)
     {
       info->callbacks->einfo (_("warning: section '%s' in '%B' is non-PIC\n"),
 	 bfd_get_section_name (input_bfd, input_section),
@@ -2262,7 +2668,7 @@ spu_elf_section_processing (bfd * abfd, Elf_Internal_Shdr * i_shdrp)
   /* begin sce local, bugzilla #2878 */
   /* If the section will loaded, we compute the SPU GUID from the section. */
   if (sec != NULL
-      && ((sec->flags & (SEC_HAS_CONTENTS | SEC_LOAD | SEC_ALLOC))
+      && ((sec->flags & (SEC_LINKER_CREATED | SEC_HAS_CONTENTS | SEC_LOAD | SEC_ALLOC))
 	  == (SEC_HAS_CONTENTS | SEC_LOAD | SEC_ALLOC))
       && strcmp (sec->name, ".SpuGUID") != 0)
     {
@@ -2324,6 +2730,683 @@ _bfd_elf_spu_get_relocated_section_contents (bfd *abfd, struct bfd_link_info *li
   return data;
 }
 
+static bfd_boolean
+spu_elf_create_fixup_section (bfd *abfd, struct bfd_link_info *info)
+{
+  struct spu_link_hash_table *htab = spu_hash_table (info);
+  struct elf_link_hash_entry *h;
+  asection *s;
+  flagword flags;
+
+#ifdef DEBUG
+  info->callbacks->info ( _("spu_elf_create_fixup_section called for %B\n"), abfd);
+#endif
+
+  if (!htab->emit_fixups)
+    return TRUE;
+
+  flags = SEC_LOAD | SEC_ALLOC | SEC_READONLY | SEC_HAS_CONTENTS | SEC_IN_MEMORY
+          | SEC_LINKER_CREATED;
+  s = bfd_make_section_with_flags (abfd, ".fixup", flags);
+  if (s == NULL
+      || ! bfd_set_section_alignment (abfd, s, 2))
+    return FALSE;
+  htab->sfixup = s;
+
+  /* Defined in the linker script, but we create it explicitly here so
+   * it is hidden. */
+  h = _bfd_elf_define_linkage_sym (abfd, info, s, "__fixup_start");
+  if (h == NULL)
+    return FALSE;
+  return TRUE;
+}
+
+static bfd_boolean
+spu_elf_create_dynamic_sections (bfd *abfd, struct bfd_link_info *info)
+{
+#ifdef DEBUG
+  info->callbacks->info ( _("spu_elf_create_dynamic_sections called for %B\n"), abfd);
+#endif
+  if (!spu_elf_create_fixup_section (abfd, info))
+    return FALSE;
+
+  if (info->executable)
+    {
+      /* We don't need the .interp section, or PHDR and INTERP segments. */
+      asection *sec = bfd_get_section_by_name (abfd, ".interp");
+      if (sec)
+	sec->flags = SEC_EXCLUDE;
+    }
+
+ /* Normally call _bfd_elf_create_dynamic_sections but we don't want the
+  * basic sections (.plt, .got, etc.) for SPU. */
+  return TRUE;
+}
+
+/* Copy the extra info we tack onto an elf_link_hash_entry.  */
+
+static void
+spu_elf_copy_indirect_symbol (struct bfd_link_info *info,
+			      struct elf_link_hash_entry *dir,
+			      struct elf_link_hash_entry *ind)
+{
+  struct spu_elf_link_hash_entry *edir, *eind;
+
+  edir = (struct spu_elf_link_hash_entry *) dir;
+  eind = (struct spu_elf_link_hash_entry *) ind;
+
+  if (eind->dyn_relocs != NULL)
+    {
+      if (edir->dyn_relocs != NULL)
+	{
+	  struct spu_elf_dyn_relocs **pp;
+	  struct spu_elf_dyn_relocs *p;
+
+	  /* Add reloc counts against the indirect sym to the direct sym
+	     list.  Merge any entries against the same section.  */
+	  for (pp = &eind->dyn_relocs; (p = *pp) != NULL; )
+	    {
+	      struct spu_elf_dyn_relocs *q;
+
+	      for (q = edir->dyn_relocs; q != NULL; q = q->next)
+		if (q->sec == p->sec)
+		  {
+		    q->count += p->count;
+		    q->pie_count += p->pie_count;
+		    *pp = p->next;
+		    break;
+		  }
+	      if (q == NULL)
+		pp = &p->next;
+	    }
+	  *pp = edir->dyn_relocs;
+	}
+
+      edir->dyn_relocs = eind->dyn_relocs;
+      eind->dyn_relocs = NULL;
+    }
+
+   _bfd_elf_link_hash_copy_indirect (info, &edir->elf, &eind->elf);
+}
+
+/* Look through the relocs for a section during the first phase, and
+   allocate space in the global offset table or procedure linkage
+   table.  */
+
+static bfd_boolean
+spu_elf_check_relocs (bfd *abfd,
+		      struct bfd_link_info *info,
+		      asection *sec,
+		      const Elf_Internal_Rela *relocs)
+{
+  struct spu_link_hash_table *htab = spu_hash_table (info);
+  Elf_Internal_Shdr *symtab_hdr;
+  struct elf_link_hash_entry **sym_hashes;
+  const Elf_Internal_Rela *rel;
+  const Elf_Internal_Rela *rel_end;
+  asection *sreloc;
+  int num_glob_dats;
+  struct spu_elf_fixup* fixups = 0;
+
+  if (info->relocatable)
+    return TRUE;
+
+  /* Create dynamic sections in an executable with --export-dynamic */
+  if (info->executable && info->export_dynamic
+      && ! htab->elf.dynamic_sections_created)
+    {
+      if (! _bfd_elf_link_create_dynamic_sections (abfd, info))
+	return FALSE;
+    }
+
+  /* There's not much point in propagating relocs to shared libs that
+     the dynamic linker won't relocate.  */
+  if ((sec->flags & SEC_ALLOC) == 0)
+    return TRUE;
+
+#ifdef DEBUG
+  info->callbacks->info ( _("spu_elf_check_relocs called for section %A in %B\n"),
+		      sec, abfd);
+#endif
+
+  symtab_hdr = &elf_tdata (abfd)->symtab_hdr;
+  sym_hashes = elf_sym_hashes (abfd);
+  sreloc = NULL;
+
+  /* Count the number of R_SPU_GLOB_DAT relocations and allocate space
+   * to record their offsets.  This is used to size .fixup. */
+  num_glob_dats = 0;
+  rel_end = relocs + sec->reloc_count;
+  for (rel = relocs; rel < rel_end; rel++)
+    if (ELF32_R_TYPE (rel->r_info) == R_SPU_GLOB_DAT)
+      num_glob_dats++;
+  if (num_glob_dats > 0)
+    fixups = elf_section_data (sec)->local_dynrel = bfd_zalloc (abfd, (num_glob_dats+1) * sizeof(struct spu_elf_fixup));
+
+  rel_end = relocs + sec->reloc_count;
+  for (rel = relocs; rel < rel_end; rel++)
+    {
+      unsigned long r_symndx;
+      enum elf_spu_reloc_type r_type;
+      struct elf_link_hash_entry *h;
+
+      r_symndx = ELF32_R_SYM (rel->r_info);
+      if (r_symndx < symtab_hdr->sh_info)
+	h = NULL;
+      else
+	{
+	  h = sym_hashes[r_symndx - symtab_hdr->sh_info];
+	  while (h->root.type == bfd_link_hash_indirect
+		 || h->root.type == bfd_link_hash_warning)
+	    h = (struct elf_link_hash_entry *) h->root.u.i.link;
+	}
+
+      r_type = ELF32_R_TYPE (rel->r_info);
+      switch (r_type)
+	{
+	case R_SPU_PPU32:
+	case R_SPU_PPU64:
+	  break;
+
+	  /* The following relocations don't need to propagate the
+	     relocation if linking a shared object since they are
+	     section relative.  */
+	case R_SPU_REL9:
+	case R_SPU_REL9I:
+	  break;
+
+	  /* These are just markers.  */
+	case R_SPU_NONE:
+	case R_SPU_max:
+	  break;
+
+	case R_SPU_REL32:
+	case R_SPU_REL16:
+	case R_SPU_GLOB_DAT:
+	case R_SPU_ADDR18:
+	case R_SPU_ADDR16:
+	case R_SPU_ADDR16_LO:
+	case R_SPU_ADDR16_HI:
+	case R_SPU_ADDR10:
+	case R_SPU_ADDR7:
+	case R_SPU_ADDR10I:
+	case R_SPU_ADDR16I:
+	case R_SPU_ADDR16X:
+
+	  /* If we are creating a shared library, and this is a reloc
+	     against a global symbol, or a non PC relative reloc
+	     against a local symbol, then we need to copy the reloc
+	     into the shared library.  However, if we are linking with
+	     -Bsymbolic, we do not need to copy a reloc against a
+	     global symbol which is defined in an object we are
+	     including in the link (i.e., DEF_REGULAR is set).  At
+	     this point we have not seen all the input files, so it is
+	     possible that DEF_REGULAR is not set now but will be set
+	     later (it is never cleared).  In case of a weak definition,
+	     DEF_REGULAR may be cleared later by a strong definition in
+	     a shared library.  We account for that possibility below by
+	     storing information in the dyn_relocs field of the hash
+	     table entry.  A similar situation occurs when creating
+	     shared libraries and symbol visibility changes render the
+	     symbol local.
+
+	     If on the other hand, we are creating an executable, we
+	     may need to keep relocations for symbols satisfied by a
+	     dynamic library if we manage to avoid copy relocs for the
+	     symbol.  */
+	  if (((info->shared && !info->pie)
+	        && h != NULL && !h->forced_local
+	        && (! info->symbolic
+		    || h->root.type == bfd_link_hash_defweak
+		    || !h->def_regular))
+	      || ((!info->shared || info->pie)
+		  && h != NULL && !h->forced_local
+		  && (h->root.type == bfd_link_hash_defweak
+		      || !h->def_regular))
+	      || (info->pie
+		  && h != NULL 
+		  && r_type == R_SPU_GLOB_DAT)
+	      || (htab->emit_fixups
+		  && r_type == R_SPU_GLOB_DAT))
+	    {
+	      struct spu_elf_dyn_relocs *p;
+	      struct spu_elf_dyn_relocs **head;
+
+#ifdef DEBUG
+	      info->callbacks->info (
+		       _("spu_elf_check_relocs needs to "
+		       "create relocation for %s\n"),
+		       (h && h->root.root.string
+			? h->root.root.string : "<unknown>"));
+#endif
+	      if (sreloc == NULL)
+		{
+		  const char *name;
+
+		  name = (bfd_elf_string_from_elf_section
+			  (abfd,
+			   elf_elfheader (abfd)->e_shstrndx,
+			   elf_section_data (sec)->rel_hdr.sh_name));
+		  if (name == NULL)
+		    return FALSE;
+
+		  BFD_ASSERT (strncmp (name, ".rela", 5) == 0
+			      && strcmp (bfd_get_section_name (abfd, sec),
+					 name + 5) == 0);
+
+		  if (htab->elf.dynobj == NULL)
+		    {
+		      htab->elf.dynobj = abfd;
+		      if (!spu_elf_create_fixup_section (abfd, info))
+			return FALSE;
+		    }
+		  sreloc = bfd_get_section_by_name (htab->elf.dynobj, name);
+		  if (sreloc == NULL)
+		    {
+		      flagword flags;
+
+		      flags = (SEC_HAS_CONTENTS | SEC_READONLY
+			       | SEC_IN_MEMORY | SEC_LINKER_CREATED
+			       | SEC_ALLOC | SEC_LOAD);
+		      sreloc = bfd_make_section_with_flags (htab->elf.dynobj,
+							    name,
+							    flags);
+		      if (sreloc == NULL
+			  || ! bfd_set_section_alignment (htab->elf.dynobj,
+							  sreloc, 2))
+			return FALSE;
+		    }
+		  elf_section_data (sec)->sreloc = sreloc;
+		}
+
+	      /* Count the number of relocations we need for this
+	       * symbol.  */
+	      if (h)
+		{
+		  head = &spu_elf_hash_entry (h)->dyn_relocs;
+		  p = *head;
+		  if (p == NULL || p->sec != sec)
+		    {
+		      p = bfd_alloc (htab->elf.dynobj, sizeof *p);
+		      if (p == NULL)
+			return FALSE;
+		      p->next = *head;
+		      *head = p;
+		      p->sec = sec;
+		      p->count = 0;
+		      p->pie_count = 0;
+		    }
+		  p->count += 1;
+		  if (r_type == R_SPU_GLOB_DAT)
+		    p->pie_count += 1;
+		}
+
+	      if (r_type == R_SPU_GLOB_DAT)
+		if (fixups)
+		  {
+		    fixups->h = h ? h : (struct elf_link_hash_entry *)-1;
+		    fixups->r_offset = rel->r_offset;
+		    fixups++;
+		  }
+	    }
+
+	  break;
+	}
+#ifdef DEBUG
+      {
+      unsigned long r_symndx = ELF32_R_SYM (rel->r_info);
+      reloc_howto_type *howto = elf_howto_table + r_type;
+      info->callbacks->info (_( "\ttype = %s (%d), name = %s, symbol index = %ld, "
+	       "offset = %ld, addend = %ld\n"),
+	       howto->name,
+	       (int) r_type,
+	       (h && h->root.root.string ? h->root.root.string : "<unknown>"),
+	       r_symndx,
+	       (long) rel->r_offset,
+	       (long) rel->r_addend);
+      }
+#endif
+    }
+
+  return TRUE;
+}
+
+static bfd_boolean
+spu_elf_finish_dynamic_sections (bfd *abfd, struct bfd_link_info *info)
+{
+  (void)abfd;
+  (void)info;
+#ifdef DEBUG
+  info->callbacks->info (_("spu_elf_finish_dynamic_sections called\n"));
+#endif
+  return TRUE;
+}
+
+static bfd_boolean
+spu_elf_finish_dynamic_symbol (
+     bfd *output_bfd,
+     struct bfd_link_info *info,
+     struct elf_link_hash_entry *h,
+     Elf_Internal_Sym *sym)
+{
+  (void)output_bfd;
+  (void)info;
+  (void)h;
+  (void)sym;
+#ifdef DEBUG
+  info->callbacks->info (_("spu_elf_finish_dynamic_symbol called for %s vis %ld\n"),
+	   h->root.root.string, ELF_ST_VISIBILITY (h->other));
+#endif
+  return TRUE;
+}
+
+/* Adjust a symbol defined by a dynamic object and referenced by a
+   regular object.  The current definition is in some section of the
+   dynamic object, but we're not including those sections.  We have to
+   change the definition to something the rest of the link can
+   understand.  */
+
+static bfd_boolean
+spu_elf_adjust_dynamic_symbol (struct bfd_link_info *info,
+			       struct elf_link_hash_entry *h)
+{
+  (void)info;
+  (void)h;
+
+#ifdef DEBUG
+  info->callbacks->info (_("spu_elf_adjust_dynamic_symbol called for %s\n"),
+	   h->root.root.string);
+#endif
+
+  return TRUE;
+}
+/* Allocate space in associated reloc sections for dynamic relocs.  */
+
+static bfd_boolean
+allocate_dynrelocs (struct elf_link_hash_entry *h, void *inf)
+{
+  struct bfd_link_info *info = inf;
+  struct spu_elf_link_hash_entry *eh;
+  struct spu_link_hash_table *htab;
+  struct spu_elf_dyn_relocs *p;
+
+  if (h->root.type == bfd_link_hash_indirect)
+    return TRUE;
+
+  if (h->root.type == bfd_link_hash_warning)
+    /* When warning symbols are created, they **replace** the "real"
+       entry in the hash table, thus we never get to see the real
+       symbol in a hash traversal.  So look at it now.  */
+    h = (struct elf_link_hash_entry *) h->root.u.i.link;
+
+  htab = spu_hash_table (info);
+
+  eh = (struct spu_elf_link_hash_entry *) h;
+  eh->elf.got.offset = (bfd_vma) -1;
+
+  if (eh->dyn_relocs == NULL)
+    return TRUE;
+
+  /* In the shared -Bsymbolic case, discard space allocated for
+     dynamic pc-relative relocs against symbols which turn out to be
+     defined in regular objects.  For the normal shared case, discard
+     space for relocs that have become local due to symbol visibility
+     changes.  */
+
+  if (info->shared && !info->pie)
+    {
+      /* Also discard relocs on undefined weak syms with non-default
+	 visibility.  */
+      if (eh->dyn_relocs != NULL
+	  && h->root.type == bfd_link_hash_undefweak)
+	{
+	  if (ELF_ST_VISIBILITY (h->other) != STV_DEFAULT)
+	    eh->dyn_relocs = NULL;
+
+	  /* Make sure undefined weak symbols are output as a dynamic
+	     symbol in PIEs.  */
+	  else if (h->dynindx == -1
+		   && !h->forced_local)
+	    {
+	      if (! bfd_elf_link_record_dynamic_symbol (info, h))
+		return FALSE;
+	    }
+	}
+    }
+  else
+    {
+      /* For the non-shared case, discard space for relocs against
+	 symbols which turn out to need copy relocs or are not
+	 dynamic.  */
+
+      if (h->def_dynamic
+	  && !h->def_regular)
+	{
+	  /* Make sure this symbol is output as a dynamic symbol.
+	     Undefined weak syms won't yet be marked as dynamic.  */
+	  if (h->dynindx == -1
+	      && !h->forced_local)
+	    {
+	      if (! bfd_elf_link_record_dynamic_symbol (info, h))
+		return FALSE;
+	    }
+
+	  /* If that succeeded, we know we'll be keeping all the
+	     relocs.  */
+	  if (h->dynindx != -1)
+	    goto keep;
+	}
+      else if (info->pie || htab->emit_fixups)
+	{
+	  int c = 0;
+	  for (p = eh->dyn_relocs; p != NULL; p = p->next)
+	    c += p->count = p->pie_count;
+	  if (c && !htab->emit_fixups)
+	    goto keep;
+
+	}
+
+      eh->dyn_relocs = NULL;
+
+    keep: ;
+    }
+
+  /* Finally, allocate space.  */
+  for (p = eh->dyn_relocs; p != NULL; p = p->next)
+    {
+      asection *sreloc = elf_section_data (p->sec)->sreloc;
+      sreloc->size += p->count * sizeof (Elf32_External_Rela);
+    }
+
+  return TRUE;
+}
+
+/* Find any dynamic relocs that apply to read-only sections.  */
+
+static bfd_boolean
+readonly_dynrelocs (struct elf_link_hash_entry *h, void *info)
+{
+  struct spu_elf_dyn_relocs *p;
+
+  if (h->root.type == bfd_link_hash_indirect)
+    return TRUE;
+
+  if (h->root.type == bfd_link_hash_warning)
+    h = (struct elf_link_hash_entry *) h->root.u.i.link;
+
+  for (p = spu_elf_hash_entry (h)->dyn_relocs; p != NULL; p = p->next)
+    {
+      asection *s = p->sec->output_section;
+
+      if (p->count 
+	  && s != NULL
+	  && ((s->flags & (SEC_READONLY | SEC_ALLOC))
+	      == (SEC_READONLY | SEC_ALLOC)))
+	{
+	  ((struct bfd_link_info *) info)->flags |= DF_TEXTREL;
+
+	  /* Not an error, just cut short the traversal.  */
+	  return FALSE;
+	}
+    }
+  return TRUE;
+}
+
+static bfd_boolean
+spu_elf_size_dynamic_sections (bfd *output_bfd,
+			       struct bfd_link_info *info)
+{
+  struct spu_link_hash_table *htab;
+  bfd *dynobj;
+  asection *sec;
+  bfd_boolean relocs;
+
+#ifdef DEBUG
+  info->callbacks->info (_("spu_elf_size_dynamic_sections called\n"));
+#endif
+
+  htab = spu_hash_table (info);
+  dynobj = htab->elf.dynobj;
+  if (dynobj == NULL)
+    abort ();
+
+  /* Allocate space for global sym dynamic relocs.  */
+  elf_link_hash_traverse (&htab->elf, allocate_dynrelocs, info);
+
+  /* The check_relocs and adjust_dynamic_symbol entry points have
+     determined the sizes of the various dynamic sections.  Allocate
+     memory for them.  */
+  relocs = FALSE;
+  for (sec = dynobj->sections; sec != NULL; sec = sec->next)
+    {
+      if ((sec->flags & SEC_LINKER_CREATED) == 0)
+	continue;
+
+      if (strncmp (bfd_get_section_name (dynobj, sec), ".rela", 5) == 0)
+	{
+	  if (sec->size != 0)
+	    {
+	      /* Remember whether there are any reloc sections.  */
+	      relocs = TRUE;
+
+	      /* We use the reloc_count field as a counter if we need
+		 to copy relocs into the output file.  */
+	      sec->reloc_count = 0;
+	    }
+	}
+      else
+	{
+	  /* It's not one of our sections, so don't allocate space.  */
+	  continue;
+	}
+
+      if (sec->size == 0)
+	{
+	  /* If we don't need this section, strip it from the
+	     output file.  This is mostly to handle .rela.bss and
+	     .rela.plt.  We must create both sections in
+	     create_dynamic_sections, because they must be created
+	     before the linker maps input sections to output
+	     sections.  The linker does that before
+	     adjust_dynamic_symbol is called, and it is that
+	     function which decides whether anything needs to go
+	     into these sections.  */
+	  sec->flags |= SEC_EXCLUDE;
+	  continue;
+	}
+
+      if ((sec->flags & SEC_HAS_CONTENTS) == 0)
+	continue;
+
+      /* Allocate memory for the section contents.  Zero it, because
+	 we may not fill in all the reloc sections.  */
+      sec->contents = bfd_zalloc (dynobj, sec->size);
+      if (sec->contents == NULL)
+	return FALSE;
+    }
+
+  if (htab->emit_fixups)
+    {
+      asection *sfixup = htab->sfixup;
+      asection *s;
+      struct spu_elf_fixup *p;
+      int fixup_count = 0;
+      int i;
+      bfd *ibfd;
+      bfd_vma base_end;
+
+      for (ibfd = info->input_bfds; ibfd != NULL; ibfd = ibfd->link_next)
+	{
+
+	  if (bfd_get_flavour (ibfd) != bfd_target_elf_flavour)
+	    continue;
+
+	  /* Count an upper bound for the size of .fixup.   It is an
+	   * upper bound because this will not merge fixups of different
+	   * sections into a single fixup record.  */
+	  for (s = ibfd->sections; s != NULL; s = s->next)
+	    if ((p = elf_section_data (s)->local_dynrel) != 0)
+	      for (base_end = 0, i = 0; p[i].h; i++)
+		if ((p[i].h == (struct elf_link_hash_entry *)-1
+		     || !spu_elf_hash_entry (p[i].h)->dyn_relocs)
+		    && p[i].r_offset >= base_end)
+		  {
+		    base_end = (p[i].r_offset & ~(bfd_vma)15) + 16;
+		    fixup_count++;
+		  }
+	}
+
+      /* We always have a NULL fixup as a sentinel */
+      sfixup->size = (fixup_count + 1) * FIXUP_RECORD_SIZE;
+      sfixup->contents = (bfd_byte *) bfd_zalloc (dynobj, sfixup->size);
+      if (sfixup->contents == NULL)
+	return FALSE;
+    }
+
+  if (htab->elf.dynamic_sections_created)
+    {
+#define add_dynamic_entry(TAG, VAL) \
+  _bfd_elf_add_dynamic_entry (info, TAG, VAL)
+
+      if (relocs)
+	{
+	  if (!add_dynamic_entry (DT_RELA, 0)
+	      || !add_dynamic_entry (DT_RELASZ, 0)
+	      || !add_dynamic_entry (DT_RELAENT, sizeof (Elf32_External_Rela)))
+	    return FALSE;
+
+	  /* If any dynamic relocs apply to a read-only section,
+	     then we need a DT_TEXTREL entry.  */
+	  if ((info->flags & DF_TEXTREL) == 0)
+	    elf_link_hash_traverse (&htab->elf, readonly_dynrelocs, info);
+
+	  if ((info->flags & DF_TEXTREL) != 0)
+	    {
+	      if (!add_dynamic_entry (DT_TEXTREL, 0))
+		return FALSE;
+	    }
+	}
+      /* Align all the dynamic sections to 16 bytes */
+      sec = bfd_get_section_by_name (output_bfd, ".dynamic");
+      if (sec)
+	  bfd_set_section_alignment (output_bfd, sec, 4);
+      sec = bfd_get_section_by_name (output_bfd, ".hash");
+      if (sec)
+	  bfd_set_section_alignment (output_bfd, sec, 4);
+      sec = bfd_get_section_by_name (output_bfd, ".dynsym");
+      if (sec)
+	  bfd_set_section_alignment (output_bfd, sec, 4);
+      sec = bfd_get_section_by_name (output_bfd, ".dynstr");
+      if (sec)
+	  bfd_set_section_alignment (output_bfd, sec, 4);
+      sec = bfd_get_section_by_name (output_bfd, ".rela.dyn");
+      if (sec)
+	  bfd_set_section_alignment (output_bfd, sec, 4);
+    }
+#undef add_dynamic_entry
+
+  return TRUE;
+}
 
 #define TARGET_BIG_SYM		bfd_elf32_spu_vec
 #define TARGET_BIG_NAME		"elf32-spu"
@@ -2353,5 +3436,13 @@ _bfd_elf_spu_get_relocated_section_contents (bfd *abfd, struct bfd_link_info *li
 #define bfd_elf32_bfd_final_link		spu_elf_final_link
 #define elf_backend_section_processing          spu_elf_section_processing
 #define bfd_elf32_bfd_get_relocated_section_contents _bfd_elf_spu_get_relocated_section_contents
+
+#define elf_backend_create_dynamic_sections	spu_elf_create_dynamic_sections
+#define elf_backend_finish_dynamic_symbol	spu_elf_finish_dynamic_symbol
+#define elf_backend_finish_dynamic_sections	spu_elf_finish_dynamic_sections
+#define elf_backend_check_relocs		spu_elf_check_relocs
+#define elf_backend_adjust_dynamic_symbol	spu_elf_adjust_dynamic_symbol
+#define elf_backend_size_dynamic_sections	spu_elf_size_dynamic_sections
+#define elf_backend_copy_indirect_symbol	spu_elf_copy_indirect_symbol
 
 #include "elf32-target.h"

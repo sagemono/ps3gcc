@@ -642,6 +642,9 @@ ocp_convert (tree type, tree expr, int convtype, int flags)
 	 conversion.  */
       else if (TREE_CODE (type) == COMPLEX_TYPE)
 	return fold_if_not_in_template (convert_to_complex (type, e));
+      /* For vector data types, we need to produce a VIEW_CONVERT_EXPR.  */
+      else if (TREE_CODE (type) == VECTOR_TYPE)
+	return fold_if_not_in_template (convert_to_vector (type, e));
       else if (TREE_CODE (e) == TARGET_EXPR)
 	{
 	  /* Don't build a NOP_EXPR of class type.  Instead, change the

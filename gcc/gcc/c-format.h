@@ -35,6 +35,12 @@ enum format_lengths
   FMT_LEN_z,
   FMT_LEN_t,
   FMT_LEN_j,
+  FMT_LEN_v,
+  FMT_LEN_vhh,
+  FMT_LEN_vh,
+  FMT_LEN_vl,
+  FMT_LEN_vll,
+  FMT_LEN_vL,
   FMT_LEN_MAX
 };
 
@@ -113,10 +119,14 @@ typedef struct
 
 
 /* Macros to fill out tables of these.  */
-#define NOARGUMENTS	{ T89_V, BADLEN, BADLEN, BADLEN, BADLEN, BADLEN, BADLEN, BADLEN, BADLEN }
+#define NOARGUMENTS	{ T89_V, BADLEN, BADLEN, BADLEN, BADLEN, BADLEN, BADLEN, BADLEN, BADLEN, NOVECLEN }
 #define BADLEN	{ 0, NULL, NULL }
-#define NOLENGTHS	{ BADLEN, BADLEN, BADLEN, BADLEN, BADLEN, BADLEN, BADLEN, BADLEN, BADLEN }
-
+#define NOLENGTHS	{ BADLEN, BADLEN, BADLEN, BADLEN, BADLEN, BADLEN, BADLEN, BADLEN, BADLEN, NOVECLEN }
+#define VECLEN_S	TEX_VI, TEX_VC, TEX_VS, TEX_VL, TEX_VLL, BADLEN
+#define VECLEN_U	TEX_VUI, TEX_VUC, TEX_VUS, TEX_VUL, TEX_VULL, BADLEN
+#define VECLEN_F	TEX_VF, BADLEN, BADLEN, BADLEN, BADLEN, TEX_VD
+#define VECLEN_C	TEX_VUC, BADLEN, BADLEN, BADLEN, BADLEN, BADLEN
+#define NOVECLEN	BADLEN, BADLEN, BADLEN, BADLEN, BADLEN, BADLEN
 
 /* Structure describing a format conversion specifier (or a set of specifiers
    which act identically), and the length modifiers used with it.  */
@@ -295,5 +305,42 @@ typedef struct
 #define T99_IM	{ STD_C99, "intmax_t", T_IM }
 #define T_UIM   &uintmax_type_node
 #define T99_UIM	{ STD_C99, "uintmax_t", T_UIM }
+
+#ifndef TEX_VC
+#define TEX_VC	{ 0, NULL, NULL }
+#endif
+#ifndef TEX_VUC
+#define TEX_VUC	{ 0, NULL, NULL }
+#endif
+#ifndef TEX_VS
+#define TEX_VS	{ 0, NULL, NULL }
+#endif
+#ifndef TEX_VUS
+#define TEX_VUS	{ 0, NULL, NULL }
+#endif
+#ifndef TEX_VI
+#define TEX_VI	{ 0, NULL, NULL }
+#endif
+#ifndef TEX_VUI
+#define TEX_VUI	{ 0, NULL, NULL }
+#endif
+#ifndef TEX_VL
+#define TEX_VL	{ 0, NULL, NULL }
+#endif
+#ifndef TEX_VUL
+#define TEX_VUL	{ 0, NULL, NULL }
+#endif
+#ifndef TEX_VLL
+#define TEX_VLL	{ 0, NULL, NULL }
+#endif
+#ifndef TEX_VULL
+#define TEX_VULL { 0, NULL, NULL }
+#endif
+#ifndef TEX_VF
+#define TEX_VF	{ 0, NULL, NULL }
+#endif
+#ifndef TEX_VD
+#define TEX_VD	{ 0, NULL, NULL }
+#endif
 
 #endif /* GCC_C_FORMAT_H */

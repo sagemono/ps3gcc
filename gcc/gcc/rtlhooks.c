@@ -44,9 +44,10 @@ gen_lowpart_general (enum machine_mode mode, rtx x)
 
   if (result)
     return result;
-  else if (REG_P (x))
+  /* Handle SUBREGs and hard REGs that were rejected by
+     simplify_gen_subreg.  */
+  else if (REG_P (x) || GET_CODE (x) == SUBREG)
     {
-      /* Must be a hard reg that's not valid in MODE.  */
       result = gen_lowpart_common (mode, copy_to_reg (x));
       gcc_assert (result != 0);
       return result;

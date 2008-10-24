@@ -41,7 +41,7 @@ static size_t mingw32_gt_pch_alloc_granularity (void);
 #undef HOST_HOOKS_GT_PCH_ALLOC_GRANULARITY
 #define HOST_HOOKS_GT_PCH_ALLOC_GRANULARITY mingw32_gt_pch_alloc_granularity
 
-static inline void w32_error(const char*, const char*, int, const char*);
+static inline void w32_error (const char*, const char*, int, const char*);
 
 /* FIXME: Is this big enough?  Why do we need it at all? */
 static const size_t pch_VA_max_size  = 128 * 1024 * 1024;
@@ -80,41 +80,33 @@ static size_t mingw32_gt_pch_alloc_granularity (void)
 static void *
 mingw32_gt_pch_get_address (size_t size, int fd  ATTRIBUTE_UNUSED)
 {
-  void* res;
-  void *oldaddress;
-  int fixed_address;
-  OSVERSIONINFO version_info;
+  void *res;
+  void *candidates[] = { (void*)0x20000000, (void*)0x40000000, NULL };
+  int i;
   
   size = (size + va_granularity - 1) & ~(va_granularity - 1);
 
   /* We are really using pch_VA_max_size as a minimum. */
   size = MAX (size, pch_VA_max_size);
   
-  /* Determine the version of Windows we are running on.  */
-  version_info.dwOSVersionInfoSize = sizeof (version_info);
-  GetVersionEx (&version_info);
-  
-  /* For Vista use a fixed address, but we should enable it always so we don't
-     end up with the case where you cannot use the PCH on a different machine
-     with a non Vista.  */
-  fixed_address = 1; /*version_info.dwMajorVersion > 5;*/
-  
-  if (!fixed_address)
-    oldaddress = NULL;
-  else
-    oldaddress = (void*)0x20000000;
-
-  /* FIXME: We let system determine base by setting first arg to NULL.
+  /* FIXME: gt_pch_save() in ggc-common.c leaves the "extra" work to this
+     function, but we cannot do so much.  Because of the strange strategy
+     of ggc-common.c, we should foresee the address space available for
+     the user process of the PCH being generated.  We use two base
+     address candidates, 0x20000000 and 0x40000000, which seem to be
+     available for most XP and Vista processes.  (Using only one address
+     fails if another PCH is used for generating PCH.)  If both fail,
+     NULL is given to let the system determine the base.
      Allocating at top of available address space avoids unnecessary
-     fragmentation of "ordinary" (malloc's)  address space but may not be safe
-     with delayed load of system dll's. Preferred addresses for NT system
-     dlls is in 0x70000000 to 0x78000000 range.
-     If we allocate at bottom we need to reserve the address as early as possible
-     and at the same point in each invocation. */
+     fragmentation of "ordinary" (malloc's) address space but may not be safe
+     with delayed load of system dll's. */
  
-  res = VirtualAlloc (oldaddress, size,
-		      MEM_RESERVE | (fixed_address ? 0 : MEM_TOP_DOWN),
-		      PAGE_NOACCESS);
+  for (i = 0; i < sizeof candidates / sizeof *candidates; i++) {
+    res = VirtualAlloc (candidates[i], size,
+		        MEM_RESERVE | MEM_TOP_DOWN,
+		        PAGE_NOACCESS);
+    if (res) break;
+  }
   if (!res)
     w32_error (__FUNCTION__, __FILE__, __LINE__, "VirtualAlloc");
   else
@@ -135,13 +127,14 @@ mingw32_gt_pch_use_address (void *addr, size_t size, int fd,
 {
   void * mmap_addr;
   static HANDLE mmap_handle;
+  int i;
   
   /* Apparently, MS Vista puts unnamed file mapping objects into Global
      namespace when running an application in a Terminal Server
      session.  This causes failure since, by default, applications 
      don't get SeCreateGlobalPrivilege. We don't need global
      memory sharing so explicitly put object into Local namespace.  */
-   const char object_name[] = "Local\\MinGWGCCPCH";
+   char object_name[] = "Local\\MinGWGCCPCH                  ";
 
   /* However, the documentation for CreateFileMapping says that on NT4
      and earlier, backslashes are invalid in object name.  So, we need
@@ -161,17 +154,49 @@ mingw32_gt_pch_use_address (void *addr, size_t size, int fd,
   version_info.dwOSVersionInfoSize = sizeof (version_info);
   GetVersionEx (&version_info);
 
-  mmap_handle = CreateFileMappingA ((HANDLE) _get_osfhandle (fd), NULL, 
-				   PAGE_WRITECOPY | SEC_COMMIT, 0, 0,
-				   version_info.dwMajorVersion > 4
-				    ? object_name : NULL);
+  if (version_info.dwMajorVersion <= 4)
+    {
+      mmap_handle = CreateFileMappingA ((HANDLE) _get_osfhandle (fd), NULL, 
+				        PAGE_WRITECOPY | SEC_COMMIT, 0, 0,
+				        NULL);
+    }
+  else
+    {
+      /* Try to generate an unique local file mapping name.  */
+      srand (local_tick);
+      while (1)
+	{
+	   sprintf (object_name, "Local\\MinGWGCCPCH%08X", rand());
+           mmap_handle = CreateFileMappingA ((HANDLE) _get_osfhandle (fd), NULL, 
+					     PAGE_WRITECOPY | SEC_COMMIT, 0, 0,
+					     object_name);
+
+	   /* If the mapping already exists, continue.  */
+	   if (mmap_handle != NULL && GetLastError() == ERROR_ALREADY_EXISTS)
+	     CloseHandle (mmap_handle);
+	   else
+	     break;
+	}
+    }
   if (mmap_handle == NULL)
     {
       w32_error (__FUNCTION__,  __FILE__, __LINE__, "CreateFileMapping");
       return -1; 
     }
-  mmap_addr = MapViewOfFileEx (mmap_handle, FILE_MAP_COPY, 0, offset,
-			       size, addr);
+
+  /* wait/retry a couple of times if needed.
+     Fixes a race when running multiple gcc's (-j) */
+  for (i = 0; i < 6; i++)
+    {
+      mmap_addr = MapViewOfFileEx (mmap_handle, FILE_MAP_COPY, 0, offset,
+			            size, addr);
+      if (mmap_addr == addr)
+	break;
+      /* Sleep for a little bit while waiting for Windows to be ready to map
+         the file in.  This only happens while running two GCCs at the same time.
+         Windows is very funny with respect of mapping files in. */
+      Sleep (500);
+   }
   if (mmap_addr != addr)
     {
       w32_error (__FUNCTION__, __FILE__, __LINE__, "MapViewOfFileEx");

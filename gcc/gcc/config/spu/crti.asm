@@ -31,17 +31,26 @@
 #    the executable file might be covered by the GNU General Public License.
 # 
 
-# This file just make a stack frame for the contents of the .fini and
-# .init sections.  Users may put any desired instructions in those
-# sections.
+# This file contains the prolgue part of the special __init() and
+# __fini() functions.  .init and .fini sections written by a user must
+# not use non-volatile registers that aren't saved here, and they must
+# not clobber the stack space allocated here.  This file must be linked
+# before any other object files containing .init or .fini sections.
 
 	# Note - this macro is complimented by the FUNC_END macro
 	# in crtn.asm.  If you change this macro you must also change
 	# that macro match.
+        #
+	# Use an even number of instructions so dual issue of following
+	# .init or .fini sections is scheduled properly.
 .macro FUNC_START
 	#  Create a stack frame and save any call-preserved registers
-	ai	$sp, $sp, -16
-	stqd	$lr, 0($sp)
+	stqd	$lr, 16($sp)
+	stqd	$sp, -80($sp) 
+	stqd	$80, -48($sp)
+	stqd	$81, -32($sp)
+	stqd	$126, -16($sp)
+	ai	$sp, $sp, -80
 .endm
 		
 	.file		"crti.asm"

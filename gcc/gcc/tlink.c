@@ -737,7 +737,7 @@ scan_linker_output (const char *fname)
 void
 do_tlink (char **ld_argv, char **object_lst ATTRIBUTE_UNUSED)
 {
-  int exit = tlink_execute ("ld", ld_argv, ldout, lderrout);
+  int exit = tlink_execute (full_ld_suffix, ld_argv, ldout, lderrout);
 
   tlink_init ();
 
@@ -763,7 +763,7 @@ do_tlink (char **ld_argv, char **object_lst ATTRIBUTE_UNUSED)
 	      break;
 	    if (tlink_verbose)
 	      fprintf (stderr, _("collect: relinking\n"));
-	    exit = tlink_execute ("ld", ld_argv, ldout, lderrout);
+	    exit = tlink_execute (full_ld_suffix, ld_argv, ldout, lderrout);
 	  }
     }
 
@@ -773,7 +773,7 @@ do_tlink (char **ld_argv, char **object_lst ATTRIBUTE_UNUSED)
   unlink (lderrout);
   if (exit)
     {
-      error ("ld returned %d exit status", exit);
+      error ("%s returned %d exit status", full_ld_suffix, exit);
       collect_exit (exit);
     }
 }

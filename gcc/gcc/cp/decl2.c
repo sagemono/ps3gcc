@@ -2746,9 +2746,11 @@ cxx_callgraph_analyze_expr (tree *tp, int *walk_subtrees ATTRIBUTE_UNUSED,
 	    mark_decl_referenced (vtbl);
 	}
       else if (DECL_CONTEXT (t)
-	       && TREE_CODE (DECL_CONTEXT (t)) == FUNCTION_DECL)
+	       && TREE_CODE (DECL_CONTEXT (t)) == FUNCTION_DECL
+	       && flag_use_repository)
 	/* If we need a static variable in a function, then we
-	   need the containing function.  */
+	   need the containing function but only if we are using
+	   repository.  */
 	mark_decl_referenced (DECL_CONTEXT (t));
       break;
     default:

@@ -31,7 +31,6 @@
 # LIBGCC
 # MULTILIBS
 # EXTRA_MULTILIB_PARTS
-# MULTILIB_BUILD_EXCEPTIONS
 # SHLIB_EXT
 # SHLIB_LINK
 # SHLIB_MKMAP
@@ -96,23 +95,6 @@ libgcov_c_dep='stmp-dirs $(srcdir)/libgcov.c $(srcdir)/gcov-io.h $(srcdir)/gcov-
 
 # Dependencies for fp-bit.c
 fpbit_c_dep='stmp-dirs config.status tsystem.h'
-
-# Don't build certain exceptions.
-if [ -n "$MULTILIB_BUILD_EXCEPTIONS" ] ; then
-  for ml in $MULTILIBS; do
-    dir=`echo ${ml} | sed -e 's/;.*$//' -e 's/=/$(EQ)/g'`
-    flags=`echo ${ml} | sed -e 's/^[^;]*;//' -e 's/@/ -/g'`;
-    dont_build=0
-    echo "#ml=$ml" 
-    for e in $MULTILIB_BUILD_EXCEPTIONS ; do
-      case $dir in
-	$e) dont_build=1 ;; 
-      esac
-    done
-    (( dont_build )) || new_multilibs="$new_multilibs $ml"
-  done
-  MULTILIBS="$new_multilibs"
-fi
 
 # Flag whether we need eh_dummy.c
 need_eh_dummy=

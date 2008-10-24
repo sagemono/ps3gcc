@@ -381,7 +381,15 @@ rvalue (tree expr)
 	 
          Non-class rvalues always have cv-unqualified types.  */
       if (!CLASS_TYPE_P (type))
-	type = TYPE_MAIN_VARIANT (type);
+	{
+	  if (flag_propagate_restrict
+	      && POINTER_TYPE_P (type)
+	      && TYPE_RESTRICT (type))
+	    type = cp_build_qualified_type (TYPE_MAIN_VARIANT (type),
+					    TYPE_QUAL_RESTRICT);
+	  else
+	    type = TYPE_MAIN_VARIANT (type);
+	}
       expr = build1 (NON_LVALUE_EXPR, type, expr);
     }
   return expr;

@@ -7657,6 +7657,17 @@ expand_expr_real_1 (tree exp, rtx target, enum machine_mode tmode,
 
 		if (bitsize == 0)
 		  return target;
+		
+		/* If we don't have a memory location for op0,
+		   make a new location for it. */
+		if (!MEM_P (op0))
+		  {
+		    rtx op0_mem = assign_stack_temp (GET_MODE (op0),
+						     GET_MODE_SIZE (GET_MODE (op0)),
+						     0);
+		    emit_move_insn (op0_mem, op0);
+		    op0 = op0_mem;
+		  }
 
 		/* In this case, BITPOS must start at a byte boundary and
 		   TARGET, if specified, must be a MEM.  */

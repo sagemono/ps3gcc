@@ -93,11 +93,19 @@ fail (const char *msg1, size_t msg1len, const char *msg3)
 #else
   static const char __progname[] = "";
 #endif
-  int fd;
+  int fd, old_fd;
 
   /* Print error message directly to the tty.  This avoids Bad Things
      happening if stderr is redirected.  */
-  fd = open (_PATH_TTY, O_WRONLY);
+  old_fd = fd = open (_PATH_TTY, O_WRONLY);
+  if(fd == -1)
+#ifdef HAVE_SYSLOG_H
+  /* Only send the error to syslog if there was no tty available.  */
+    syslog (LOG_CRIT, msg3);
+#else /* HAVE_SYSLOG_H */
+  /* If we don't have a syslog, then print out using stderr just in case.  */
+    fd = 2;
+#endif
   if (fd != -1)
     {
       static const char msg2[] = " terminated\n";
@@ -107,6 +115,7 @@ fail (const char *msg1, size_t msg1len, const char *msg3)
       progname_len = strlen (__progname);
       len = msg1len + progname_len + sizeof(msg2)-1 + 1;
       p = buf = alloca (len);
+
 
       memcpy (p, msg1, msg1len);
       p += msg1len;
@@ -122,14 +131,9 @@ fail (const char *msg1, size_t msg1len, const char *msg3)
           buf += wrote;
           len -= wrote;
         }
-      close (fd);
+      if (old_fd != -1)
+        close (fd);
     }
-
-#ifdef HAVE_SYSLOG_H
-  /* Only send the error to syslog if there was no tty available.  */
-  else
-    syslog (LOG_CRIT, msg3);
-#endif /* HAVE_SYSLOG_H */
 
   /* Try very hard to exit.  Note that signals may be blocked preventing
      the first two options from working.  The use of volatile is here to

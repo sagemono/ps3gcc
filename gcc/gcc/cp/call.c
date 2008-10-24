@@ -4498,8 +4498,15 @@ convert_arg_to_ellipsis (tree arg)
 	 there is no need to emit a warning, since the expression won't be
 	 evaluated. We keep the builtin_trap just as a safety check.  */
       if (!skip_evaluation)
-	warning (0, "cannot pass objects of non-POD type %q#T through %<...%>; "
-		 "call will abort at runtime", TREE_TYPE (arg));
+	{
+	  if (!error_nonPOD_varags)
+	    warning (OPT_WnonPOD_varargs,
+		     "cannot pass objects of non-POD type %q#T through %<...%>; "
+		     "call will abort at runtime", TREE_TYPE (arg));
+	  else
+	    error ("cannot pass objects of non-POD type %q#T through %<...%>; "
+		   "call will abort at runtime", TREE_TYPE (arg));
+	}
       arg = call_builtin_trap ();
       arg = build2 (COMPOUND_EXPR, integer_type_node, arg,
 		    integer_zero_node);
@@ -4523,9 +4530,15 @@ build_x_va_arg (tree expr, tree type)
 
   if (! pod_type_p (type))
     {
-      /* Undefined behavior [expr.call] 5.2.2/7.  */
-      warning (0, "cannot receive objects of non-POD type %q#T through %<...%>; "
-	       "call will abort at runtime", type);
+      
+          if (!error_nonPOD_varags)
+	    warning (OPT_WnonPOD_varargs,
+		     "cannot receive objects of non-POD type %q#T through %<...%>; "
+		     "call will abort at runtime", type);
+	  else
+	    error ("cannot receive objects of non-POD type %q#T through %<...%>; "
+		   "call will abort at runtime", type);
+
       expr = convert (build_pointer_type (type), null_node);
       expr = build2 (COMPOUND_EXPR, TREE_TYPE (expr),
 		     call_builtin_trap (), expr);
@@ -4586,9 +4599,14 @@ convert_default_arg (tree type, tree arg, tree fn, int parmnum)
     }
   else
     {
-      /* This could get clobbered by the following call.  */
-      if (TREE_HAS_CONSTRUCTOR (arg))
-	arg = copy_node (arg);
+      /* We must make a copy of ARG, in case subsequent processing
+         alters any part of it.  For example, during gimplification a
+         cast of the form (T) &X::f (where "f" is a member function)
+         will lead to replacing the PTRMEM_CST for &X::f with a
+         VAR_DECL.  We can avoid the copy for constants, since they
+         are never modified in place.  */
+      if (!CONSTANT_CLASS_P (arg))
+        arg = unshare_expr (arg);
 
       arg = convert_for_initialization (0, type, arg, LOOKUP_NORMAL,
 					"default argument", fn, parmnum);

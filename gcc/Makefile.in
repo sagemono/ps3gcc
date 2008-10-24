@@ -212,6 +212,7 @@ BASE_TARGET_EXPORTS = \
 
 RAW_CXX_TARGET_EXPORTS = \
 	$(BASE_TARGET_EXPORTS) \
+	RAW_CXX_FOR_TARGET="$(RAW_CXX_FOR_TARGET)"; export RAW_CXX_FOR_TARGET; \
 	CXX_FOR_TARGET="$(RAW_CXX_FOR_TARGET)"; export CXX_FOR_TARGET; \
 	CXX="$(RAW_CXX_FOR_TARGET)"; export CXX;
 
@@ -354,11 +355,15 @@ all:
 
 # This is the list of directories that may be needed in RPATH_ENVVAR
 # so that prorgams built for the target machine work.
-TARGET_LIB_PATH = $(TARGET_LIB_PATH_libstdc++-v3)$(TARGET_LIB_PATH_libmudflap)$(TARGET_LIB_PATH_libssp)$(HOST_LIB_PATH_gcc)
+TARGET_LIB_PATH = $(TARGET_LIB_PATH_libstdc++-v3)$(TARGET_LIB_PATH_libsupcxx)$(TARGET_LIB_PATH_libmudflap)$(TARGET_LIB_PATH_libssp)$(HOST_LIB_PATH_gcc)
 
 @if target-libstdc++-v3
 TARGET_LIB_PATH_libstdc++-v3 = $$r/$(TARGET_SUBDIR)/libstdc++-v3/.libs:
 @endif target-libstdc++-v3
+
+@if target-libsupcxx
+TARGET_LIB_PATH_libsupcxx = $$r/$(TARGET_SUBDIR)/libsupcxx/.libs:
+@endif target-libsupcxx
 
 @if target-libmudflap
 TARGET_LIB_PATH_libmudflap = $$r/$(TARGET_SUBDIR)/libmudflap/.libs:
@@ -609,6 +614,7 @@ configure-host:  \
 .PHONY: configure-target
 configure-target:  \
     maybe-configure-target-libstdc++-v3 \
+    maybe-configure-target-libsupcxx \
     maybe-configure-target-libmudflap \
     maybe-configure-target-libssp \
     maybe-configure-target-newlib \
@@ -728,6 +734,7 @@ all-host:  \
 .PHONY: all-target
 all-target:  \
     maybe-all-target-libstdc++-v3 \
+    maybe-all-target-libsupcxx \
     maybe-all-target-libmudflap \
     maybe-all-target-libssp \
     maybe-all-target-newlib \
@@ -835,6 +842,7 @@ info-host:  \
 .PHONY: info-target
 info-target:  \
     maybe-info-target-libstdc++-v3 \
+    maybe-info-target-libsupcxx \
     maybe-info-target-libmudflap \
     maybe-info-target-libssp \
     maybe-info-target-newlib \
@@ -937,6 +945,7 @@ dvi-host:  \
 .PHONY: dvi-target
 dvi-target:  \
     maybe-dvi-target-libstdc++-v3 \
+    maybe-dvi-target-libsupcxx \
     maybe-dvi-target-libmudflap \
     maybe-dvi-target-libssp \
     maybe-dvi-target-newlib \
@@ -1039,6 +1048,7 @@ html-host:  \
 .PHONY: html-target
 html-target:  \
     maybe-html-target-libstdc++-v3 \
+    maybe-html-target-libsupcxx \
     maybe-html-target-libmudflap \
     maybe-html-target-libssp \
     maybe-html-target-newlib \
@@ -1141,6 +1151,7 @@ TAGS-host:  \
 .PHONY: TAGS-target
 TAGS-target:  \
     maybe-TAGS-target-libstdc++-v3 \
+    maybe-TAGS-target-libsupcxx \
     maybe-TAGS-target-libmudflap \
     maybe-TAGS-target-libssp \
     maybe-TAGS-target-newlib \
@@ -1243,6 +1254,7 @@ install-info-host:  \
 .PHONY: install-info-target
 install-info-target:  \
     maybe-install-info-target-libstdc++-v3 \
+    maybe-install-info-target-libsupcxx \
     maybe-install-info-target-libmudflap \
     maybe-install-info-target-libssp \
     maybe-install-info-target-newlib \
@@ -1345,6 +1357,7 @@ installcheck-host:  \
 .PHONY: installcheck-target
 installcheck-target:  \
     maybe-installcheck-target-libstdc++-v3 \
+    maybe-installcheck-target-libsupcxx \
     maybe-installcheck-target-libmudflap \
     maybe-installcheck-target-libssp \
     maybe-installcheck-target-newlib \
@@ -1447,6 +1460,7 @@ mostlyclean-host:  \
 .PHONY: mostlyclean-target
 mostlyclean-target:  \
     maybe-mostlyclean-target-libstdc++-v3 \
+    maybe-mostlyclean-target-libsupcxx \
     maybe-mostlyclean-target-libmudflap \
     maybe-mostlyclean-target-libssp \
     maybe-mostlyclean-target-newlib \
@@ -1549,6 +1563,7 @@ clean-host:  \
 .PHONY: clean-target
 clean-target:  \
     maybe-clean-target-libstdc++-v3 \
+    maybe-clean-target-libsupcxx \
     maybe-clean-target-libmudflap \
     maybe-clean-target-libssp \
     maybe-clean-target-newlib \
@@ -1651,6 +1666,7 @@ distclean-host:  \
 .PHONY: distclean-target
 distclean-target:  \
     maybe-distclean-target-libstdc++-v3 \
+    maybe-distclean-target-libsupcxx \
     maybe-distclean-target-libmudflap \
     maybe-distclean-target-libssp \
     maybe-distclean-target-newlib \
@@ -1753,6 +1769,7 @@ maintainer-clean-host:  \
 .PHONY: maintainer-clean-target
 maintainer-clean-target:  \
     maybe-maintainer-clean-target-libstdc++-v3 \
+    maybe-maintainer-clean-target-libsupcxx \
     maybe-maintainer-clean-target-libmudflap \
     maybe-maintainer-clean-target-libssp \
     maybe-maintainer-clean-target-newlib \
@@ -1911,6 +1928,7 @@ check-host:  \
 .PHONY: check-target
 check-target:  \
     maybe-check-target-libstdc++-v3 \
+    maybe-check-target-libsupcxx \
     maybe-check-target-libmudflap \
     maybe-check-target-libssp \
     maybe-check-target-newlib \
@@ -2110,6 +2128,7 @@ install-host:  \
 .PHONY: install-target
 install-target:  \
     maybe-install-target-libstdc++-v3 \
+    maybe-install-target-libsupcxx \
     maybe-install-target-libmudflap \
     maybe-install-target-libssp \
     maybe-install-target-newlib \
@@ -28542,6 +28561,350 @@ maintainer-clean-target-libstdc++-v3:
 
 
 # There's only one multilib.out.  Cleverer subdirs shouldn't need it copied.
+@if target-libsupcxx
+$(TARGET_SUBDIR)/libsupcxx/multilib.out: multilib.out
+	$(SHELL) $(srcdir)/mkinstalldirs $(TARGET_SUBDIR)/libsupcxx ; \
+	rm -f $(TARGET_SUBDIR)/libsupcxx/Makefile || : ; \
+	cp multilib.out $(TARGET_SUBDIR)/libsupcxx/multilib.out
+@endif target-libsupcxx
+
+
+
+.PHONY: configure-target-libsupcxx maybe-configure-target-libsupcxx
+maybe-configure-target-libsupcxx:
+@if target-libsupcxx
+maybe-configure-target-libsupcxx: configure-target-libsupcxx
+configure-target-libsupcxx: $(TARGET_SUBDIR)/libsupcxx/multilib.out
+	@$(unstage)
+	@test ! -f $(TARGET_SUBDIR)/libsupcxx/Makefile || exit 0; \
+	$(SHELL) $(srcdir)/mkinstalldirs $(TARGET_SUBDIR)/libsupcxx ; \
+	r=`${PWD_COMMAND}`; export r; \
+	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
+	$(RAW_CXX_TARGET_EXPORTS) \
+	echo Configuring in $(TARGET_SUBDIR)/libsupcxx; \
+	cd "$(TARGET_SUBDIR)/libsupcxx" || exit 1; \
+	case $(srcdir) in \
+	  /* | [A-Za-z]:[\\/]*) topdir=$(srcdir) ;; \
+	  *) topdir=`echo $(TARGET_SUBDIR)/libsupcxx/ | \
+		sed -e 's,\./,,g' -e 's,[^/]*/,../,g' `$(srcdir) ;; \
+	esac; \
+	srcdiroption="--srcdir=$${topdir}/libsupcxx"; \
+	libsrcdir="$$s/libsupcxx"; \
+	rm -f no-such-file || : ; \
+	CONFIG_SITE=no-such-file $(SHELL) $${libsrcdir}/configure \
+	  $(TARGET_CONFIGARGS) $${srcdiroption}  \
+	  || exit 1
+@endif target-libsupcxx
+
+
+
+
+
+.PHONY: all-target-libsupcxx maybe-all-target-libsupcxx
+maybe-all-target-libsupcxx:
+@if target-libsupcxx
+TARGET-target-libsupcxx=all
+maybe-all-target-libsupcxx: all-target-libsupcxx
+all-target-libsupcxx: configure-target-libsupcxx
+	@$(unstage)
+	@r=`${PWD_COMMAND}`; export r; \
+	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
+	$(RAW_CXX_TARGET_EXPORTS) \
+	(cd $(TARGET_SUBDIR)/libsupcxx && \
+	  $(MAKE) $(TARGET_FLAGS_TO_PASS) 'CXX=$$(RAW_CXX_FOR_TARGET)' 'CXX_FOR_TARGET=$$(RAW_CXX_FOR_TARGET)'  $(TARGET-target-libsupcxx))
+@endif target-libsupcxx
+
+
+
+
+
+.PHONY: check-target-libsupcxx maybe-check-target-libsupcxx
+maybe-check-target-libsupcxx:
+@if target-libsupcxx
+maybe-check-target-libsupcxx: check-target-libsupcxx
+
+# Dummy target for uncheckable module.
+check-target-libsupcxx:
+
+@endif target-libsupcxx
+
+.PHONY: install-target-libsupcxx maybe-install-target-libsupcxx
+maybe-install-target-libsupcxx:
+@if target-libsupcxx
+maybe-install-target-libsupcxx: install-target-libsupcxx
+
+install-target-libsupcxx: installdirs
+	@: $(MAKE); $(unstage)
+	@r=`${PWD_COMMAND}`; export r; \
+	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
+	$(RAW_CXX_TARGET_EXPORTS) \
+	(cd $(TARGET_SUBDIR)/libsupcxx && \
+	  $(MAKE) $(TARGET_FLAGS_TO_PASS)  install)
+
+@endif target-libsupcxx
+
+# Other targets (info, dvi, etc.)
+
+.PHONY: maybe-info-target-libsupcxx info-target-libsupcxx
+maybe-info-target-libsupcxx:
+@if target-libsupcxx
+maybe-info-target-libsupcxx: info-target-libsupcxx
+
+info-target-libsupcxx: \
+    configure-target-libsupcxx 
+	@: $(MAKE); $(unstage)
+	@[ -f $(TARGET_SUBDIR)/libsupcxx/Makefile ] || exit 0 ; \
+	r=`${PWD_COMMAND}`; export r; \
+	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
+	$(RAW_CXX_TARGET_EXPORTS) \
+	echo "Doing info in $(TARGET_SUBDIR)/libsupcxx" ; \
+	for flag in $(EXTRA_TARGET_FLAGS); do \
+	  eval `echo "$$flag" | sed -e "s|^\([^=]*\)=\(.*\)|\1='\2'; export \1|"`; \
+	done; \
+	(cd $(TARGET_SUBDIR)/libsupcxx && \
+	  $(MAKE) $(BASE_FLAGS_TO_PASS) "AR=$${AR}" "AS=$${AS}" \
+	          "CC=$${CC}" "CXX=$${CXX}" "LD=$${LD}" "NM=$${NM}" \
+	          "RANLIB=$${RANLIB}" \
+	          "DLLTOOL=$${DLLTOOL}" "WINDRES=$${WINDRES}" \
+	           info) \
+	  || exit 1
+
+@endif target-libsupcxx
+
+.PHONY: maybe-dvi-target-libsupcxx dvi-target-libsupcxx
+maybe-dvi-target-libsupcxx:
+@if target-libsupcxx
+maybe-dvi-target-libsupcxx: dvi-target-libsupcxx
+
+dvi-target-libsupcxx: \
+    configure-target-libsupcxx 
+	@: $(MAKE); $(unstage)
+	@[ -f $(TARGET_SUBDIR)/libsupcxx/Makefile ] || exit 0 ; \
+	r=`${PWD_COMMAND}`; export r; \
+	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
+	$(RAW_CXX_TARGET_EXPORTS) \
+	echo "Doing dvi in $(TARGET_SUBDIR)/libsupcxx" ; \
+	for flag in $(EXTRA_TARGET_FLAGS); do \
+	  eval `echo "$$flag" | sed -e "s|^\([^=]*\)=\(.*\)|\1='\2'; export \1|"`; \
+	done; \
+	(cd $(TARGET_SUBDIR)/libsupcxx && \
+	  $(MAKE) $(BASE_FLAGS_TO_PASS) "AR=$${AR}" "AS=$${AS}" \
+	          "CC=$${CC}" "CXX=$${CXX}" "LD=$${LD}" "NM=$${NM}" \
+	          "RANLIB=$${RANLIB}" \
+	          "DLLTOOL=$${DLLTOOL}" "WINDRES=$${WINDRES}" \
+	           dvi) \
+	  || exit 1
+
+@endif target-libsupcxx
+
+.PHONY: maybe-html-target-libsupcxx html-target-libsupcxx
+maybe-html-target-libsupcxx:
+@if target-libsupcxx
+maybe-html-target-libsupcxx: html-target-libsupcxx
+
+html-target-libsupcxx: \
+    configure-target-libsupcxx 
+	@: $(MAKE); $(unstage)
+	@[ -f $(TARGET_SUBDIR)/libsupcxx/Makefile ] || exit 0 ; \
+	r=`${PWD_COMMAND}`; export r; \
+	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
+	$(RAW_CXX_TARGET_EXPORTS) \
+	echo "Doing html in $(TARGET_SUBDIR)/libsupcxx" ; \
+	for flag in $(EXTRA_TARGET_FLAGS); do \
+	  eval `echo "$$flag" | sed -e "s|^\([^=]*\)=\(.*\)|\1='\2'; export \1|"`; \
+	done; \
+	(cd $(TARGET_SUBDIR)/libsupcxx && \
+	  $(MAKE) $(BASE_FLAGS_TO_PASS) "AR=$${AR}" "AS=$${AS}" \
+	          "CC=$${CC}" "CXX=$${CXX}" "LD=$${LD}" "NM=$${NM}" \
+	          "RANLIB=$${RANLIB}" \
+	          "DLLTOOL=$${DLLTOOL}" "WINDRES=$${WINDRES}" \
+	           html) \
+	  || exit 1
+
+@endif target-libsupcxx
+
+.PHONY: maybe-TAGS-target-libsupcxx TAGS-target-libsupcxx
+maybe-TAGS-target-libsupcxx:
+@if target-libsupcxx
+maybe-TAGS-target-libsupcxx: TAGS-target-libsupcxx
+
+TAGS-target-libsupcxx: \
+    configure-target-libsupcxx 
+	@: $(MAKE); $(unstage)
+	@[ -f $(TARGET_SUBDIR)/libsupcxx/Makefile ] || exit 0 ; \
+	r=`${PWD_COMMAND}`; export r; \
+	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
+	$(RAW_CXX_TARGET_EXPORTS) \
+	echo "Doing TAGS in $(TARGET_SUBDIR)/libsupcxx" ; \
+	for flag in $(EXTRA_TARGET_FLAGS); do \
+	  eval `echo "$$flag" | sed -e "s|^\([^=]*\)=\(.*\)|\1='\2'; export \1|"`; \
+	done; \
+	(cd $(TARGET_SUBDIR)/libsupcxx && \
+	  $(MAKE) $(BASE_FLAGS_TO_PASS) "AR=$${AR}" "AS=$${AS}" \
+	          "CC=$${CC}" "CXX=$${CXX}" "LD=$${LD}" "NM=$${NM}" \
+	          "RANLIB=$${RANLIB}" \
+	          "DLLTOOL=$${DLLTOOL}" "WINDRES=$${WINDRES}" \
+	           TAGS) \
+	  || exit 1
+
+@endif target-libsupcxx
+
+.PHONY: maybe-install-info-target-libsupcxx install-info-target-libsupcxx
+maybe-install-info-target-libsupcxx:
+@if target-libsupcxx
+maybe-install-info-target-libsupcxx: install-info-target-libsupcxx
+
+install-info-target-libsupcxx: \
+    configure-target-libsupcxx \
+    info-target-libsupcxx 
+	@: $(MAKE); $(unstage)
+	@[ -f $(TARGET_SUBDIR)/libsupcxx/Makefile ] || exit 0 ; \
+	r=`${PWD_COMMAND}`; export r; \
+	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
+	$(RAW_CXX_TARGET_EXPORTS) \
+	echo "Doing install-info in $(TARGET_SUBDIR)/libsupcxx" ; \
+	for flag in $(EXTRA_TARGET_FLAGS); do \
+	  eval `echo "$$flag" | sed -e "s|^\([^=]*\)=\(.*\)|\1='\2'; export \1|"`; \
+	done; \
+	(cd $(TARGET_SUBDIR)/libsupcxx && \
+	  $(MAKE) $(BASE_FLAGS_TO_PASS) "AR=$${AR}" "AS=$${AS}" \
+	          "CC=$${CC}" "CXX=$${CXX}" "LD=$${LD}" "NM=$${NM}" \
+	          "RANLIB=$${RANLIB}" \
+	          "DLLTOOL=$${DLLTOOL}" "WINDRES=$${WINDRES}" \
+	           install-info) \
+	  || exit 1
+
+@endif target-libsupcxx
+
+.PHONY: maybe-installcheck-target-libsupcxx installcheck-target-libsupcxx
+maybe-installcheck-target-libsupcxx:
+@if target-libsupcxx
+maybe-installcheck-target-libsupcxx: installcheck-target-libsupcxx
+
+installcheck-target-libsupcxx: \
+    configure-target-libsupcxx 
+	@: $(MAKE); $(unstage)
+	@[ -f $(TARGET_SUBDIR)/libsupcxx/Makefile ] || exit 0 ; \
+	r=`${PWD_COMMAND}`; export r; \
+	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
+	$(RAW_CXX_TARGET_EXPORTS) \
+	echo "Doing installcheck in $(TARGET_SUBDIR)/libsupcxx" ; \
+	for flag in $(EXTRA_TARGET_FLAGS); do \
+	  eval `echo "$$flag" | sed -e "s|^\([^=]*\)=\(.*\)|\1='\2'; export \1|"`; \
+	done; \
+	(cd $(TARGET_SUBDIR)/libsupcxx && \
+	  $(MAKE) $(BASE_FLAGS_TO_PASS) "AR=$${AR}" "AS=$${AS}" \
+	          "CC=$${CC}" "CXX=$${CXX}" "LD=$${LD}" "NM=$${NM}" \
+	          "RANLIB=$${RANLIB}" \
+	          "DLLTOOL=$${DLLTOOL}" "WINDRES=$${WINDRES}" \
+	           installcheck) \
+	  || exit 1
+
+@endif target-libsupcxx
+
+.PHONY: maybe-mostlyclean-target-libsupcxx mostlyclean-target-libsupcxx
+maybe-mostlyclean-target-libsupcxx:
+@if target-libsupcxx
+maybe-mostlyclean-target-libsupcxx: mostlyclean-target-libsupcxx
+
+mostlyclean-target-libsupcxx: 
+	@: $(MAKE); $(unstage)
+	@[ -f $(TARGET_SUBDIR)/libsupcxx/Makefile ] || exit 0 ; \
+	r=`${PWD_COMMAND}`; export r; \
+	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
+	$(RAW_CXX_TARGET_EXPORTS) \
+	echo "Doing mostlyclean in $(TARGET_SUBDIR)/libsupcxx" ; \
+	for flag in $(EXTRA_TARGET_FLAGS); do \
+	  eval `echo "$$flag" | sed -e "s|^\([^=]*\)=\(.*\)|\1='\2'; export \1|"`; \
+	done; \
+	(cd $(TARGET_SUBDIR)/libsupcxx && \
+	  $(MAKE) $(BASE_FLAGS_TO_PASS) "AR=$${AR}" "AS=$${AS}" \
+	          "CC=$${CC}" "CXX=$${CXX}" "LD=$${LD}" "NM=$${NM}" \
+	          "RANLIB=$${RANLIB}" \
+	          "DLLTOOL=$${DLLTOOL}" "WINDRES=$${WINDRES}" \
+	           mostlyclean) \
+	  || exit 1
+
+@endif target-libsupcxx
+
+.PHONY: maybe-clean-target-libsupcxx clean-target-libsupcxx
+maybe-clean-target-libsupcxx:
+@if target-libsupcxx
+maybe-clean-target-libsupcxx: clean-target-libsupcxx
+
+clean-target-libsupcxx: 
+	@: $(MAKE); $(unstage)
+	@[ -f $(TARGET_SUBDIR)/libsupcxx/Makefile ] || exit 0 ; \
+	r=`${PWD_COMMAND}`; export r; \
+	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
+	$(RAW_CXX_TARGET_EXPORTS) \
+	echo "Doing clean in $(TARGET_SUBDIR)/libsupcxx" ; \
+	for flag in $(EXTRA_TARGET_FLAGS); do \
+	  eval `echo "$$flag" | sed -e "s|^\([^=]*\)=\(.*\)|\1='\2'; export \1|"`; \
+	done; \
+	(cd $(TARGET_SUBDIR)/libsupcxx && \
+	  $(MAKE) $(BASE_FLAGS_TO_PASS) "AR=$${AR}" "AS=$${AS}" \
+	          "CC=$${CC}" "CXX=$${CXX}" "LD=$${LD}" "NM=$${NM}" \
+	          "RANLIB=$${RANLIB}" \
+	          "DLLTOOL=$${DLLTOOL}" "WINDRES=$${WINDRES}" \
+	           clean) \
+	  || exit 1
+
+@endif target-libsupcxx
+
+.PHONY: maybe-distclean-target-libsupcxx distclean-target-libsupcxx
+maybe-distclean-target-libsupcxx:
+@if target-libsupcxx
+maybe-distclean-target-libsupcxx: distclean-target-libsupcxx
+
+distclean-target-libsupcxx: 
+	@: $(MAKE); $(unstage)
+	@[ -f $(TARGET_SUBDIR)/libsupcxx/Makefile ] || exit 0 ; \
+	r=`${PWD_COMMAND}`; export r; \
+	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
+	$(RAW_CXX_TARGET_EXPORTS) \
+	echo "Doing distclean in $(TARGET_SUBDIR)/libsupcxx" ; \
+	for flag in $(EXTRA_TARGET_FLAGS); do \
+	  eval `echo "$$flag" | sed -e "s|^\([^=]*\)=\(.*\)|\1='\2'; export \1|"`; \
+	done; \
+	(cd $(TARGET_SUBDIR)/libsupcxx && \
+	  $(MAKE) $(BASE_FLAGS_TO_PASS) "AR=$${AR}" "AS=$${AS}" \
+	          "CC=$${CC}" "CXX=$${CXX}" "LD=$${LD}" "NM=$${NM}" \
+	          "RANLIB=$${RANLIB}" \
+	          "DLLTOOL=$${DLLTOOL}" "WINDRES=$${WINDRES}" \
+	           distclean) \
+	  || exit 1
+
+@endif target-libsupcxx
+
+.PHONY: maybe-maintainer-clean-target-libsupcxx maintainer-clean-target-libsupcxx
+maybe-maintainer-clean-target-libsupcxx:
+@if target-libsupcxx
+maybe-maintainer-clean-target-libsupcxx: maintainer-clean-target-libsupcxx
+
+maintainer-clean-target-libsupcxx: 
+	@: $(MAKE); $(unstage)
+	@[ -f $(TARGET_SUBDIR)/libsupcxx/Makefile ] || exit 0 ; \
+	r=`${PWD_COMMAND}`; export r; \
+	s=`cd $(srcdir); ${PWD_COMMAND}`; export s; \
+	$(RAW_CXX_TARGET_EXPORTS) \
+	echo "Doing maintainer-clean in $(TARGET_SUBDIR)/libsupcxx" ; \
+	for flag in $(EXTRA_TARGET_FLAGS); do \
+	  eval `echo "$$flag" | sed -e "s|^\([^=]*\)=\(.*\)|\1='\2'; export \1|"`; \
+	done; \
+	(cd $(TARGET_SUBDIR)/libsupcxx && \
+	  $(MAKE) $(BASE_FLAGS_TO_PASS) "AR=$${AR}" "AS=$${AS}" \
+	          "CC=$${CC}" "CXX=$${CXX}" "LD=$${LD}" "NM=$${NM}" \
+	          "RANLIB=$${RANLIB}" \
+	          "DLLTOOL=$${DLLTOOL}" "WINDRES=$${WINDRES}" \
+	           maintainer-clean) \
+	  || exit 1
+
+@endif target-libsupcxx
+
+
+
+# There's only one multilib.out.  Cleverer subdirs shouldn't need it copied.
 @if target-libmudflap
 $(TARGET_SUBDIR)/libmudflap/multilib.out: multilib.out
 	$(SHELL) $(srcdir)/mkinstalldirs $(TARGET_SUBDIR)/libmudflap ; \
@@ -36146,6 +36509,8 @@ do-distclean: distclean-stage1
 
 configure-target-libstdc++-v3: maybe-all-gcc
 
+configure-target-libsupcxx: maybe-all-gcc
+
 configure-target-libmudflap: maybe-all-gcc
 
 configure-target-libssp: maybe-all-gcc
@@ -36205,6 +36570,8 @@ configure-target-libobjc: maybe-all-target-newlib maybe-all-target-libgloss
 configure-target-libssp: maybe-all-target-newlib maybe-all-target-libgloss
 
 configure-target-libstdc++-v3: maybe-all-target-newlib maybe-all-target-libgloss
+
+configure-target-libsupcxx: maybe-all-target-newlib maybe-all-target-libgloss
 
 configure-target-zlib: maybe-all-target-newlib maybe-all-target-libgloss
 
@@ -36693,6 +37060,9 @@ all-target-libjava: maybe-all-target-qthreads
 all-target-libjava: maybe-all-target-libffi
 all-target-libobjc: maybe-all-target-libiberty
 all-target-libstdc++-v3: maybe-all-target-libiberty
+all-target-libsupcxx: maybe-all-target-libiberty
+configure-target-libssp: maybe-all-target-libsupcxx
+configure-target-libmudflap: maybe-all-target-libsupcxx
 all-target-libgloss: maybe-configure-target-newlib
 all-target-winsup: maybe-all-target-libiberty
 all-target-winsup: maybe-all-target-libtermcap

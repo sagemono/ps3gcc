@@ -294,6 +294,19 @@ define__GNUC__ (void)
     builtin_define_with_value_n ("__GNUC_PATCHLEVEL__", "0", 1);
 
   gcc_assert (!*v || *v == ' ' || *v == '-');
+
+  {
+    const char *vt;
+
+    vt = strstr (version_string, "Rev: ");
+    gcc_assert (vt);
+    vt += strlen ("Rev: ");
+    gcc_assert (ISDIGIT (*vt));
+    q = vt;
+    while (ISDIGIT (*vt))
+      vt++;
+    builtin_define_with_value_n ("__PS3_GCC_REVISION__", q, vt - q);
+  }
 }
 
 /* Define macros used by <stdint.h>.  Currently only defines limits

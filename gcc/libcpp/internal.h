@@ -590,6 +590,7 @@ extern cppchar_t _cpp_valid_ucn (cpp_reader *, const unsigned char **,
 				 const unsigned char *, int,
 				 struct normalize_state *state);
 extern void _cpp_destroy_iconv (cpp_reader *);
+extern const char * _cpp_guess_input_charset (unsigned char *, size_t *);
 extern unsigned char *_cpp_convert_input (cpp_reader *, const char *,
 					  unsigned char *, size_t, size_t,
 					  off_t *);

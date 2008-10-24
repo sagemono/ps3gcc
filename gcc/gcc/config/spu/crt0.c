@@ -3,12 +3,20 @@
  * Sony Computer Entertainment, Inc.,
  * Toshiba Corporation,
  * International Business Machines Corporation,
- * 2001,2002,2003,2004,2005,2006.
+ * 2001,2002,2003,2004,2005,2006,2007,2008.
  *
  * This file is free software; you can redistribute it and/or modify it under
  * the terms of the GNU General Public License as published by the Free
  * Software Foundation; either version 2 of the License, or (at your option)
  * any later version.
+ *
+ * In addition to the permissions in the GNU General Public License, the
+ * Free Software Foundation gives you unlimited permission to link the
+ * compiled version of this file with other programs, and to distribute
+ * those programs without any restriction coming from the use of this
+ * file.  (The General Public License restrictions do apply in other
+ * respects; for example, they cover modification of the file, and
+ * distribution when not linked into another program.)
  *
  * This file is distributed in the hope that it will be useful, but WITHOUT
  * ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
@@ -91,6 +99,9 @@ extern int main(int, unsigned long long, unsigned long long);
 void _start(int, unsigned long long, unsigned long long) __attribute__((naked));
 #endif
 
+extern void _init (void);
+extern void _fini (void);
+
 extern void exit(int);
 
 void _exit(int) __attribute__((naked));
@@ -112,15 +123,6 @@ char argv_buf[256] = "0000000000000000000000000000000000000000"
  int  argc = 1;
 char *argv[16] = {0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0};
 #endif
-
-/* If we want these aligned we need to do it in the linker script. */
-func_ptr __CTOR_LIST__[1]
-  __attribute__ ((section(".ctors"), aligned(4)))
-  = { (func_ptr) (-1) };
-
-static func_ptr __DTOR_LIST__[1]
-  __attribute__((section(".dtors"), aligned(4)))
-  = { (func_ptr) (-1) };
 
 #ifdef _STD_MAIN
 #define NOT_USED_IN_STD_MAIN	__attribute__((unused))
@@ -198,19 +200,7 @@ _start(int spu_id NOT_USED_IN_STD_MAIN,
   si_sp = si_selb(chain, stack_size, si_fsmbi(0x0f00));
 
 
-  {
-    extern func_ptr __CTOR_END__[];
-    func_ptr *p;
-
-    /* The compiler assumes all symbols are 16 byte aligned, which is
-     * not the case for __CTOR_END__.  This inline assembly makes sure
-     * the address is loaded into a register for which the compiler does
-     * not assume anything about alignment. */
-    asm ("\n" : "=r" (p) : "0" (__CTOR_END__ - 1));
-
-    for (; *p != (func_ptr) -1; p--)
-      (*p) ();
-  }
+  _init();
 
 #ifdef _STD_MAIN
   argv[0] = argv_buf;
@@ -236,16 +226,7 @@ void _Exit(int) __attribute__((__weak__, __alias__("_exit")));
 void
 _exit(int rc)
 {
-  {
-    static func_ptr *p = 0;
-    if (!p)
-      {
-	/* See comment for __CTOR_END__ above. */
-	asm ("" : "=r" (p) : "0" (__DTOR_LIST__ + 1));
-	for (; *p; p++)
-	  (*p) ();
-      }
-  }
+  _fini();
 #if defined (_SPU_THREAD)
   sys_spu_thread_exit(rc);
 #elif defined (_SPURS_TASK)

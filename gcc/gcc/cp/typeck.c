@@ -4707,7 +4707,7 @@ check_for_casting_away_constness (tree src_type, tree dest_type,
 				  const char *description)
 {
   if (diag_fn && casts_away_constness (src_type, dest_type))
-    diag_fn ("%s from type %qT to type %qT casts away constness",
+    diag_fn ("%s from type %qT to type %qT casts away qualifiers",
 	     description, src_type, dest_type);
 }
 

@@ -118,6 +118,8 @@ extern const char *lbasename (const char *);
 
 extern char *lrealpath (const char *);
 
+extern char *ldirseparator (const char *);
+
 /* Concatenate an arbitrary number of strings.  You must pass NULL as
    the last argument of this function, to terminate the list of
    strings.  Allocates memory using xmalloc.  */

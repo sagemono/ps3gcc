@@ -15,7 +15,7 @@
 メントを参照してください。
 例:
     mkdir work/src
-    unzip toolchain-src-2.4.0-GCC411.zip -d work/src
+    unzip toolchain-src-2.5.0-GCC411.zip -d work/src
     mkdir work/build
     cd work/build
     ../src/build.sh
@@ -48,7 +48,6 @@ diff-from-gcc           GCC 4.1.2およびBinutils 2.17からの差分情報
                         これには、当社による変更点のみが含まれます。
 binutils/               GNU development toolsソースファイル
 gcc/                    GNU Compiler Collection (GCC)ソースファイル
-libsupcxx/              new abi support
 mingw/                  ダウンロードしたMinGWランタイムを置く場所
 
 ----------------------------------------------------------------------

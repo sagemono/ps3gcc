@@ -313,6 +313,8 @@ regrename_optimize (void)
 	     have a closer look at each register still in there.  */
 	  for (new_reg = 0; new_reg < FIRST_PSEUDO_REGISTER; new_reg++)
 	    {
+	      int write_only = 0;
+	      int used = 0;
 	      int nregs = hard_regno_nregs[new_reg][GET_MODE (*this->loc)];
 
 	      for (i = nregs - 1; i >= 0; --i)
@@ -336,16 +338,36 @@ regrename_optimize (void)
 	      if (i >= 0)
 		continue;
 
+	      extract_insn (last->insn);
+	      for (i = 0; i < recog_data.n_operands; i++)
+		{
+		  if (new_reg == REGNO (*recog_data.operand_loc[i])
+		      && reg != REGNO (*recog_data.operand_loc[i])
+		      && recog_data.operand_type[i] == OP_OUT)
+		    used = 1;
+		}
+
 	      /* See whether it accepts all modes that occur in
 		 definition and uses.  */
 	      for (tmp = this; tmp; tmp = tmp->next_use)
-		if (! HARD_REGNO_MODE_OK (new_reg, GET_MODE (*tmp->loc))
-		    || (tmp->need_caller_save_reg
-			&& ! (HARD_REGNO_CALL_PART_CLOBBERED
-			      (reg, GET_MODE (*tmp->loc)))
-			&& (HARD_REGNO_CALL_PART_CLOBBERED
-			    (new_reg, GET_MODE (*tmp->loc)))))
-		  break;
+		{
+		  for (i = 0; i < recog_data.n_operands; i++)
+		    if (tmp->loc == recog_data.operand_loc[i]
+			&& recog_data.operand_type[i] == OP_OUT)
+		      write_only = 1;
+
+		  if (! HARD_REGNO_MODE_OK (new_reg, GET_MODE (*tmp->loc))
+		      || (tmp->need_caller_save_reg
+			  && ! (HARD_REGNO_CALL_PART_CLOBBERED
+				(reg, GET_MODE (*tmp->loc)))
+			  && (HARD_REGNO_CALL_PART_CLOBBERED
+			      (new_reg, GET_MODE (*tmp->loc)))))
+		    break;
+		}
+
+	      if (used && write_only)
+		continue;
+
 	      if (! tmp)
 		{
 		  if (new_reg == prefer_reg

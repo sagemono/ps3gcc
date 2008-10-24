@@ -417,6 +417,11 @@ struct cpp_options
 
     /* Use a syntax that works only with Visual Studio. */
     bool visual_studio;
+
+    /* begin sce local, bugzilla 51130 */
+    /* Use a drive letter that works only with Cygwin's Make. */
+    bool cygwin_make;
+    /* end sce local */
   } deps;
 
   /* Target-specific features set by the front end or client.  */

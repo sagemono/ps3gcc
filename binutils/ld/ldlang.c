@@ -669,7 +669,7 @@ walk_wild (lang_wild_statement_type *s, callback_t callback, void *data)
     {
       LANG_FOR_EACH_INPUT_STATEMENT (f)
 	{
-	  if (fnmatch (file_spec, f->filename, FNM_FILE_NAME) == 0)
+	  if (fnmatch (file_spec, f->filename, 0) == 0)
 	    walk_wild_file (s, f, callback, data);
 	}
     }
@@ -4156,13 +4156,12 @@ lang_size_sections_1
 		os->processed = FALSE;
 		exp_fold_tree (os->addr_tree, bfd_abs_section_ptr, &dot);
 
-		if (!expld.result.valid_p
-		    && expld.phase != lang_mark_phase_enum)
+		if (expld.result.valid_p)
+		  dot = expld.result.value + expld.result.section->vma;
+		else if (expld.phase != lang_mark_phase_enum)
 		  einfo (_("%F%S: non constant or forward reference"
 			   " address expression for section %s\n"),
 			 os->name);
-
-		dot = expld.result.value + expld.result.section->vma;
 	      }
 
 	    if (os->bfd_section == NULL)
@@ -5486,8 +5485,13 @@ lang_process (void)
   /* Create a bfd for each input file.  */
   current_target = default_target;
   open_input_bfds (statement_list.head, FALSE);
-
+  /* begin sce local bz 53338 
+     Insert "_start" symbol into the top of gc_sym_list.
+     exp_nameop, ldexp.c:848 may already register entries to gc_sym_list. */
+  entry_symbol.next = link_info.gc_sym_list;
+  /* end sce local bz 53338 */
   link_info.gc_sym_list = &entry_symbol;
+
   if (entry_symbol.name == NULL)
     link_info.gc_sym_list = ldlang_undef_chain_list_head;
 

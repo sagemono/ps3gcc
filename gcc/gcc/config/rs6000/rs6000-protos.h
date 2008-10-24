@@ -103,6 +103,7 @@ extern void rs6000_initialize_trampoline (rtx, rtx, rtx);
 extern rtx rs6000_longcall_ref (rtx);
 extern void rs6000_fatal_bad_address (rtx);
 extern rtx create_TOC_reference (rtx);
+extern const char *rs6000_get_pred (rtx, bool);
 extern void rs6000_split_multireg_move (rtx, rtx);
 extern void rs6000_emit_move (rtx, rtx, enum machine_mode);
 extern rtx rs6000_legitimize_address (rtx, rtx, enum machine_mode);

@@ -138,6 +138,7 @@ CFILES = alloca.c argv.c asprintf.c atexit.c				\
 	hashtab.c hex.c							\
 	index.c insque.c						\
 	lbasename.c							\
+	ldirseparator.c							\
 	lrealpath.c							\
 	make-relative-prefix.c						\
 	make-temp-file.c md5.c memchr.c memcmp.c memcpy.c memmove.c	\
@@ -170,7 +171,7 @@ REQUIRED_OFILES = ./regex.o ./cplus-dem.o ./cp-demangle.o ./md5.o	\
 	 ./fopen_unlocked.o						\
 	./getopt.o ./getopt1.o ./getpwd.o ./getruntime.o		\
 	./hashtab.o ./hex.o						\
-	./lbasename.o ./lrealpath.o					\
+	./lbasename.o ./ldirseparator ./lrealpath.o			\
 	./make-relative-prefix.o ./make-temp-file.o			\
 	./objalloc.o ./obstack.o					\
 	./partition.o ./pexecute.o ./physmem.o				\
@@ -677,6 +678,14 @@ $(CONFIGURED_OFILES): stamp-picdir
 	else true; fi
 	$(COMPILE.c) $(srcdir)/lbasename.c $(OUTPUT_OPTION)
 
+./ldirseparator: $(srcdir)/ldirseparator.c config.h $(INCDIR)/ansidecl.h \
+	$(INCDIR)/filenames.h $(INCDIR)/libiberty.h \
+	$(INCDIR)/safe-ctype.h
+	if [ x"$(PICFLAG)" != x ]; then \
+	  $(COMPILE.c) $(PICFLAG) $(srcdir)/ldirseparator.c -o pic/$@; \
+	else true; fi
+	$(COMPILE.c) $(srcdir)/ldirseparator.c $(OUTPUT_OPTION)
+ 
 ./lrealpath.o: $(srcdir)/lrealpath.c config.h $(INCDIR)/ansidecl.h \
 	$(INCDIR)/libiberty.h
 	if [ x"$(PICFLAG)" != x ]; then \

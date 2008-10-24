@@ -72,6 +72,68 @@ neg_const_int (enum machine_mode mode, rtx i)
   return gen_int_mode (- INTVAL (i), mode);
 }
 
+
+/* Subroutine of simplify_binary_operand that checks for the addition of +/- 0.0.
+
+   If !NEGATE, return true if ADDEND is +/-0.0 and, for all X of type
+   TYPE, X + ADDEND is the same as X.  If NEGATE, return true if X -
+   ADDEND is the same as X.
+
+   X + 0 and X - 0 both give X when X is NaN, infinite, or nonzero
+   and finite.  The problematic cases are when X is zero, and its mode
+   has signed zeros.  In the case of rounding towards -infinity,
+   X - 0 is not the same as X because 0 - 0 is -0.  In other rounding
+   modes, X + 0 is not the same as X because -0 + 0 is 0.  */
+
+static bool
+fold_real_zero_addition_p (enum machine_mode mode, rtx addend, int negate)
+{
+  REAL_VALUE_TYPE d;
+  /* For vectors, if addend is a splat, then use the splatted value. */
+  if (GET_CODE (addend) == CONST_VECTOR)
+    {
+      rtx t;
+      int i = CONST_VECTOR_NUNITS (addend) - 1;
+      t = CONST_VECTOR_ELT (addend, i);
+      for ( ; i >= 0; i --)
+        {
+	  if (!rtx_equal_p (t, CONST_VECTOR_ELT (addend, i)))
+	    return false;
+	}
+      addend = t;
+      mode = GET_MODE_INNER (mode);
+    }
+  if (GET_MODE_CLASS (mode) != MODE_FLOAT
+      || GET_CODE (addend) != CONST_DOUBLE)
+    return false;
+  
+  REAL_VALUE_FROM_CONST_DOUBLE (d, addend);
+
+  if (!REAL_VALUES_EQUAL (d, dconst0, mode))
+    return false;
+
+  /* Don't allow the fold with -fsignaling-nans.  */
+  if (HONOR_SNANS (mode))
+    return false;
+
+  /* Allow the fold if zeros aren't signed, or their sign isn't important.  */
+  if (!HONOR_SIGNED_ZEROS (mode))
+    return true;
+
+  /* Treat x + -0 as x - 0 and x - -0 as x + 0.  */
+  if (REAL_VALUE_MINUS_ZERO (d))
+    negate = !negate;
+
+  if (!SAFE_FOR_MINUS_ZERO (mode))
+    return false;
+
+  /* The mode has signed zeros, and we have to honor their sign.
+     In this situation, there is only one case we can return true for.
+     X - 0 is the same as X unless rounding towards -infinity is
+     supported.  */
+  return negate && !HONOR_SIGN_DEPENDENT_ROUNDING (mode);
+}
+
 /* Test whether expression, X, is an immediate constant that represents
    the most significant bit of machine mode MODE.  */
 
@@ -1310,6 +1372,12 @@ simplify_binary_operation_1 (enum rtx_code code, enum machine_mode mode,
   switch (code)
     {
     case PLUS:
+      if (fold_real_zero_addition_p (mode, trueop1, 0))
+        return op0;
+
+      if (fold_real_zero_addition_p (mode, trueop0, 0))
+        return op1;
+
       /* Maybe simplify x + 0 to x.  The two expressions are equivalent
 	 when x is NaN, infinite, or finite and nonzero.  They aren't
 	 when x is -0 and the rounding mode is not towards -infinity,
@@ -1495,6 +1563,11 @@ simplify_binary_operation_1 (enum rtx_code code, enum machine_mode mode,
       break;
 
     case MINUS:
+      if (fold_real_zero_addition_p (mode, trueop1, 1))
+        return op0;
+      if (fold_real_zero_addition_p (mode, trueop0, 0))
+	return simplify_gen_unary (NEG, mode, op1, mode);
+
       /* We can't assume x-x is 0 even with non-IEEE floating point,
 	 but since it is zero except in very strange circumstances, we
 	 will treat it as zero with -funsafe-math-optimizations.  */
@@ -2137,10 +2210,6 @@ simplify_binary_operation_1 (enum rtx_code code, enum machine_mode mode,
 	  gcc_assert (GET_CODE (trueop1) == PARALLEL);
 	  gcc_assert (XVECLEN (trueop1, 0) == 1);
 	  gcc_assert (GET_CODE (XVECEXP (trueop1, 0, 0)) == CONST_INT);
-	  if (CONSTANT_P (trueop0))
-	    return simplify_const_unary_operation (VEC_DUPLICATE, mode,
-						   trueop0,
-						   GET_MODE_INNER (mode));
 	  if (GET_CODE (trueop0) == VEC_SELECT
 	      && GET_MODE (XEXP (trueop0, 0)) == mode
 	      && GET_CODE (XEXP (trueop0, 1)) == PARALLEL
