@@ -1641,14 +1641,11 @@ validate_remap_regs_1 (rtx *loc, rtx *reg_map, rtx *reg_map_orig, unsigned int n
       return;
 
     case CLOBBER:
-      if (GET_CODE (x) == SUBREG)
+      if (GET_CODE (XEXP (x, 0)) == MEM)
 	{
-	  loc = &SUBREG_REG (x);
-	  x = SUBREG_REG (x);
+	  remap_regs_status = -1;
+	  return;
 	}
-      if (GET_CODE (x) == REG
-	  && REGNO_REG_SET_P (exposed_set, REGNO (x)))
-	abort();
       break;
 
     default:

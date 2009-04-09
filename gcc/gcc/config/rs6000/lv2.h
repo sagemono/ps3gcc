@@ -436,7 +436,7 @@
 #undef  ASM_OUTPUT_SPECIAL_POOL_ENTRY_P
 #define ASM_OUTPUT_SPECIAL_POOL_ENTRY_P(X, MODE)			\
   (TARGET_TOC								\
-   && rs6000_base_toc  < 2						\
+   && (rs6000_base_toc  < 2 || rs6000_use_toc_for_sym (X))						\
    && (GET_CODE (X) == SYMBOL_REF					\
        || (GET_CODE (X) == CONST && GET_CODE (XEXP (X, 0)) == PLUS	\
 	   && GET_CODE (XEXP (XEXP (X, 0), 0)) == SYMBOL_REF)		\
@@ -775,8 +775,13 @@ enum { SIGNAL_FRAMESIZE = 128 };
   "%{YP,*} %{R*} "					 \
   "%{Qy:} %{!Qn:-Qy} "					 \
   "%{mlp64:-melf64ppc} "						\
-  "%{mno-sn-ld|mno-prxfixup: ; : " \
-  "  %{!mlp64:--alternative-ld=ps3ppuld --gnu-mode %{!mno-prxfixup: %{!mforce-prx-fixup: %{!r: --prx-fixup}}} %{mprx|mprx-with-runtime:--no-check-unresolved} " \
+  "%{mno-sn-ld|mno-prxfixup: " \
+  "  %{mno-toc: %e-mno-toc can not be used with -mno-sn-ld or -mno-prxfixup}; " \
+  " :%{!mlp64:--alternative-ld=ps3ppuld --gnu-mode " \
+  "    %{fno-exceptions: --no-exceptions} " \
+  "    %{mno-toc: --no-toc-restore} " \
+  "    %{!mno-prxfixup: %{!mforce-prx-fixup: %{!r: --prx-fixup}}} " \
+  "    %{mprx|mprx-with-runtime:--no-check-unresolved} " \
   "    %{mppuguid: %{!r:-ppuguid}} " \
   "    %{r|mno-ppuguid:-no-ppuguid} } } " \
   "%{shared}"

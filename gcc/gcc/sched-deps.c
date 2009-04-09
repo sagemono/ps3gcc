@@ -38,6 +38,7 @@ Software Foundation, 51 Franklin Street, Fifth Floor, Boston, MA
 #include "except.h"
 #include "toplev.h"
 #include "recog.h"
+#include "target.h"
 #include "sched-int.h"
 #include "params.h"
 #include "cselib.h"
@@ -822,7 +823,11 @@ sched_analyze_2 (struct deps *deps, rtx x, rtx insn)
 	   Consider for instance a volatile asm that changes the fpu rounding
 	   mode.  An insn should not be moved across this even if it only uses
 	   pseudo-regs because it might give an incorrectly rounded result.  */
-	if (code != ASM_OPERANDS || MEM_VOLATILE_P (x))
+	if (code == UNSPEC_VOLATILE
+	    && targetm.sched.no_barrier_for_unspec_volatile
+	    && targetm.sched.no_barrier_for_unspec_volatile (insn, x))
+	  CANT_MOVE (insn) = 1;
+	else if (code != ASM_OPERANDS || MEM_VOLATILE_P (x))
 	  reg_pending_barrier = TRUE_BARRIER;
 
 	/* For all ASM_OPERANDS, we must traverse the vector of input operands.

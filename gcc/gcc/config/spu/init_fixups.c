@@ -35,15 +35,15 @@
 #include <spu_intrinsics.h>
 #include <stdint.h>
 
-extern unsigned int __fixup_start[] __attribute__((section(".fixup", "a"), aligned(4)));
+static int __fixup_start[0] __attribute__((section(".fixup_head", "a"), aligned(4), used));
 
 /* We use $126 explicitly here and compile with -mfixed-range=79 to make
  * sure it is setup properly when compiling with -fPIC.  When this file
  * is not compiled with -fPIC, the user must setup up $126. */
 register unsigned int si_r126 asm ("$126");
 
-void __init_fixups (void) __attribute__ ((naked, section(".init")));
-void
+static void __init_fixups (void) __attribute__ ((naked, section(".init.fixups","ax"), used));
+static void
 __init_fixups (void)
 {
   unsigned int * fixup = __fixup_start;

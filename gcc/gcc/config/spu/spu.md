@@ -148,6 +148,7 @@
  (UNSPEC_WRCH           48)
  (UNSPEC_REALIGN_LOAD   49)
  (UNSPEC_MASK_FOR_LOAD  50)
+ (UNSPEC_ADD_PIC        51)
   ])
 
 (include "predicates.md")
@@ -203,8 +204,14 @@
                        (DF "d")  (V2DF "d")])
 (define_mode_attr d6  [(SF "6")  (V4SF "6")
                        (DF "d")  (V2DF "d")])
-(define_mode_attr f2i [(SF "SI") (V4SF "V4SI")
+(define_mode_attr F2I [(SF "SI") (V4SF "V4SI")
                        (DF "DI") (V2DF "V2DI")])
+(define_mode_attr f2i [(SF "si") (V4SF "v4si")
+                       (DF "di") (V2DF "v2di")])
+(define_mode_attr I2F [(SI "SF") (V4SI "V4SF")
+                       (DI "DF") (V2DI "V2DF")])
+(define_mode_attr i2f [(SI "sf") (V4SI "v4sf")
+                       (DI "df") (V2DI "v2df")])
 
 (define_mode_attr umask  [(HI "f")  (V8HI "f")
 		          (SI "g")  (V4SI "g")])
@@ -268,7 +275,15 @@
 	(match_operand:SI 1 "immediate_operand" "s"))
    (use (const_int 0))]
   "flag_pic"
-  "ila\t%0,%%pic(%1)")
+  "ila\t%0,%1")
+
+(define_insn "add_pic"
+  [(set (match_operand:SI 0 "spu_reg_operand" "=r")
+	(unspec:SI [(match_operand:SI 1 "spu_reg_operand" "r")
+		    (match_operand:SI 2 "spu_reg_operand" "r")
+		    (match_operand:SI 3 "immediate_operand" "s")] UNSPEC_ADD_PIC))]
+  ""
+  "a\t%0,%1,%2,%3")
 
 ;; Whenever a function generates the 'pic' pattern above we need to
 ;; load the pic_offset_table register.
@@ -607,60 +622,80 @@
 
 ;; float conversions
 
-(define_insn "floatsisf2"
-  [(set (match_operand:SF 0 "spu_reg_operand" "=r")
-	(float:SF (match_operand:SI 1 "spu_reg_operand" "r")))]
+(define_insn "float<mode><i2f>2"
+  [(set (match_operand:<I2F> 0 "spu_reg_operand" "=r")
+	(float:<I2F> (match_operand:VSI 1 "spu_reg_operand" "r")))]
   ""
   "csflt\t%0,%1,0"
   [(set_attr "type" "fp7")])
 
-(define_insn "floatv4siv4sf2"
-  [(set (match_operand:V4SF 0 "spu_reg_operand" "=r")
-	(float:V4SF (match_operand:V4SI 1 "spu_reg_operand" "r")))]
-  ""
-  "csflt\t%0,%1,0"
-  [(set_attr "type" "fp7")])
-
-(define_insn "fix_truncsfsi2"
-  [(set (match_operand:SI 0 "spu_reg_operand" "=r")
-	(fix:SI (match_operand:SF 1 "spu_reg_operand" "r")))]
+(define_insn "fix_trunc<mode><f2i>2"
+  [(set (match_operand:<F2I> 0 "spu_reg_operand" "=r")
+	(fix:<F2I> (match_operand:VSF 1 "spu_reg_operand" "r")))]
   ""
   "cflts\t%0,%1,0"
   [(set_attr "type" "fp7")])
 
-(define_insn "fix_truncv4sfv4si2"
-  [(set (match_operand:V4SI 0 "spu_reg_operand" "=r")
-	(fix:V4SI (match_operand:V4SF 1 "spu_reg_operand" "r")))]
-  ""
-  "cflts\t%0,%1,0"
-  [(set_attr "type" "fp7")])
-
-(define_insn "floatunssisf2"
-  [(set (match_operand:SF 0 "spu_reg_operand" "=r")
-	(unsigned_float:SF (match_operand:SI 1 "spu_reg_operand" "r")))]
+(define_insn "floatuns<mode><i2f>2"
+  [(set (match_operand:<I2F> 0 "spu_reg_operand" "=r")
+	(unsigned_float:<I2F> (match_operand:VSI 1 "spu_reg_operand" "r")))]
   ""
   "cuflt\t%0,%1,0"
   [(set_attr "type" "fp7")])
 
-(define_insn "floatunsv4siv4sf2"
-  [(set (match_operand:V4SF 0 "spu_reg_operand" "=r")
-	(unsigned_float:V4SF (match_operand:V4SI 1 "spu_reg_operand" "r")))]
-  ""
-  "cuflt\t%0,%1,0"
-  [(set_attr "type" "fp7")])
-
-(define_insn "fixuns_truncsfsi2"
-  [(set (match_operand:SI 0 "spu_reg_operand" "=r")
-	(unsigned_fix:SI (match_operand:SF 1 "spu_reg_operand" "r")))]
+(define_insn "fixuns_trunc<mode><f2i>2"
+  [(set (match_operand:<F2I> 0 "spu_reg_operand" "=r")
+	(unsigned_fix:<F2I> (match_operand:VSF 1 "spu_reg_operand" "r")))]
   ""
   "cfltu\t%0,%1,0"
   [(set_attr "type" "fp7")])
 
-(define_insn "fixuns_truncv4sfv4si2"
-  [(set (match_operand:V4SI 0 "spu_reg_operand" "=r")
-	(unsigned_fix:V4SI (match_operand:V4SF 1 "spu_reg_operand" "r")))]
+(define_insn "float<mode><i2f>2_mul"
+  [(set (match_operand:<I2F> 0 "spu_reg_operand" "=r")
+	(mult:<I2F> (float:<I2F> (match_operand:VSI 1 "spu_reg_operand" "r"))
+		    (match_operand:<I2F> 2 "spu_inv_exp2_operand" "w")))]
   ""
-  "cfltu\t%0,%1,0"
+  "csflt\t%0,%1,%w2"
+  [(set_attr "type" "fp7")])
+
+(define_insn "float<mode><i2f>2_div"
+  [(set (match_operand:<I2F> 0 "spu_reg_operand" "=r")
+	(div:<I2F> (float:<I2F> (match_operand:VSI 1 "spu_reg_operand" "r"))
+		   (match_operand:<I2F> 2 "spu_exp2_operand" "v")))]
+  ""
+  "csflt\t%0,%1,%v2"
+  [(set_attr "type" "fp7")])
+
+(define_insn "fix_trunc<mode><f2i>2_mul"
+  [(set (match_operand:<F2I> 0 "spu_reg_operand" "=r")
+	(fix:<F2I> (mult:VSF (match_operand:VSF 1 "spu_reg_operand" "r")
+			     (match_operand:VSF 2 "spu_exp2_operand" "v"))))]
+  ""
+  "cflts\t%0,%1,%v2"
+  [(set_attr "type" "fp7")])
+
+(define_insn "floatuns<mode><i2f>2_mul"
+  [(set (match_operand:<I2F> 0 "spu_reg_operand" "=r")
+	(mult:<I2F> (unsigned_float:<I2F> (match_operand:VSI 1 "spu_reg_operand" "r"))
+		    (match_operand:<I2F> 2 "spu_inv_exp2_operand" "w")))]
+  ""
+  "cuflt\t%0,%1,%w2"
+  [(set_attr "type" "fp7")])
+
+(define_insn "floatuns<mode><i2f>2_div"
+  [(set (match_operand:<I2F> 0 "spu_reg_operand" "=r")
+	(div:<I2F> (unsigned_float:<I2F> (match_operand:VSI 1 "spu_reg_operand" "r"))
+		   (match_operand:<I2F> 2 "spu_exp2_operand" "v")))]
+  ""
+  "cuflt\t%0,%1,%v2"
+  [(set_attr "type" "fp7")])
+
+(define_insn "fixuns_trunc<mode><f2i>2_mul"
+  [(set (match_operand:<F2I> 0 "spu_reg_operand" "=r")
+	(unsigned_fix:<F2I> (mult:VSF (match_operand:VSF 1 "spu_reg_operand" "r")
+				      (match_operand:VSF 2 "spu_exp2_operand" "v"))))]
+  ""
+  "cfltu\t%0,%1,%v2"
   [(set_attr "type" "fp7")])
 
 (define_insn "extendsfdf2"
@@ -1052,8 +1087,8 @@
 	  (neg:VSF (match_operand:VSF 1 "spu_reg_operand" "")))
      (use (match_dup 2))])]
   ""
-  "operands[2] = gen_reg_rtx (<f2i>mode);
-   emit_move_insn (operands[2], spu_const (<f2i>mode, -0x80000000ull));")
+  "operands[2] = gen_reg_rtx (<F2I>mode);
+   emit_move_insn (operands[2], spu_const (<F2I>mode, -0x80000000ull));")
 
 (define_expand "neg<mode>2"
   [(parallel
@@ -1061,22 +1096,22 @@
 	  (neg:VDF (match_operand:VDF 1 "spu_reg_operand" "")))
      (use (match_dup 2))])]
   ""
-  "operands[2] = gen_reg_rtx (<f2i>mode);
-   emit_move_insn (operands[2], spu_const (<f2i>mode, -0x8000000000000000ull));")
+  "operands[2] = gen_reg_rtx (<F2I>mode);
+   emit_move_insn (operands[2], spu_const (<F2I>mode, -0x8000000000000000ull));")
 
 (define_insn_and_split "_neg<mode>2"
   [(set (match_operand:VSDF 0 "spu_reg_operand" "=r")
 	(neg:VSDF (match_operand:VSDF 1 "spu_reg_operand" "r")))
-   (use (match_operand:<f2i> 2 "spu_reg_operand" "r"))]
+   (use (match_operand:<F2I> 2 "spu_reg_operand" "r"))]
   ""
   "#"
-  ""
-  [(set (match_dup:<f2i> 3)
-	(xor:<f2i> (match_dup:<f2i> 4)
-		   (match_dup:<f2i> 2)))]
+  "split0_completed"
+  [(set (match_dup:<F2I> 3)
+	(xor:<F2I> (match_dup:<F2I> 4)
+		   (match_dup:<F2I> 2)))]
   {
-    operands[3] = spu_gen_subreg (<f2i>mode, operands[0]);
-    operands[4] = spu_gen_subreg (<f2i>mode, operands[1]);
+    operands[3] = spu_gen_subreg (<F2I>mode, operands[0]);
+    operands[4] = spu_gen_subreg (<F2I>mode, operands[1]);
   })
 
 
@@ -1088,8 +1123,8 @@
 	  (abs:VSF (match_operand:VSF 1 "spu_reg_operand" "")))
      (use (match_dup 2))])]
   ""
-  "operands[2] = gen_reg_rtx (<f2i>mode);
-   emit_move_insn (operands[2], spu_const (<f2i>mode, 0x7fffffffull));")
+  "operands[2] = gen_reg_rtx (<F2I>mode);
+   emit_move_insn (operands[2], spu_const (<F2I>mode, 0x7fffffffull));")
 
 (define_expand "abs<mode>2"
   [(parallel
@@ -1097,22 +1132,22 @@
 	  (abs:VDF (match_operand:VDF 1 "spu_reg_operand" "")))
      (use (match_dup 2))])]
   ""
-  "operands[2] = gen_reg_rtx (<f2i>mode);
-   emit_move_insn (operands[2], spu_const (<f2i>mode, 0x7fffffffffffffffull));")
+  "operands[2] = gen_reg_rtx (<F2I>mode);
+   emit_move_insn (operands[2], spu_const (<F2I>mode, 0x7fffffffffffffffull));")
 
 (define_insn_and_split "_abs<mode>2"
   [(set (match_operand:VSDF 0 "spu_reg_operand" "=r")
 	(abs:VSDF (match_operand:VSDF 1 "spu_reg_operand" "r")))
-   (use (match_operand:<f2i> 2 "spu_reg_operand" "r"))]
+   (use (match_operand:<F2I> 2 "spu_reg_operand" "r"))]
   ""
   "#"
-  ""
-  [(set (match_dup:<f2i> 3)
-	(and:<f2i> (match_dup:<f2i> 4)
-		   (match_dup:<f2i> 2)))]
+  "split0_completed"
+  [(set (match_dup:<F2I> 3)
+	(and:<F2I> (match_dup:<F2I> 4)
+		   (match_dup:<F2I> 2)))]
   {
-    operands[3] = spu_gen_subreg (<f2i>mode, operands[0]);
-    operands[4] = spu_gen_subreg (<f2i>mode, operands[1]);
+    operands[3] = spu_gen_subreg (<F2I>mode, operands[0]);
+    operands[4] = spu_gen_subreg (<F2I>mode, operands[1]);
   })
 
 
@@ -1283,7 +1318,7 @@
 (define_insn "umulhisi3_imm"
   [(set (match_operand:SI 0 "spu_reg_operand" "=r")
 	(mult:SI (zero_extend:SI (match_operand:HI 1 "spu_reg_operand" "r"))
-		 (match_operand:SI 2 "imm_t_operand" "t")))]
+		 (match_operand:SI 2 "imm_u_operand" "u")))]
   ""
   "mpyui\t%0,%1,%u2"
   [(set_attr "type" "fp7")])
@@ -1295,7 +1330,7 @@
 	    (vec_select:V4HI
 	      (match_operand:V8HI 1 "spu_reg_operand" "r")
 	      (parallel [(const_int 1)(const_int 3)(const_int 5)(const_int 7)])))
-	  (match_operand:V4SI 2 "imm_t_operand" "t")))]
+	  (match_operand:V4SI 2 "imm_u_operand" "u")))]
   ""
   "mpyui\t%0,%1,%u2"
   [(set_attr "type" "fp7")])
@@ -2646,15 +2681,15 @@
    (set_attr "length" "12")])
 
 (define_insn "ceq_<mode>"
-  [(set (match_operand:<f2i> 0 "spu_reg_operand" "=r")
-	(eq:<f2i> (match_operand:VSF 1 "spu_reg_operand" "r")
+  [(set (match_operand:<F2I> 0 "spu_reg_operand" "=r")
+	(eq:<F2I> (match_operand:VSF 1 "spu_reg_operand" "r")
 		  (match_operand:VSF 2 "spu_reg_operand" "r")))]
   ""
   "fceq\t%0,%1,%2")
 
 (define_insn "cmeq_<mode>"
-  [(set (match_operand:<f2i> 0 "spu_reg_operand" "=r")
-	(eq:<f2i> (abs:VSF (match_operand:VSF 1 "spu_reg_operand" "r"))
+  [(set (match_operand:<F2I> 0 "spu_reg_operand" "=r")
+	(eq:<F2I> (abs:VSF (match_operand:VSF 1 "spu_reg_operand" "r"))
 	          (abs:VSF (match_operand:VSF 2 "spu_reg_operand" "r"))))]
   ""
   "fcmeq\t%0,%1,%2")
@@ -2769,15 +2804,15 @@ selb\t%0,%5,%0,%3"
    (set_attr "length" "36")])
 
 (define_insn "cgt_<mode>"
-  [(set (match_operand:<f2i> 0 "spu_reg_operand" "=r")
-	(gt:<f2i> (match_operand:VSF 1 "spu_reg_operand" "r")
+  [(set (match_operand:<F2I> 0 "spu_reg_operand" "=r")
+	(gt:<F2I> (match_operand:VSF 1 "spu_reg_operand" "r")
 		  (match_operand:VSF 2 "spu_reg_operand" "r")))]
   ""
   "fcgt\t%0,%1,%2")
 
 (define_insn "cmgt_<mode>"
-  [(set (match_operand:<f2i> 0 "spu_reg_operand" "=r")
-	(gt:<f2i> (abs:VSF (match_operand:VSF 1 "spu_reg_operand" "r"))
+  [(set (match_operand:<F2I> 0 "spu_reg_operand" "=r")
+	(gt:<F2I> (abs:VSF (match_operand:VSF 1 "spu_reg_operand" "r"))
 		  (abs:VSF (match_operand:VSF 2 "spu_reg_operand" "r"))))]
   ""
   "fcmgt\t%0,%1,%2")

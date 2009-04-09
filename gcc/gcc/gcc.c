@@ -2758,8 +2758,11 @@ execute (void)
 
   commands[0].prog = argbuf[0]; /* first command.  */
 
+  string = find_a_file (&exec_prefixes, commands[0].prog, X_OK, 0);
+
   /* begin sce local, bugzilla #8169 */
-  if (response_file_flag
+  if ((response_file_flag
+       || check_argument_length (string ? string : argbuf[0], &argbuf[1]))
       && strcmp (commands[0].prog, LINKER_NAME) == 0)
     {
       /* FIXME: allocated memory for saving argv is leaked.(?) */
@@ -2778,8 +2781,6 @@ execute (void)
   else
     commands[0].argv = &argbuf[0];
   /* end sce local */
-
-  string = find_a_file (&exec_prefixes, commands[0].prog, X_OK, 0);
 
   if (string)
     commands[0].argv[0] = string;

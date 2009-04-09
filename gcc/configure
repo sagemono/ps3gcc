@@ -71,6 +71,7 @@ libdir='${exec_prefix}/lib'
 includedir='${prefix}/include'
 oldincludedir='/usr/include'
 infodir='${prefix}/info'
+pdfdir='${prefix}/pdf'
 mandir='${prefix}/man'
 
 # Initialize some other variables.
@@ -188,6 +189,7 @@ Directory and file names:
   --includedir=DIR        C header files in DIR [PREFIX/include]
   --oldincludedir=DIR     C header files for non-gcc in DIR [/usr/include]
   --infodir=DIR           info documentation in DIR [PREFIX/info]
+  --pdfdir=DIR		  pdf documentation in DIR [PREFIX/pdf]
   --mandir=DIR            man documentation in DIR [PREFIX/man]
   --srcdir=DIR            find the sources in DIR [configure dir or ..]
   --program-prefix=PREFIX prepend PREFIX to installed program names
@@ -277,6 +279,10 @@ EOF
   | --oldin=* | --oldi=* | --old=* | --ol=* | --o=*)
     oldincludedir="$ac_optarg" ;;
 
+  -pdfdir | --pdfdir | --pdfdi | --pdfd | --pdf | --pd)
+    ac_prev=pdfdir ;;
+  -pdfdir=* | --pdfdir=* | --pdfdi=* | --pdfd=* | --pdf=* | --pd=*)
+    pdfdir="$ac_optarg" ;;
   -prefix | --prefix | --prefi | --pref | --pre | --pr | --p)
     ac_prev=prefix ;;
   -prefix=* | --prefix=* | --prefi=* | --pref=* | --pre=* | --pr=* | --p=*)
@@ -6344,6 +6350,7 @@ s%@libdir@%$libdir%g
 s%@includedir@%$includedir%g
 s%@oldincludedir@%$oldincludedir%g
 s%@infodir@%$infodir%g
+s%@pdfdir@%$pdfdir%g
 s%@mandir@%$mandir%g
 s%@host@%$host%g
 s%@host_alias@%$host_alias%g

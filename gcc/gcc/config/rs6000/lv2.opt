@@ -101,3 +101,12 @@ For Cell OS kernel
 mfast-libc
 Target Report RejectNegative
 Link with libcs.a instead of libc.a from the point of view of performance.
+
+; Bz57983
+mcallprof=
+Target Var(lv2_callprof) Init(0) Joined UInteger
+Generate programs that are available for CallProf of SN Tuner.
+-mcallprof=0 has no effect (default).
+-mcallprof=1 enables function profiling by Tuner.
+-mcallprof=2 enables callgraph profiling. (It will be available at SDK300 or later).
+

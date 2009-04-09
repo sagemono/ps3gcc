@@ -1142,9 +1142,11 @@ parse_args (unsigned argc, char **argv)
 	  trace_files = TRUE;
 	  break;
 	case 'T':
+	  previous_script_handle = saved_script_handle;
 	  ldfile_open_command_file (optarg);
 	  parser_input = input_script;
 	  yyparse ();
+	  previous_script_handle = NULL;
 	  break;
 	case OPTION_SECTION_START:
 	  {

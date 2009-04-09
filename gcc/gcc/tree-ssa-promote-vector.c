@@ -133,6 +133,7 @@ try_promote (use_operand_p use_p, tree lhs, int elements, bool already_promoted)
 	  newcompare = build2 (code, TREE_TYPE (rhs_use), lhs1, rhs1);
 	  if (!set_rhs (&use_stmt, newcompare))
 	    gcc_unreachable ();
+	  update_stmt (use_stmt);
 	}
     }
   /* FIXME handle other classes of expressions, unary and binary, etc..   */

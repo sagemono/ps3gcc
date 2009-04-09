@@ -50,7 +50,7 @@ static const struct token_spelling token_spellings[N_TTYPES] = { TTYPE_TABLE };
 #define TOKEN_SPELL(token) (token_spellings[(token)->type].category)
 #define TOKEN_NAME(token) (token_spellings[(token)->type].name)
 
-static void add_line_note (cpp_buffer *, const uchar *, unsigned int);
+static void add_line_note (cpp_reader *, const uchar *, unsigned int);
 static int skip_line_comment (cpp_reader *);
 static void skip_whitespace (cpp_reader *, cppchar_t);
 static void lex_string (cpp_reader *, cpp_token *, const uchar *);
@@ -80,8 +80,12 @@ cpp_ideq (const cpp_token *token, const char *string)
 /* Record a note TYPE at byte POS into the current cleaned logical
    line.  */
 static void
-add_line_note (cpp_buffer *buffer, const uchar *pos, unsigned int type)
+add_line_note (cpp_reader *pfile, const uchar *pos, unsigned int type)
 {
+  cpp_buffer *buffer;
+  if (pfile->overlaid_buffer)
+    return;
+  buffer = pfile->buffer;
   if (buffer->notes_used == buffer->notes_cap)
     {
       buffer->notes_cap = buffer->notes_cap * 2 + 200;
@@ -140,7 +144,7 @@ _cpp_clean_line (cpp_reader *pfile)
 
 	      /* Have an escaped newline; process it and proceed to
 		 the slow path.  */
-	      add_line_note (buffer, p - 1, p != d ? ' ' : '\\');
+	      add_line_note (pfile, p - 1, p != d ? ' ' : '\\');
 	      d = p - 2;
 	      buffer->next_line = p - 1;
 	      break;
@@ -149,7 +153,7 @@ _cpp_clean_line (cpp_reader *pfile)
 	    {
 	      /* Have a trigraph.  We may or may not have to convert
 		 it.  Add a line note regardless, for -Wtrigraphs.  */
-	      add_line_note (buffer, s, s[2]);
+	      add_line_note (pfile, s, s[2]);
 	      if (CPP_OPTION (pfile, trigraphs))
 		{
 		  /* We do, and that means we have to switch to the
@@ -183,14 +187,14 @@ _cpp_clean_line (cpp_reader *pfile)
 	      if (p == buffer->next_line || p[-1] != '\\')
 		break;
 
-	      add_line_note (buffer, p - 1, p != d ? ' ': '\\');
+	      add_line_note (pfile, p - 1, p != d ? ' ': '\\');
 	      d = p - 2;
 	      buffer->next_line = p - 1;
 	    }
 	  else if (c == '?' && s[1] == '?' && _cpp_trigraph_map[s[2]])
 	    {
 	      /* Add a note regardless, for the benefit of -Wtrigraphs.  */
-	      add_line_note (buffer, d, s[2]);
+	      add_line_note (pfile, d, s[2]);
 	      if (CPP_OPTION (pfile, trigraphs))
 		{
 		  *d = _cpp_trigraph_map[s[2]];
@@ -214,7 +218,7 @@ _cpp_clean_line (cpp_reader *pfile)
  done:
   *d = '\n';
   /* A sentinel note that should never be processed.  */
-  add_line_note (buffer, d + 1, '\n');
+  add_line_note (pfile, d + 1, '\n');
   buffer->next_line = s + 1;
 }
 
@@ -252,6 +256,9 @@ void
 _cpp_process_line_notes (cpp_reader *pfile, int in_comment)
 {
   cpp_buffer *buffer = pfile->buffer;
+
+  if (pfile->overlaid_buffer)
+    return;
 
   for (;;)
     {

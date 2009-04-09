@@ -2,7 +2,7 @@
    Sony Computer Entertainment, Inc.,
    Toshiba Corporation,
    International Business Machines Corporation,
-   2001,2002,2003,2004,2005,2006,2007
+   2001,2002,2003,2004,2005,2006,2007,2008
 
    This file is free software; you can redistribute it and/or modify it under
    the terms of the GNU General Public License as published by the Free
@@ -43,10 +43,10 @@
 #define CC1_SPEC \
 	"%{!testing:%{!fbuiltin:-fno-builtin}} " \
 	"%{testing:%{!mno-error-reloc:;!merror-reloc:;!mwarn-reloc:;:-mno-warn-reloc}} " \
+	"%{mno-fixups: %{!mno-warn-reloc:-mwarn-reloc}} " \
 	"%{!fno-aggressive-cmov:-faggressive-cmov} " \
 	"%{!fno-strict-aligned:-fstrict-aligned} " \
 	"%{Os:%{!mhint-max-nops*:-mhint-max-nops=0} %{!mdual-nops:-mno-dual-nops}} " \
-	"%{mspurs-job-initialize|shared|mfixups: %{!merror-reloc:%{!mwarn-reloc: -mno-warn-reloc}}} " \
 	"%{shared|mfixups: -fPIC} "
 
 #undef CC1PLUS_SPEC
@@ -68,13 +68,17 @@
 #define STARTFILE_SPEC	"%{mspurs-job:job_start_gcc%O%s; " \
                         "  mspurs-job-initialize:job_start_w_crt%O%s job_crt%O%s; " \
 		        "  mcellsim|mspusim:cs-crt0%O%s; " \
-			"  :%{cstdmain:crt2%O%s; " \
+			"  :--strip-crt " \
+			   "%{cstdmain:crt2%O%s; " \
                            "  mraw|mapusim:crt3%O%s; " \
                            "  mis:crt4%O%s; " \
                            "  mspurs-task:spurs_task%O%s; " \
                            "  shared:; " \
                            "  :crt1%O%s} " \
-			   "crti%O%s %{mno-fixups:;shared|mfixups:init_fixups%O%s} init_crtend%O%s} "
+			   "crti%O%s "\
+                           "%{fpic|fPIC|shared: %{!mno-fixups:init_fixups%O%s}} " \
+			   "%{mzerobss:init_zerobss%O%s} " \
+                           "init_crtend%O%s} "
 
 #undef  ENDFILE_SPEC
 #define ENDFILE_SPEC	"%{mspurs-job*|mcellsim|mspusim:crtend1%O%s; :fini_crtbegin%O%s crtn%O%s} "
@@ -88,8 +92,9 @@
 #undef LINK_SPEC
 #define LINK_SPEC "%{mlarge-mem: --defsym __stack=0xfffffff0} " \
                   "%{!Ttext*: %{mspurs-job*:%{fPIC|fpic:-Ttext=0x0; :-Ttext=0x4c00}; mspurs-task:-Ttext=0x3000}} " \
-                  "%{!testing:%{!mno-error-reloc:%{!mno-warn-reloc:%{mfixups|shared|fPIC|fpic:%{mspurs-job-initialize|mfixups|shared:--warn-pic-code; :--warn-pic-all}}}}} " \
-                  "%{shared} %{static} %{mfixups|shared:%{mno-fixups|nostartfiles:;:--emit-fixups}} " \
+                  "%{mno-fixups: --warn-pic-code}" \
+                  "%{shared} %{static} " \
+                  "%{fpic|fPIC|shared:%{mno-fixups|nostartfiles:;:--emit-fixups}} " \
                   "%{rdynamic: %{static|shared: ; : -export-dynamic}} "
 
 #undef LINK_GCC_C_SEQUENCE_SPEC 

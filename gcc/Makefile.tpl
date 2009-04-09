@@ -53,6 +53,7 @@ libdir = @libdir@
 includedir = @includedir@
 oldincludedir = @oldincludedir@
 infodir = @infodir@
+pdfdir = @pdfdir@
 mandir = @mandir@
 man1dir = $(mandir)/man1
 man2dir = $(mandir)/man2
@@ -546,12 +547,14 @@ do-[+make_target+]:
 
 # Here are the targets which correspond to the do-X targets.
 
-.PHONY: info installcheck dvi html install-info
+.PHONY: info installcheck dvi pdf html
+.PHONY: install-info install-pdf
 .PHONY: clean distclean mostlyclean maintainer-clean realclean
 .PHONY: local-clean local-distclean local-maintainer-clean
 info: do-info
 installcheck: do-installcheck
 dvi: do-dvi
+pdf: do-pdf
 html: do-html
 
 # Make sure makeinfo is built before we do a `make info', if we're
@@ -563,6 +566,8 @@ install-info: do-install-info dir.info
 	if [ -f dir.info ] ; then \
 	  $(INSTALL_DATA) dir.info $(DESTDIR)$(infodir)/dir.info ; \
 	else true ; fi
+
+install-pdf: do-install-pdf
 
 local-clean:
 	-rm -f *.a TEMP errs core *.o *~ \#* TAGS *.E *.log
@@ -914,7 +919,7 @@ install-[+module+]: installdirs
 [+ ENDIF no_install +]
 @endif [+module+]
 
-# Other targets (info, dvi, etc.)
+# Other targets (info, dvi, pdf, etc.)
 [+ FOR recursive_targets +]
 .PHONY: maybe-[+make_target+]-[+module+] [+make_target+]-[+module+]
 maybe-[+make_target+]-[+module+]:
@@ -1030,7 +1035,7 @@ ENDIF raw_cxx +]
 [+ ENDIF no_install +]
 @endif target-[+module+]
 
-# Other targets (info, dvi, etc.)
+# Other targets (info, dvi, pdf, etc.)
 [+ FOR recursive_targets +]
 .PHONY: maybe-[+make_target+]-target-[+module+] [+make_target+]-target-[+module+]
 maybe-[+make_target+]-target-[+module+]:

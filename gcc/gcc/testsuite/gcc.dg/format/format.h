@@ -60,6 +60,22 @@ extern int vfscanf (FILE *restrict, const char *restrict, va_list);
 extern int vscanf (const char *restrict, va_list);
 extern int vsscanf (const char *restrict, const char *restrict, va_list);
 
+extern int fwprintf (FILE *restrict, const wchar_t *restrict, ...);
+extern int wprintf (const wchar_t *restrict, ...);
+extern int swprintf (wchar_t *restrict, size_t, const wchar_t *restrict, ...);
+extern int vfwprintf (FILE *restrict, const wchar_t *restrict, va_list);
+extern int vwprintf (const wchar_t *restrict, va_list);
+extern int vswprintf (wchar_t *restrict, size_t, const wchar_t *restrict,
+		      va_list);
+
+extern int fwscanf (FILE *restrict, const wchar_t *restrict, ...);
+extern int wscanf (const wchar_t *restrict, ...);
+extern int swscanf (const wchar_t *restrict, const wchar_t *restrict, ...);
+extern int vfwscanf (FILE *restrict, const wchar_t *restrict, va_list);
+extern int vwscanf (const wchar_t *restrict, va_list);
+extern int vswscanf (const wchar_t *restrict, const wchar_t *restrict,
+		     va_list);
+
 extern char *gettext (const char *);
 extern char *dgettext (const char *, const char *);
 extern char *dcgettext (const char *, const char *, int);
@@ -68,5 +84,6 @@ struct tm;
 
 extern size_t strftime (char *restrict, size_t, const char *restrict,
 			const struct tm *restrict);
-
+extern size_t wcsftime (wchar_t *restrict, size_t, const wchar_t *restrict,
+			const struct tm *restrict);
 extern ssize_t strfmon (char *restrict, size_t, const char *restrict, ...);

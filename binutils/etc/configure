@@ -311,6 +311,7 @@ libdir='${exec_prefix}/lib'
 includedir='${prefix}/include'
 oldincludedir='/usr/include'
 infodir='${prefix}/info'
+pdfdir='${prefix}/pdf'
 mandir='${prefix}/man'
 
 ac_prev=
@@ -1953,6 +1954,7 @@ s,@libdir@,$libdir,;t t
 s,@includedir@,$includedir,;t t
 s,@oldincludedir@,$oldincludedir,;t t
 s,@infodir@,$infodir,;t t
+s,@pdfdir@,$pdfdir,;t t
 s,@mandir@,$mandir,;t t
 s,@build_alias@,$build_alias,;t t
 s,@host_alias@,$host_alias,;t t

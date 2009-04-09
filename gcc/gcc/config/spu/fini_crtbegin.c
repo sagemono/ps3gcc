@@ -26,11 +26,11 @@
  * 02110-1301, USA.  */
 
 /* We want __CTOR_LIST__ and __DTOR_LIST__ to be the first entries in
- * .ctors and .dtors.   We achieve this by naming the file with
- * crtbegin which is special cased by the linker script.
+ * .ctors and .dtors.   We achieve this by putting them in the special
+ * sections .ctors_head and .dtors_head. 
  *
  * We want __fini_dtors to be at the end of .fini.  We achieve this by
- * placing it at the end of the link command line. 
+ * putting it in the special section .fini.dtors.
  *
  * We want all of this in the same file so we can declare the
  * __CTOR_LIST__ and __DTOR_LIST__ as static so they don't show up as
@@ -39,23 +39,28 @@
 typedef void (*func_ptr) (void);
 
 static func_ptr __CTOR_LIST__[1]
-  __attribute__ ((section(".ctors"), aligned(4), used))
+  __attribute__ ((section(".ctors_head"), aligned(4), used))
   = { (func_ptr) (-1) };
 
 static func_ptr __DTOR_LIST__[1]
-  __attribute__((section(".dtors"), aligned(4)))
+  __attribute__((section(".dtors_head"), aligned(4)))
   = { (func_ptr) (-1) };
 
-void __fini_dtors (void) __attribute__ ((naked, section(".fini")));
+static void __fini_dtors (void) __attribute__ ((naked, section(".fini.dtors","ax"), used));
 
-void __fini_dtors (void)
+static void
+__fini_dtors (void)
 {
   static func_ptr *p = 0;
+  /* Use p to make sure we only call the destructors once. */
   if (!p)
     {
-      /* See comment for __CTOR_END__ above. */
-      asm ("" : "=r" (p) : "0" (__DTOR_LIST__ + 1));
-      for (; *p; p++)
-	(*p) ();
+      func_ptr *lp;
+      /* __DTOR_LIST__ is not 16 byte aligned, but the compiler assumes
+       * all symbols are, so we need to use this asm to load it.  */
+      asm ("" : "=r" (lp) : "0" (__DTOR_LIST__ + 1));
+      p = lp;
+      for (; *lp; lp++)
+	(*lp) ();
     }
 }

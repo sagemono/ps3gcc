@@ -145,6 +145,10 @@ struct alias_set_entry GTY(())
   /* Nonzero if would have a child of zero: this effectively makes this
      alias set the same as alias set zero.  */
   int has_zero_child;
+
+  /* When a decl with restrict keyword has been inlined, it conflicts
+     with restricted decls with different context. */
+  tree restrict_context;
 };
 typedef struct alias_set_entry *alias_set_entry;
 
@@ -169,6 +173,7 @@ static int nonoverlapping_memrefs_p (rtx, rtx);
 static int write_dependence_p (rtx, rtx, int);
 
 static void memory_modified_1 (rtx, rtx, void *);
+static alias_set_entry alloc_alias_set_entry (HOST_WIDE_INT);
 static void record_alias_subset (HOST_WIDE_INT, HOST_WIDE_INT);
 
 /* Set up all info needed to perform alias analysis on memory references.  */
@@ -306,7 +311,7 @@ insert_subset_children (splay_tree_node node, void *data)
 int
 alias_sets_conflict_p (HOST_WIDE_INT set1, HOST_WIDE_INT set2)
 {
-  alias_set_entry ase;
+  alias_set_entry ase1, ase2;
 
   /* If have no alias set information for one of the operands, we have
      to assume it can alias anything.  */
@@ -316,19 +321,25 @@ alias_sets_conflict_p (HOST_WIDE_INT set1, HOST_WIDE_INT set2)
     return 1;
 
   /* See if the first alias set is a subset of the second.  */
-  ase = get_alias_set_entry (set1);
-  if (ase != 0
-      && (ase->has_zero_child
-	  || splay_tree_lookup (ase->children,
+  ase1 = get_alias_set_entry (set1);
+  if (ase1 != 0
+      && (ase1->has_zero_child
+	  || splay_tree_lookup (ase1->children,
 				(splay_tree_key) set2)))
     return 1;
 
   /* Now do the same, but with the alias sets reversed.  */
-  ase = get_alias_set_entry (set2);
-  if (ase != 0
-      && (ase->has_zero_child
-	  || splay_tree_lookup (ase->children,
+  ase2 = get_alias_set_entry (set2);
+  if (ase2 != 0
+      && (ase2->has_zero_child
+	  || splay_tree_lookup (ase2->children,
 				(splay_tree_key) set1)))
+    return 1;
+
+  /* Two sets that refer to restricted pointers still conflict when they
+     come from different contexts. */
+  if (ase1 && ase2 && ase1->restrict_context && ase2->restrict_context
+      && ase1->restrict_context != ase2->restrict_context)
     return 1;
 
   /* The two alias sets are distinct and neither one is the
@@ -561,6 +572,14 @@ get_alias_set (tree t)
 		      DECL_POINTER_ALIAS_SET (decl) = new_alias_set ();
 		      record_alias_subset (pointed_to_alias_set,
 					   DECL_POINTER_ALIAS_SET (decl));
+		      if (DECL_FROM_INLINE (decl))
+			{
+			  alias_set_entry ase;
+			  ase = get_alias_set_entry (DECL_POINTER_ALIAS_SET (decl));
+			  if (ase == 0)
+			    ase = alloc_alias_set_entry (DECL_POINTER_ALIAS_SET (decl));
+			  ase->restrict_context = DECL_CONTEXT (DECL_ABSTRACT_ORIGIN (decl));
+			}
 		    }
 		}
 
@@ -682,6 +701,21 @@ new_alias_set (void)
     return 0;
 }
 
+  /* Create an entry for the SUPERSET, so that we have a place to
+     attach the SUBSET.  */
+static alias_set_entry
+alloc_alias_set_entry (HOST_WIDE_INT alias_set)
+{
+  alias_set_entry ase;
+  ase = ggc_alloc (sizeof (struct alias_set_entry));
+  ase->alias_set = alias_set;
+  ase->children = splay_tree_new_ggc (splay_tree_compare_ints);
+  ase->has_zero_child = 0;
+  ase->restrict_context = 0;
+  VARRAY_GENERIC_PTR (alias_sets, alias_set) = ase;
+  return ase;
+}
+
 /* Indicate that things in SUBSET can alias things in SUPERSET, but that
    not everything that aliases SUPERSET also aliases SUBSET.  For example,
    in C, a store to an `int' can alias a load of a structure containing an
@@ -713,12 +747,7 @@ record_alias_subset (HOST_WIDE_INT superset, HOST_WIDE_INT subset)
     {
       /* Create an entry for the SUPERSET, so that we have a place to
 	 attach the SUBSET.  */
-      superset_entry = ggc_alloc (sizeof (struct alias_set_entry));
-      superset_entry->alias_set = superset;
-      superset_entry->children
-	= splay_tree_new_ggc (splay_tree_compare_ints);
-      superset_entry->has_zero_child = 0;
-      VARRAY_GENERIC_PTR (alias_sets, superset) = superset_entry;
+      superset_entry = alloc_alias_set_entry (superset);
     }
 
   if (subset == 0)

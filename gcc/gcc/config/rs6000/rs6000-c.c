@@ -2904,7 +2904,60 @@ altivec_build_resolved_builtin (tree *args, int n,
       args[0] = fold_build2 (BIT_XOR_EXPR, TREE_TYPE (args[0]), args[0],
 			     build_int_cst (NULL_TREE, 2));
     }
+  if (desc->code == ALTIVEC_BUILTIN_VEC_LVLX)
+    {
+      tree arg1 = args[1];
+      STRIP_NOPS (arg1);
+      /* vec_lvlx (0, &a) is really vec_promote (a, 0) */
+      if (zero_p (args[0])
+          && TREE_CODE (arg1) == ADDR_EXPR)
+	{
+	  int size;
+	  VEC(constructor_elt,gc) *vec;
+	  bool unsigned_p;
+	  tree type;
 
+	  arg1 = TREE_OPERAND (arg1, 0);
+	  type = TREE_TYPE (arg1);
+
+	  if (!SCALAR_FLOAT_TYPE_P (type)
+	      && !INTEGRAL_TYPE_P (type))
+	    goto nospecialcase;
+
+	  switch (TYPE_MODE (type))
+	    {
+	      case SImode:
+	        type = (unsigned_p ? unsigned_V4SI_type_node : V4SI_type_node);
+	        size = 4;
+	        break;
+	      case HImode:
+	        type = (unsigned_p ? unsigned_V8HI_type_node : V8HI_type_node);
+	        size = 8;
+	        break;
+	      case QImode:
+	        type = (unsigned_p ? unsigned_V16QI_type_node : V16QI_type_node);
+	        size = 16;
+	        break;
+	      case SFmode: type = V4SF_type_node; size = 4; break;
+	      default:
+	        goto nospecialcase;
+	    }
+
+	  arg1 = save_expr (fold_convert (TREE_TYPE (type), arg1));
+	  vec = VEC_alloc (constructor_elt, gc, size);
+	  for(i = 0; i < size; i++)
+	    {
+	      constructor_elt *elt;
+
+	      elt = VEC_quick_push (constructor_elt, vec, NULL);
+	      elt->index = NULL_TREE;
+	      elt->value = arg1;
+	    }
+	  return fold_convert (ret_type, build_constructor (type, vec));
+	}
+    }
+
+nospecialcase:
   while (--n >= 0)
     arglist = tree_cons (NULL_TREE,
 			 fold_convert (arg_type[n], args[n]),

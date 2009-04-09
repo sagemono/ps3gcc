@@ -300,12 +300,8 @@ bfd_elf_string_from_elf_section (bfd *abfd,
   return ((char *) hdr->contents) + strindex;
 }
 
-/* Read and convert symbols to internal format.
-   SYMCOUNT specifies the number of symbols to read, starting from
-   symbol SYMOFFSET.  If any of INTSYM_BUF, EXTSYM_BUF or EXTSHNDX_BUF
-   are non-NULL, they are used to store the internal symbols, external
-   symbols, and symbol section index extensions, respectively.  */
-
+/* A hook for reading in symbol tables.  The default calls
+   _bfd_elf_get_elf_syms, which always reads from disk.  */
 Elf_Internal_Sym *
 bfd_elf_get_elf_syms (bfd *ibfd,
 		      Elf_Internal_Shdr *symtab_hdr,
@@ -314,6 +310,26 @@ bfd_elf_get_elf_syms (bfd *ibfd,
 		      Elf_Internal_Sym *intsym_buf,
 		      void *extsym_buf,
 		      Elf_External_Sym_Shndx *extshndx_buf)
+{
+  return (*get_elf_backend_data (ibfd)->get_elf_syms)
+	      (ibfd, symtab_hdr, symcount, symoffset,
+	       intsym_buf, extsym_buf, extshndx_buf);
+}
+
+/* Read and convert symbols to internal format.
+   SYMCOUNT specifies the number of symbols to read, starting from
+   symbol SYMOFFSET.  If any of INTSYM_BUF, EXTSYM_BUF or EXTSHNDX_BUF
+   are non-NULL, they are used to store the internal symbols, external
+   symbols, and symbol section index extensions, respectively.  */
+
+Elf_Internal_Sym *
+_bfd_elf_get_elf_syms (bfd *ibfd,
+		       Elf_Internal_Shdr *symtab_hdr,
+		       size_t symcount,
+		       size_t symoffset,
+		       Elf_Internal_Sym *intsym_buf,
+		       void *extsym_buf,
+		       Elf_External_Sym_Shndx *extshndx_buf)
 {
   Elf_Internal_Shdr *shndx_hdr;
   void *alloc_ext;
@@ -2478,7 +2494,7 @@ _bfd_elf_new_section_hook (bfd *abfd, asection *sec)
 	 
 	 FIXME: Here I only handle SHF_ALLOC, SHF_WRITE and SHF_EXECINSTR.
 	 Should I also consider SHF_TLS, SHF_GROUP and so on? */
-      if (strcmp (sec->name, ".SpuGUID") == 0)
+      if (ssect && strcmp (sec->name, ".SpuGUID") == 0)
 	{
 	  if ((ssect->attr & SHF_ALLOC) == SHF_ALLOC)
 	    sec->flags |= SEC_ALLOC;

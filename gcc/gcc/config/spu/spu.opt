@@ -4,7 +4,7 @@
 ; Sony Computer Entertainment, Inc.,
 ; Toshiba Corporation,
 ; International Business Machines Corporation,
-; 2006.
+; 2006,2008
 
 ; This file is free software; you can redistribute it and/or modify it under
 ; the terms of the GNU General Public License as published by the Free
@@ -85,7 +85,7 @@ Target Report
 Build executable for SPURS task model
 
 mwarn-reloc
-Target Report Mask(WARN_RELOC)
+Target Report Mask(WARN_RELOC) Init(0)
 Emit warnings when run-time relocations are generated
 
 merror-reloc
@@ -147,4 +147,8 @@ Assume $126 has been initialized as the PIC base register
 mfixups
 Target 
 Create fixups at link time for PIC
+
+mzerobss
+Target NoReport
+Add init code to zero the bss section
 

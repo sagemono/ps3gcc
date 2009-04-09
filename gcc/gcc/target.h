@@ -294,6 +294,16 @@ struct gcc_target
      * queued for 1 cycle. */
     int (* can_schedule) (rtx);
 
+    /* This function should return TRUE when an UNSPEC_VOLATILE effects
+     * only some instructions and a barrier is not required.  Any
+     * dependencies required by the UNSPEC_VOLATILE must be represented
+     * in the RTL some other way, for example, add
+     *   (clobber (mem:BLK (scratch)))
+     * to an insn to create dependencies with all memory insns.  The
+     * first argument is the insn, the second argument is the
+     * UNSPEC_VOLATILE in the insn. */
+    bool (* no_barrier_for_unspec_volatile) (rtx, rtx);
+
   } sched;
 
   /* Functions relating to vectorization.  */

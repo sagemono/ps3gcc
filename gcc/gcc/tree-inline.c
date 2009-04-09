@@ -2762,6 +2762,7 @@ copy_decl_for_dup (tree decl, tree from_fn, tree to_fn, bool versioning)
       TREE_READONLY (copy) = TREE_READONLY (decl);
       TREE_THIS_VOLATILE (copy) = TREE_THIS_VOLATILE (decl);
       DECL_GIMPLE_REG_P (copy) = DECL_GIMPLE_REG_P (decl);
+      DECL_POINTER_ALIAS_SET (copy) = DECL_POINTER_ALIAS_SET (decl);
     }
   else
     {

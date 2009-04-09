@@ -936,6 +936,7 @@ uninstall-info: uninstall-info-recursive
 	tags tags-recursive uninstall uninstall-am \
 	uninstall-bfdlibLTLIBRARIES uninstall-info-am
 
+install-pdf:
 
 .PHONY: install-html
 install-html:

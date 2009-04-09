@@ -1,6 +1,6 @@
-// Global parts of the pgo spec.
-// Used by gcc as well as spusim.
-/* Copyright (C) 2006 Sony Computer Entertainment, Inc.,
+/* Global parts of the pgo spec.
+   Used by gcc as well as spusim.
+   Copyright (C) 2006 Sony Computer Entertainment, Inc.,
 
    PGO is free software; you can redistribute it and/or modify it under
    the terms of the GNU General Public License as published by the Free
@@ -21,19 +21,17 @@
 #ifndef PGO_PGO_H
 #define PGO_PGO_H
 
-#ident "$Id: pgo.h,v 1.5 2006/09/24 22:13:12 dje Exp $"
-
 /* Version number of the contents of the .pgo_info section.  */
 #define PGO_FILE_VERSION_MAJOR 0
 #define PGO_FILE_VERSION_MINOR 0
 
-// ??? Should probably move pgo_rec_e contents to a .def file, but
-// the contents aren't as complex as modes.
+/* ??? Should probably move pgo_rec_e contents to a .def file, but
+   the contents aren't as complex as modes.  */
 
 enum pgo_rec_e
 {
-    // Make "unknown" have value zero.  There's typically lots of zeros in
-    // the files and we want to catch mismatches asap.
+    /* Make "unknown" have value zero.  There's typically lots of zeros in
+       the files and we want to catch mismatches asap. */
     PGO_REC_UNKNOWN = 0,
 
     /* counter records */
@@ -58,7 +56,7 @@ enum pgo_rec_e
     PGO_REC_NON_COUNTER_MAX
 };
 
-#ifdef IN_PGO // don't use these directly
+#ifdef IN_PGO /* don't use these directly */
 
 #define PGO_COUNTER_REC_NAMES \
     "PGO_REC_EDGE", \
@@ -87,9 +85,9 @@ enum pgo_mode_e
 
 enum pgo_mode_kind_e
 {
-    PGO_MKIND_OTHER = 0, // e.g. VOID
+    PGO_MKIND_OTHER = 0, /* e.g. VOID */
     PGO_MKIND_INT,
     PGO_MKIND_MAX
 };
 
-#endif // PGO_PGO_H
+#endif /* PGO_PGO_H */

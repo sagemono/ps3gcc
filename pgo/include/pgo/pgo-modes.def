@@ -1,13 +1,13 @@
-// Information on each "mode" in PGO.
-// A mode in PGO derives from GCC modes.
-// pgo_mode_e is also intended to contain information regarding where in a
-// register a smaller value is.  Eg. If a value is in a register other than
-// its default location (e.g. an SI value in the lower word of an SPU
-// register), then this distinction will be via a pgo_mode_e value.
-// One could try to keep things more orthogonal, and something like that can
-// certainly be built on top of pgo_mode_e, but w.r.t. externalizing GCC
-// values, there's just too much randomness so some form of enumeration seems
-// to be ultimately necessary.
+/* Information on each "mode" in PGO.
+   A mode in PGO derives from GCC modes.
+   pgo_mode_e is also intended to contain information regarding where in a
+   register a smaller value is.  Eg. If a value is in a register other than
+   its default location (e.g. an SI value in the lower word of an SPU
+   register), then this distinction will be via a pgo_mode_e value.
+   One could try to keep things more orthogonal, and something like that can
+   certainly be built on top of pgo_mode_e, but w.r.t. externalizing GCC
+   values, there's just too much randomness so some form of enumeration seems
+   to be ultimately necessary. */
 
 /* Copyright (C) 2006 Sony Computer Entertainment, Inc.,
 
@@ -28,8 +28,8 @@
 
 
 
-// Syntax: PGO_MODE (SYMBOL, "NAME", KIND, bitsize)
-// Symbol concatenation is avoided to keep searching simple.
+/* Syntax: PGO_MODE (SYMBOL, "NAME", KIND, bitsize)
+   Symbol concatenation is avoided to keep searching simple. */
 
 #ifndef PGO_MODE
 #error "PGO_MODE not defined"
@@ -43,6 +43,6 @@ PGO_MODE (PGO_MODE_SI, "SI", PGO_MKIND_INT, 32)
 PGO_MODE (PGO_MODE_DI, "DI", PGO_MKIND_INT, 64)
 PGO_MODE (PGO_MODE_TI, "TI", PGO_MKIND_INT, 128)
 
-// That's it for now.
+/* That's it for now. */
 
 #undef PGO_MODE

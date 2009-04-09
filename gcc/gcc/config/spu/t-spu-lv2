@@ -71,7 +71,7 @@ MULTILIB_MATCHES=fPIC=fpic fPIC=shared fPIC=mfixups
 # Neither gcc or newlib seem to have a standard way to generate multiple
 # crt*.o files.  So we don't use the standard crt0.o name anymore.
 EXTRA_MULTILIB_PARTS = crti.o crtn.o crt1.o crt2.o crt3.o crt4.o spurs_task.o crtend1.o \
-                       init_fixups.o init_crtend.o fini_crtbegin.o
+                       init_fixups.o init_zerobss.o init_crtend.o fini_crtbegin.o
 
 LIBGCC = stmp-multilib
 INSTALL_LIBGCC = install-multilib
@@ -79,13 +79,13 @@ INSTALL_LIBGCC = install-multilib
 # Need to rebuild spu.o whenever spu_builtins.def is changed.
 $(out_object_file): $(srcdir)/config/spu/spu_builtins.def
 
+# Make sure spu.c never has warnings.  
+spu.o-warn = -Werror -Wno-format -Wno-missing-format-attribute
+
 # Assemble startup files.
 $(T)crti.o: $(srcdir)/config/spu/crti.asm $(GCC_PASSES)
 	$(GCC_FOR_TARGET) $(GCC_CFLAGS) $(MULTILIB_CFLAGS) $(INCLUDES) \
 	-c -o $(T)crti.o -x assembler-with-cpp $(srcdir)/config/spu/crti.asm
-
-# Make sure spu.c never has warnings.  
-spu.o-warn = -Werror -Wno-format -Wno-missing-format-attribute
 
 $(T)crtn.o: $(srcdir)/config/spu/crtn.asm $(GCC_PASSES)
 	$(GCC_FOR_TARGET) $(GCC_CFLAGS) $(MULTILIB_CFLAGS) $(INCLUDES) \
@@ -125,6 +125,11 @@ $(T)init_fixups.o: $(srcdir)/config/spu/init_fixups.c $(GCC_PASSES)
 	$(GCC_FOR_TARGET) $(GCC_CFLAGS) $(MULTILIB_CFLAGS) $(INCLUDES) \
 	-Os -ffixed-79 \
 	-c -o $(T)init_fixups.o $(srcdir)/config/spu/init_fixups.c
+
+$(T)init_zerobss.o: $(srcdir)/config/spu/init_zerobss.c $(GCC_PASSES)
+	$(GCC_FOR_TARGET) $(GCC_CFLAGS) $(MULTILIB_CFLAGS) $(INCLUDES) \
+	-Os -ffixed-79 \
+	-c -o $(T)init_zerobss.o $(srcdir)/config/spu/init_zerobss.c
 
 $(T)init_crtend.o: $(srcdir)/config/spu/init_crtend.c $(GCC_PASSES)
 	$(GCC_FOR_TARGET) $(GCC_CFLAGS) $(MULTILIB_CFLAGS) $(INCLUDES) \

@@ -185,6 +185,7 @@ install : all
 	$(INSTALL_SCRIPT) mkheaders $(DESTDIR)$(itoolsdir)/mkheaders
 
 dvi :
+pdf :
 info :
 html :
 installcheck :

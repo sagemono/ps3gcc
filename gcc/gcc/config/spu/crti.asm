@@ -55,14 +55,14 @@
 		
 	.file		"crti.asm"
 
-	.section	".init"
+	.section	".init.head","ax"
 	.align 2
 	.global	_init
 _init:
 	FUNC_START
 	
 		
-	.section	".fini"
+	.section	".fini.head","ax"
 	.align	2
 	.global	_fini
 _fini:

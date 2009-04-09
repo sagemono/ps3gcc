@@ -3241,6 +3241,11 @@ c_common_nodes_and_builtins (void)
       unsigned_wchar_type_node = c_common_unsigned_type (wchar_type_node);
     }
 
+  wstring_type_node = build_pointer_type (wchar_type_node);
+  const_wstring_type_node
+    = build_pointer_type (build_qualified_type
+                          (wchar_type_node, TYPE_QUAL_CONST));
+
   /* This is for wide string constants.  */
   wchar_array_type_node
     = build_array_type (wchar_type_node, array_domain_type);

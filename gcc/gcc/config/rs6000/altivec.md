@@ -204,7 +204,7 @@
     {
     case 0: return "stvx %1,%y0";
     case 1: return "lvx %0,%y1";
-    case 2: return "vor %0,%1,%1";
+    case 2: return "vsldoi %0,%1,%1, 0";
     case 3: return "#";
     case 4: return "#";
     case 5: return "#";
@@ -213,7 +213,7 @@
     default: gcc_unreachable ();
     }
 }
-  [(set_attr "type" "vecstore,vecload,vecsimple,store,load,*,*,*")])
+  [(set_attr "type" "vecstore,vecload,vecperm,store,load,*,*,*")])
 
 (define_split
   [(set (match_operand:V4SI 0 "nonimmediate_operand" "")

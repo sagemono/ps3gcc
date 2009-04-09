@@ -23,6 +23,8 @@ static int emit_fixups;
 static bfd_vma local_store_lo = 0;
 static bfd_vma local_store_hi = 0x3ffff;
 
+/* Whether to strip unneeded crt sections */
+static int strip_crt;
 
 static int
 is_spu_target (void)
@@ -52,7 +54,8 @@ static void
 spu_before_allocation (void)
 {
   if (is_spu_target ()
-      && !link_info.relocatable)
+      && !link_info.relocatable
+      && !link_info.shared)
     {
       /* Size the sections.  This is premature, but we need to know the
 	 rough layout so that overlays can be found.  */
@@ -94,7 +97,8 @@ spu_create_output_section_statements (void)
 			    stack_analysis,
 			    emit_stack_syms,
 			    flag_warn_pic,
-			    emit_fixups);
+			    emit_fixups,
+			    strip_crt);
 }
 
 EOF
@@ -110,6 +114,7 @@ PARSE_AND_LIST_PROLOGUE='
 #define OPTION_SPU_WARN_PIC_ALL		(OPTION_SPU_STACK_SYMS + 1)
 #define OPTION_SPU_WARN_PIC_CODE	(OPTION_SPU_WARN_PIC_ALL + 1)
 #define OPTION_SPU_EMIT_FIXUPS		(OPTION_SPU_WARN_PIC_CODE + 1)
+#define OPTION_SPU_STRIP_CRT		(OPTION_SPU_EMIT_FIXUPS + 1)
 '
 
 PARSE_AND_LIST_LONGOPTS='
@@ -120,6 +125,7 @@ PARSE_AND_LIST_LONGOPTS='
   { "warn-pic-all", no_argument, NULL, OPTION_SPU_WARN_PIC_ALL },
   { "warn-pic-code", no_argument, NULL, OPTION_SPU_WARN_PIC_CODE },
   { "emit-fixups", no_argument, NULL, OPTION_SPU_EMIT_FIXUPS },
+  { "strip-crt", no_argument, NULL, OPTION_SPU_STRIP_CRT },
 '
 
 PARSE_AND_LIST_OPTIONS='
@@ -130,7 +136,8 @@ PARSE_AND_LIST_OPTIONS='
   --emit-stack-syms     Add __stack_func giving stack needed for each func.\n\
   --warn-pic-all        Warn about non-PIC references in code or data.\n\
   --warn-pic-code       Warn about non-PIC references in code.\n\
-  --emit-fixups         Emit fixups in .fixup.\n"
+  --emit-fixups         Emit fixups in .fixup.\n\
+  --strip-crt           Strip unneeded sections from crt files.\n"
 		   ));
 '
 
@@ -171,6 +178,10 @@ PARSE_AND_LIST_ARGS_CASES='
 
     case OPTION_SPU_EMIT_FIXUPS:
       emit_fixups = 1;
+      break;
+
+    case OPTION_SPU_STRIP_CRT:
+      strip_crt = 1;
       break;
 '
 

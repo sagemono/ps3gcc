@@ -26,11 +26,11 @@
  * 02110-1301, USA.  */
 
 /* We want __CTOR_END__ and __DTOR_END__ to be the last entries in
- * .ctors and .dtors.   We achieve this by naming the file with crtend. 
+ * .ctors and .dtors.   We achieve this by putting them in the special
+ * sections .ctors_tail and .dtors_tail. 
  *
  * We want __init_ctors to be at the end of .init.  We achieve this by
- * placing it at the start of the link command line which is special
- * cased by the linker script.
+ * putting it in the special section .init.ctors.
  *
  * We want all of this in the same file so we can declare the
  * __CTOR_END__ and __DTOR_END__ as static so they don't show up as
@@ -39,16 +39,17 @@
 typedef void (*func_ptr) (void);
 
 static func_ptr __CTOR_END__[1]
-  __attribute__ ((section(".ctors"), aligned(4)))
+  __attribute__ ((section(".ctors_tail"), aligned(4)))
   = { (func_ptr) (0) };
 
 static func_ptr __DTOR_END__[1]
-  __attribute__((section(".dtors"), aligned(4), used))
+  __attribute__((section(".dtors_tail"), aligned(4), used))
   = { (func_ptr) (0) };
 
-void __init_ctors (void) __attribute__ ((naked, section(".init")));
+static void __init_ctors (void) __attribute__ ((naked, section(".init.ctors","ax"), used));
 
-void __init_ctors (void)
+static void
+__init_ctors (void)
 {
   func_ptr *p;
 

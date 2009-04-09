@@ -163,6 +163,7 @@ Target Report
 Put everything in the regular TOC
 
 ;  -1 means it hasn't been set, 0 for -mno-base-toc, 1 for -mbase-toc, 2 for -mall-base-toc
+;  3 for SN style references (set by -mno-toc)
 mbase-toc
 Target Report Var(rs6000_base_toc) Init(-1)
 Access global constants with a 16 bit offset from r2 and all other globals using a 32 bit offset from r2
@@ -170,6 +171,13 @@ Access global constants with a 16 bit offset from r2 and all other globals using
 mall-base-toc
 Target Report Var(rs6000_base_toc,2) VarExists
 Access all globals, including constants, using a 32 bit offset from r2
+
+; Bz54159 - implement TOC-free
+; To be compatible with code that is not TOC-free the linker must
+; generate stubs that restore the TOC base.
+mno-toc
+Target Report RejectNegative Mask(TOC_FREE)
+Do not use a TOC for data references and do not save/restore the TOC base
 
 mvrsave
 Target Report Var(TARGET_ALTIVEC_VRSAVE)

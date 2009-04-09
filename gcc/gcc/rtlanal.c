@@ -2162,7 +2162,7 @@ may_trap_p_1 (rtx x, bool unaligned_mems)
     case UMOD:
       if (HONOR_SNANS (GET_MODE (x)))
 	return 1;
-      if (GET_MODE_CLASS (GET_MODE (x)) == MODE_FLOAT)
+      if (FLOAT_MODE_P (GET_MODE (x)))
 	return flag_trapping_math;
       if (!CONSTANT_P (XEXP (x, 1)) || (XEXP (x, 1) == const0_rtx))
 	return 1;
@@ -2219,7 +2219,7 @@ may_trap_p_1 (rtx x, bool unaligned_mems)
 
     default:
       /* Any floating arithmetic may trap.  */
-      if (GET_MODE_CLASS (GET_MODE (x)) == MODE_FLOAT
+      if (FLOAT_MODE_P (GET_MODE (x))
 	  && flag_trapping_math)
 	return 1;
     }
@@ -3779,9 +3779,24 @@ nonzero_bits1 (rtx x, enum machine_mode mode, rtx known_x,
       if (num_sign_bit_copies (XEXP (x, 0), GET_MODE (x))
 	  == GET_MODE_BITSIZE (GET_MODE (x)))
 	nonzero = 1;
+#else
+      /* Call only reg_num_sign_bit_copies which not cause mutual
+         recursion for the default case and combine. */
+      if (GET_CODE (XEXP (x, 0)) == REG)
+	{
+	  unsigned int copies_for_hook = 1;
+	  rtx new =
+	    rtl_hooks.reg_num_sign_bit_copies (XEXP (x, 0),
+					       GET_MODE (XEXP (x, 0)),
+					       NULL_RTX, VOIDmode, 0,
+					       &copies_for_hook);
+	  if (new == NULL_RTX
+	      && copies_for_hook == GET_MODE_BITSIZE (GET_MODE (x)))
+	    nonzero = 1;
+	}
 #endif
 
-      if (GET_MODE_SIZE (GET_MODE (x)) < mode_width)
+      if (GET_MODE_BITSIZE (GET_MODE (x)) < mode_width)
 	nonzero |= (GET_MODE_MASK (mode) & ~GET_MODE_MASK (GET_MODE (x)));
       break;
 

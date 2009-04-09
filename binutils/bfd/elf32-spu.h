@@ -39,5 +39,5 @@ struct _spu_elf_section_data
 
 extern void spu_elf_plugin (int);
 extern bfd_boolean spu_elf_create_sections (bfd *, struct bfd_link_info *);
-extern void spu_elf_set_link_options (struct bfd_link_info *, int, int, int, int);
+extern void spu_elf_set_link_options (struct bfd_link_info *, int, int, int, int, int);
 extern asection *spu_elf_check_vma (bfd *, bfd_vma, bfd_vma);

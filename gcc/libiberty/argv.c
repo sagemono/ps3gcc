@@ -564,13 +564,17 @@ create_response_file (basename, argv)
   /* Don't emit command name into the response file.  */
   while (*argv != NULL)
     {
-      char *string;
+      const char *string;
       unsigned i, len;
 #ifdef _WIN32
       int quote = 0;
 #endif
-      if (**argv == '\0')
-	continue;
+      if (!strcmp (*argv, "-use-response-file") || **argv == '\0')
+	{
+	  ++argv;
+	  continue;
+	}
+
       string = *argv;
       len = strlen (string);
       for (i = 0; i < len; i++)
@@ -607,6 +611,26 @@ create_response_file (basename, argv)
   fclose (rsp_fp);
 
   return response_filename;
+}
+
+int
+check_argument_length (const char * argv0, const char * const * argv)
+{
+#ifdef _WIN32
+  int length = 0;
+
+  length = strlen (argv0) + 1;
+
+  while (*argv)
+    {
+      length += strlen (*argv) + 1;
+      argv++;
+    }
+
+  return length < 32768 ? 0 : 1;
+#else
+  return 0;
+#endif
 }
 /* CELL LOCAL End */
 

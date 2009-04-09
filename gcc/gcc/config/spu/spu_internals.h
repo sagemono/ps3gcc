@@ -332,29 +332,18 @@ typedef __vector signed char qword;
 
 #else /* __cplusplus */
 
-/* A bit of a hack...  Float conversion needs an immediate operand.
- * always_inline doesn't help because the compiler generates an error
- * before inlining happens. */
-static inline vec_float4 __hack_spu_convtf (vec_int4, vec_float4, vec_float4) __attribute__((__always_inline__));
-static inline vec_float4 __hack_spu_convtf (vec_uint4, vec_float4, vec_float4) __attribute__((__always_inline__));
+static inline vec_float4 spu_convtf (vec_int4, int) __attribute__((__always_inline__));
+static inline vec_float4 spu_convtf (vec_uint4, int) __attribute__((__always_inline__));
 static inline vec_float4
-__hack_spu_convtf (vec_int4 ra, vec_float4 from_signed, vec_float4 from_unsigned)
+spu_convtf (vec_int4 ra, int imm) 
 {
-  (void)ra;
-  (void)from_unsigned;
-  return from_signed;
+  return __builtin_spu_convtf_1(ra, imm);
 }
 static inline vec_float4
-__hack_spu_convtf (vec_uint4 ra, vec_float4 from_signed, vec_float4 from_unsigned)
+spu_convtf (vec_uint4 ra, int imm) 
 {
-  (void)ra;
-  (void)from_signed;
-  return from_unsigned;
+  return __builtin_spu_convtf_0(ra, imm);
 }
-#define spu_convtf(ra,imm) \
-  __hack_spu_convtf((ra), \
-	            __builtin_spu_convtf_1((vec_int4)(ra), (imm)), \
-		    __builtin_spu_convtf_0((vec_uint4)(ra), (imm)))
 
 /* The following defines and functions were created automatically from
  * spu_builtins.def. */

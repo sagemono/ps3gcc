@@ -45,6 +45,7 @@ extern bool legitimate_constant_pool_address_p (rtx);
 extern bool legitimate_indirect_address_p (rtx, int);
 extern bool rs6000_legitimate_offset_address_p (enum machine_mode, rtx, int);
 extern bool rs6000_legitimate_small_data_p (enum machine_mode, rtx);
+extern bool rs6000_use_toc_for_sym (rtx x);
 
 extern rtx rs6000_got_register (rtx);
 extern rtx find_addr_reg (rtx);
@@ -162,6 +163,7 @@ extern int rs6000_register_move_cost (enum machine_mode,
 				      enum reg_class, enum reg_class);
 extern int rs6000_memory_move_cost (enum machine_mode, enum reg_class, int);
 extern bool rs6000_tls_referenced_p (rtx);
+extern bool rs6000_cannot_force_const_mem (rtx);
 extern tree rs6000_select_overloaded_intrinsic (tree, tree);
 extern int rs6000_hard_regno_nregs (int, enum machine_mode);
 extern void rs6000_conditional_register_usage (void);

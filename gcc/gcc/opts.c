@@ -731,6 +731,12 @@ decode_options (unsigned int argc, const char **argv, int called_by_pragma)
       flag_reorder_blocks_and_partition = 0;
       flag_reorder_blocks = 1;
     }
+
+  if (flag_ignore_exceptions && flag_exceptions)
+    {
+      error ("-fignore-exceptions has to be used with -fno-exceptions");
+      flag_ignore_exceptions = 0;
+    }
 }
 
 /* Handle target- and language-independent options.  Return zero to

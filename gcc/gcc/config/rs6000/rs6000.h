@@ -187,7 +187,7 @@
    While the extern keyword means a variable might be defined in a
    different translation unit, the extern attribute means it might be
    defined in a different module (e.g. dll).  */
-#define SYMBOL_FLAG_EXTERN      (SYMBOL_FLAG_MACH_DEP << 0)
+#define SYMBOL_FLAG_USE_TOC      (SYMBOL_FLAG_MACH_DEP << 0)
 
 #ifdef IN_LIBGCC2
 /* For libgcc2 we make sure this is a compile time constant */
@@ -1711,11 +1711,13 @@ typedef struct rs6000_args
 
 #define MAX_REGS_PER_ADDRESS 2
 
-/* Recognize any constant value that is a valid address.  */
+/* Recognize any constant value that is a valid address. 
+ * We don't allow CONST and SYMBOL_REF when we want LEGITIMIZE_ADDRESS
+ * to generate HIGH/LO_SUM. */
 
 #define CONSTANT_ADDRESS_P(X)   \
-  (GET_CODE (X) == LABEL_REF || GET_CODE (X) == SYMBOL_REF		\
-   || GET_CODE (X) == CONST_INT || GET_CODE (X) == CONST		\
+  ((rs6000_base_toc > 0 ? 0 : GET_CODE (X) == CONST || GET_CODE (X) == SYMBOL_REF)		\
+   || GET_CODE (X) == CONST_INT || GET_CODE (X) == LABEL_REF		\
    || GET_CODE (X) == HIGH)
 
 /* Nonzero if the constant value X is a legitimate general operand.

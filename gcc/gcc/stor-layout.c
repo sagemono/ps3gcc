@@ -1475,8 +1475,14 @@ compute_record_mode (tree type)
       /* If this field is the whole struct, remember its mode so
 	 that, say, we can put a double in a class into a DF
 	 register instead of forcing it to live in the stack.  */
-      if (simple_cst_equal (TYPE_SIZE (type), DECL_SIZE (field)))
+      if (simple_cst_equal (TYPE_SIZE (type), DECL_SIZE (field))
+          && (mode == VOIDmode || DECL_MODE (field) == mode))
 	mode = DECL_MODE (field);
+      else
+        {
+          mode = VOIDmode;
+	  break;
+	}
 
 #ifdef MEMBER_TYPE_FORCES_BLK
       /* With some targets, eg. c4x, it is sub-optimal
@@ -1489,8 +1495,9 @@ compute_record_mode (tree type)
 
   /* If we only have one real field; use its mode if that mode's size
      matches the type's size.  This only applies to RECORD_TYPE.  This
-     does not apply to unions.  */
-  if (TREE_CODE (type) == RECORD_TYPE && mode != VOIDmode
+     apply to unions if the mode of each decl are the same.  */
+  if ((TREE_CODE (type) == RECORD_TYPE || TREE_CODE (type) == UNION_TYPE)
+      && mode != VOIDmode
       && host_integerp (TYPE_SIZE (type), 1)
       && GET_MODE_BITSIZE (mode) == TREE_INT_CST_LOW (TYPE_SIZE (type)))
     TYPE_MODE (type) = mode;

@@ -520,37 +520,119 @@
   [(set_attr "type" "br")])
 
 ;; float convert
-(define_insn "spu_csflt"
+(define_expand "spu_csflt"
+  [(set (match_operand:V4SF 0 "spu_reg_operand")
+	(unspec:V4SF [(match_operand:V4SI 1 "spu_reg_operand")
+		      (match_operand:SI 2 "spu_nonmem_operand")] 0 ))]
+  ""
+{
+  if (GET_CODE (operands[2]) == CONST_INT
+      && (INTVAL (operands[2]) < 0 || INTVAL (operands[2]) > 127))
+    {
+      error ("spu_convtf expects an integer literal in the range [0, 127].");
+      operands[2] = force_reg (SImode, operands[2]);
+    }
+  if (GET_CODE (operands[2]) != CONST_INT)
+    {
+      rtx exp2;
+      rtx cnv = gen_reg_rtx (V4SFmode);
+      rtx scale = gen_reg_rtx (SImode);
+      rtx op2 = force_reg (SImode, operands[2]);
+      rtx m1 = spu_gen_exp2 (V4SFmode, GEN_INT (-1));
+      emit_insn (gen_subsi3 (scale, const1_rtx, op2));
+      exp2 = spu_gen_exp2 (V4SFmode, scale);
+      emit_insn (gen_floatv4siv4sf2_mul (cnv, operands[1], m1));
+      emit_insn (gen_mulv4sf3 (operands[0], cnv, exp2));
+    }
+  else
+    {
+      rtx exp2 = spu_gen_exp2 (V4SFmode, operands[2]);
+      emit_insn (gen_floatv4siv4sf2_div (operands[0], operands[1], exp2));
+    }
+  DONE;
+})
+
+(define_expand "spu_cflts"
+  [(set (match_operand:V4SI 0 "spu_reg_operand")
+	(unspec:V4SI [(match_operand:V4SF 1 "spu_reg_operand")
+                      (match_operand:SI 2 "spu_nonmem_operand")] 0 ))]
+  ""
+{
+  rtx exp2;
+  if (GET_CODE (operands[2]) == CONST_INT
+      && (INTVAL (operands[2]) < 0 || INTVAL (operands[2]) > 127))
+    {
+      error ("spu_convts expects an integer literal in the range [0, 127].");
+      operands[2] = force_reg (SImode, operands[2]);
+    }
+  exp2 = spu_gen_exp2 (V4SFmode, operands[2]);
+  if (GET_CODE (operands[2]) != CONST_INT)
+    {
+      rtx mul = gen_reg_rtx (V4SFmode);
+      emit_insn (gen_mulv4sf3 (mul, operands[1], exp2));
+      emit_insn (gen_fix_truncv4sfv4si2 (operands[0], mul));
+    }
+  else 
+    emit_insn (gen_fix_truncv4sfv4si2_mul (operands[0], operands[1], exp2));
+  DONE;
+})
+
+(define_expand "spu_cuflt"
   [(set (match_operand:V4SF 0 "spu_reg_operand" "=r")
-	(unspec:V4SF [(match_operand:V4SI 1 "spu_reg_operand" "r")
-		      (match_operand:SI 2 "const_int_operand" "K")] UNSPEC_CSFLT ))]
+	(unspec:V4SF [(match_operand:V4SI 1 "spu_reg_operand")
+		      (match_operand:SI 2 "spu_nonmem_operand")] 0 ))]
   ""
-  "csflt\t%0,%1,%2"
-  [(set_attr "type" "fp7")])
+{
+  if (GET_CODE (operands[2]) == CONST_INT
+      && (INTVAL (operands[2]) < 0 || INTVAL (operands[2]) > 127))
+    {
+      error ("spu_convtf expects an integer literal in the range [0, 127].");
+      operands[2] = force_reg (SImode, operands[2]);
+    }
+  if (GET_CODE (operands[2]) != CONST_INT)
+    {
+      rtx exp2;
+      rtx cnv = gen_reg_rtx (V4SFmode);
+      rtx scale = gen_reg_rtx (SImode);
+      rtx op2 = force_reg (SImode, operands[2]);
+      rtx m1 = spu_gen_exp2 (V4SFmode, GEN_INT (-1));
+      emit_insn (gen_subsi3 (scale, const1_rtx, op2));
+      exp2 = spu_gen_exp2 (V4SFmode, scale);
+      emit_insn (gen_floatunsv4siv4sf2_mul (cnv, operands[1], m1));
+      emit_insn (gen_mulv4sf3 (operands[0], cnv, exp2));
+    }
+  else
+    {
+      rtx exp2 = spu_gen_exp2 (V4SFmode, operands[2]);
+      emit_insn (gen_floatunsv4siv4sf2_div (operands[0], operands[1], exp2));
+    }
+  DONE;
+})
 
-(define_insn "spu_cflts"
-  [(set (match_operand:V4SI 0 "spu_reg_operand" "=r")
-	(unspec:V4SI [(match_operand:V4SF 1 "spu_reg_operand" "r")
-                      (match_operand:SI 2 "const_int_operand" "J")] UNSPEC_CFLTS ))]
+(define_expand "spu_cfltu"
+  [(set (match_operand:V4SI 0 "spu_reg_operand")
+	(unspec:V4SI [(match_operand:V4SF 1 "spu_reg_operand")
+		      (match_operand:SI 2 "spu_nonmem_operand")] 0 ))]
   ""
-  "cflts\t%0,%1,%2"
-  [(set_attr "type" "fp7")])
-
-(define_insn "spu_cuflt"
-  [(set (match_operand:V4SF 0 "spu_reg_operand" "=r")
-	(unspec:V4SF [(match_operand:V4SI 1 "spu_reg_operand" "r")
-		      (match_operand:SI 2 "const_int_operand" "K")] UNSPEC_CUFLT ))]
-  ""
-  "cuflt\t%0,%1,%2"
-  [(set_attr "type" "fp7")])
-
-(define_insn "spu_cfltu"
-  [(set (match_operand:V4SI 0 "spu_reg_operand" "=r")
-	(unspec:V4SI [(match_operand:V4SF 1 "spu_reg_operand" "r")
-		      (match_operand:SI 2 "const_int_operand" "J")] UNSPEC_CFLTU ))]
-  ""
-  "cfltu\t%0,%1,%2"
-  [(set_attr "type" "fp7")])
+{
+  rtx exp2;
+  if (GET_CODE (operands[2]) == CONST_INT
+      && (INTVAL (operands[2]) < 0 || INTVAL (operands[2]) > 127))
+    {
+      error ("spu_convtu expects an integer literal in the range [0, 127].");
+      operands[2] = force_reg (SImode, operands[2]);
+    }
+  exp2 = spu_gen_exp2 (V4SFmode, operands[2]);
+  if (GET_CODE (operands[2]) != CONST_INT)
+    {
+      rtx mul = gen_reg_rtx (V4SFmode);
+      emit_insn (gen_mulv4sf3 (mul, operands[1], exp2));
+      emit_insn (gen_fixuns_truncv4sfv4si2 (operands[0], mul));
+    }
+  else 
+    emit_insn (gen_fixuns_truncv4sfv4si2_mul (operands[0], operands[1], exp2));
+  DONE;
+})
 
 (define_expand "spu_frds"
    [(set (match_operand:V4SF 0 "spu_reg_operand" "")
@@ -711,63 +793,67 @@
   [(set (match_operand:V4SI 0 "spu_reg_operand" "")
         (unspec_volatile:V4SI [(match_operand:SI 1 "const_int_operand" "")] UNSPEC_RDCH))]
   ""
-  "{
+  {
     if (spu_safe_dma (INTVAL (operands[1])))
-      {
-        emit_insn (gen_spu_rdch_clobber (operands[0], operands[1]));
-        DONE;
-      }
-   }")
+      emit_insn (gen_spu_rdch_clobber (operands[0], operands[1]));
+    else
+      emit_insn (gen_spu_rdch_noclobber (operands[0], operands[1]));
+    DONE;
+  })
 
 (define_expand "spu_rchcnt"
   [(set (match_operand:SI 0 "spu_reg_operand" "")
         (unspec_volatile:SI [(match_operand:SI 1 "const_int_operand" "")] UNSPEC_RCHCNT))]
   ""
-  "{
+  {
     if (spu_safe_dma (INTVAL (operands[1])))
-      {
-        emit_insn (gen_spu_rchcnt_clobber (operands[0], operands[1]));
-        DONE;
-      }
-   }")
+      emit_insn (gen_spu_rchcnt_clobber (operands[0], operands[1]));
+    else
+      emit_insn (gen_spu_rchcnt_noclobber (operands[0], operands[1]));
+    DONE;
+  })
 
 (define_expand "spu_wrch"
-   [(unspec_volatile [(match_operand:SI 0 "const_int_operand" "")
- 	              (match_operand:V4SI 1 "spu_reg_operand" "")] UNSPEC_WRCH)]
-   ""
-  "{
+  [(unspec_volatile [(match_operand:SI 0 "const_int_operand" "")
+ 	             (match_operand:V4SI 1 "spu_reg_operand" "")] UNSPEC_WRCH)]
+  ""
+  {
     if (spu_safe_dma (INTVAL (operands[0])))
-      {
-        emit_insn (gen_spu_wrch_clobber (operands[0], operands[1]));
-        DONE;
-      }
-   }")
+      emit_insn (gen_spu_wrch_clobber (operands[0], operands[1]));
+    else
+      emit_insn (gen_spu_wrch_noclobber (operands[0], operands[1]));
+    DONE;
+  })
 
 (define_insn "spu_rdch_noclobber"
   [(set (match_operand:V4SI 0 "spu_reg_operand" "=r")
-        (unspec_volatile:V4SI [(match_operand:SI 1 "const_int_operand" "J")] UNSPEC_RDCH))]
+        (unspec_volatile:V4SI [(match_operand:SI 1 "const_int_operand" "J")] UNSPEC_RDCH))
+   (set (reg:V4SI 131) (unspec:V4SI [(reg:V4SI 131)] UNSPEC_RDCH))]
   ""
   "rdch\t%0,$ch%1"
   [(set_attr "type" "spr")])
 
 (define_insn "spu_rchcnt_noclobber"
   [(set (match_operand:SI 0 "spu_reg_operand" "=r")
-        (unspec_volatile:SI [(match_operand:SI 1 "const_int_operand" "J")] UNSPEC_RCHCNT))]
+        (unspec_volatile:SI [(match_operand:SI 1 "const_int_operand" "J")] UNSPEC_RCHCNT))
+   (set (reg:V4SI 131) (unspec:V4SI [(reg:V4SI 131)] UNSPEC_RCHCNT))]
   ""
   "rchcnt\t%0,$ch%1"
   [(set_attr "type" "spr")])
 
 (define_insn "spu_wrch_noclobber"
-   [(unspec_volatile [(match_operand:SI 0 "const_int_operand" "J")
- 	              (match_operand:V4SI 1 "spu_reg_operand" "r")] UNSPEC_WRCH)]
-   ""
-   "wrch\t$ch%0,%1"
-   [(set_attr "type" "spr")])
+  [(unspec_volatile [(match_operand:SI 0 "const_int_operand" "J")
+ 	             (match_operand:V4SI 1 "spu_reg_operand" "r")] UNSPEC_WRCH)
+   (set (reg:V4SI 131) (unspec:V4SI [(reg:V4SI 131)] UNSPEC_WRCH))]
+  ""
+  "wrch\t$ch%0,%1"
+  [(set_attr "type" "spr")])
 
 (define_insn "spu_rdch_clobber"
   [(set (match_operand:V4SI 0 "spu_reg_operand" "=r")
         (unspec_volatile:V4SI [(match_operand:SI 1 "const_int_operand" "J")] UNSPEC_RDCH))
-    (clobber (mem:BLK (scratch)))]
+   (set (reg:V4SI 131) (unspec:V4SI [(reg:V4SI 131)] UNSPEC_RDCH))
+   (clobber (mem:BLK (scratch)))]
   ""
   "rdch\t%0,$ch%1"
   [(set_attr "type" "spr")])
@@ -775,18 +861,20 @@
 (define_insn "spu_rchcnt_clobber"
   [(set (match_operand:SI 0 "spu_reg_operand" "=r")
         (unspec_volatile:SI [(match_operand:SI 1 "const_int_operand" "J")] UNSPEC_RCHCNT))
-    (clobber (mem:BLK (scratch)))]
+   (set (reg:V4SI 131) (unspec:V4SI [(reg:V4SI 131)] UNSPEC_RCHCNT))
+   (clobber (mem:BLK (scratch)))]
   ""
   "rchcnt\t%0,$ch%1"
   [(set_attr "type" "spr")])
 
 (define_insn "spu_wrch_clobber"
-   [(unspec_volatile [(match_operand:SI 0 "const_int_operand" "J")
- 	              (match_operand:V4SI 1 "spu_reg_operand" "r")] UNSPEC_WRCH)
-    (clobber (mem:BLK (scratch)))]
-   ""
-   "wrch\t$ch%0,%1"
-   [(set_attr "type" "spr")])
+  [(unspec_volatile [(match_operand:SI 0 "const_int_operand" "J")
+ 	             (match_operand:V4SI 1 "spu_reg_operand" "r")] UNSPEC_WRCH)
+   (set (reg:V4SI 131) (unspec:V4SI [(reg:V4SI 131)] UNSPEC_WRCH))
+   (clobber (mem:BLK (scratch)))]
+  ""
+  "wrch\t$ch%0,%1"
+  [(set_attr "type" "spr")])
 
 (define_expand "spu_splats" 
   [(set (match_operand 0 "spu_reg_operand" "")

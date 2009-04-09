@@ -128,6 +128,12 @@ static reloc_howto_type elf_howto_table[] = {
   HOWTO (R_SPU_PPU64,      0, 4, 64, FALSE,  0, complain_overflow_dont,
 	 bfd_elf_generic_reloc, "SPU_PPU64",
 	 FALSE, 0, -1, FALSE),
+
+  /* Mark the instruction that adds the PIC offset */
+  HOWTO (R_SPU_ADD_PIC,      0, 2, 32, FALSE,  0, complain_overflow_dont,
+	 bfd_elf_generic_reloc, "SPU_ADD_PIC",
+	 FALSE, 0, 0xffffc000, FALSE),
+
 };
 
 static struct bfd_elf_special_section const spu_elf_special_sections[]=
@@ -176,6 +182,8 @@ spu_elf_bfd_to_reloc_type (bfd_reloc_code_real_type code)
       return R_SPU_PPU32;
     case BFD_RELOC_SPU_PPU64:
       return R_SPU_PPU64;
+    case BFD_RELOC_SPU_ADD_PIC:
+      return R_SPU_ADD_PIC;
     }
 }
 
@@ -321,6 +329,8 @@ struct spu_link_hash_table
   /* Pointer to the fixup section */
   asection *sfixup;
 
+  asection *init_ctors, *fini_dtors;
+
   /* Set if stack size analysis should be done.  */
   unsigned int stack_analysis : 1;
 
@@ -336,6 +346,10 @@ struct spu_link_hash_table
   /* Set when we want to save R_SPU_GLOB_DAT relocations in section
    * .fixup when creating an executable.  */   
   unsigned int emit_fixups : 1;
+
+  /* Set when we want to strip unneeded sections from the standard crt
+   * files. */
+  unsigned int strip_crt : 1;
 };
 
 #define spu_hash_table(p) \
@@ -489,7 +503,8 @@ spu_elf_set_link_options (struct bfd_link_info *info,
 			  int stack_analysis,
 			  int emit_stack_syms,
 			  int flag_warn_pic,
-			  int emit_fixups)
+			  int emit_fixups,
+			  int strip_crt)
 {
   struct spu_link_hash_table *htab = spu_hash_table (info);
 
@@ -498,6 +513,7 @@ spu_elf_set_link_options (struct bfd_link_info *info,
   htab->emit_stack_syms = emit_stack_syms;
   htab->warn_pic = flag_warn_pic;
   htab->emit_fixups = emit_fixups;
+  htab->strip_crt = strip_crt;
 }
 
 /* Create the note section if not already present.  This is done early so
@@ -2021,7 +2037,10 @@ spu_elf_relocate_section (bfd *output_bfd,
 
       /*  Determine if this section is contains non-PIC relocations */
       if ((info->shared || htab->warn_pic > 0 || htab->emit_fixups)
-	  && (input_section->flags & SEC_LOAD))
+	  && (input_section->flags & SEC_LOAD)
+	  && (sym_name == 0 || sec == 0
+	      || !bfd_is_abs_section (sec)
+	      || strncmp (sym_name, "__ABS__", 7) != 0))
 	{
 	  /* Most absolute address relocations means this object is
 	   * non-PIC.  The exception is R_SPU_ADDR18 which is used when
@@ -2089,6 +2108,11 @@ spu_elf_relocate_section (bfd *output_bfd,
 	case R_SPU_ADDR16_LO:
 	case R_SPU_ADDR16_HI:
 
+	  /* This marks the add instruction that adjusts the above
+	   * relocations.  When dynamically linking, this instruction
+	   * should be patched to "ai $dst,$src,0" */
+	case R_SPU_ADD_PIC:
+
 	  /* This is for branches, loads and stores.  It should never
 	   * exist because R_SPU_REL16 should always get generated
 	   * instead. */
@@ -2117,22 +2141,16 @@ spu_elf_relocate_section (bfd *output_bfd,
 	    break;
 	  /* Fall thru.  */
 
-	  if (((info->shared && !info->pie)
+	  if ((info->shared
 	       && (h == NULL
 		   || ELF_ST_VISIBILITY (h->other) == STV_DEFAULT
 		   || h->root.type != bfd_link_hash_undefweak)
 	       && !SYMBOL_CALLS_LOCAL (info, h))
-	      || ((!info->shared || info->pie)
+	      || (!info->shared
 		  && h != NULL
 		  && h->dynindx != -1
 		  && h->def_dynamic
-		  && !h->def_regular)
-	      || (info->pie
-		  && h != NULL
-		  && r_type == R_SPU_GLOB_DAT
-		  && SYMBOL_CALLS_LOCAL (info, h))
-	      || (htab->emit_fixups
-		  && r_type == R_SPU_GLOB_DAT))
+		  && !h->def_regular))
 	    {
 	      int skip;
 
@@ -2154,11 +2172,20 @@ spu_elf_relocate_section (bfd *output_bfd,
 	      if (outrel.r_offset == (bfd_vma) -1
 		  || outrel.r_offset == (bfd_vma) -2)
 		skip = (int) outrel.r_offset;
-	      outrel.r_offset += (input_section->output_section->vma
-				  + input_section->output_offset);
+	      else
+		outrel.r_offset += (input_section->output_section->vma
+				    + input_section->output_offset);
 
 	      if (skip)
 		memset (&outrel, 0, sizeof outrel);
+	      else if (r_type == R_SPU_ADD_PIC)
+		{
+		  /* This symbol has a dynamic relocation, so this add
+		     should be changed to a reg copy. */
+		  relocation = 0x1c000000;
+		  addend = 0;
+		  break;
+		}
 	      else if (!SYMBOL_REFERENCES_LOCAL (info, h))
 		{
 		  unresolved_reloc = FALSE;
@@ -2170,24 +2197,12 @@ spu_elf_relocate_section (bfd *output_bfd,
 		  long indx;
 		  outrel.r_addend = relocation + rel->r_addend;
 
-		  if (bfd_is_abs_section (sec))
+		  if (sec && bfd_is_abs_section (sec))
 		    indx = 0;
 		  else if (sec == NULL || sec->owner == NULL)
 		    {
 		      bfd_set_error (bfd_error_bad_value);
 		      return FALSE;
-		    }
-		  else if (htab->emit_fixups)
-		    {
-#ifdef DEBUG
-		      info->callbacks->info (_("  fixup for name=%s section=%s offset=%v count=%d\n"),
-			      (h && h->root.root.string ? h->root.root.string : "<unknown>"),
-			      sec->name, 
-			      outrel.r_offset,
-			      htab->sfixup->reloc_count);
-#endif
-		      spu_elf_emit_fixup (output_bfd, info, outrel.r_offset);
-		      break;
 		    }
 		  else
 		    {
@@ -2233,6 +2248,9 @@ spu_elf_relocate_section (bfd *output_bfd,
 		  BFD_ASSERT (sreloc != NULL);
 		}
 
+	      if (sreloc->contents == NULL)
+		return FALSE;
+
 	      loc = sreloc->contents;
 	      loc += sreloc->reloc_count++ * sizeof (Elf32_External_Rela);
 	      bfd_elf32_swap_reloca_out (output_bfd, &outrel, loc);
@@ -2250,17 +2268,39 @@ spu_elf_relocate_section (bfd *output_bfd,
 		  break;
 		}
 	    }
+	  else if (htab->emit_fixups && r_type == R_SPU_GLOB_DAT
+	           && strncmp (sym_name, "__ABS__", 7) != 0)
+	    {
+	      bfd_vma offset;
+	      
+	      BFD_ASSERT(outrel.r_offset != (bfd_vma) -1 && outrel.r_offset != (bfd_vma) -2);
+
+	      offset = rel->r_offset + input_section->output_section->vma
+				  + input_section->output_offset;
+	      spu_elf_emit_fixup (output_bfd, info, offset);
+#if defined DEBUG
+	      info->callbacks->info (_("  fixup for name=%s section=%s offset=%v count=%d\n"),
+		      (h && h->root.root.string ? h->root.root.string : "<unknown>"),
+		      sec->name, 
+		      offset,
+		      htab->sfixup->reloc_count);
+#endif
+	    }
+	  /* When it is not a dynamic symbol, leave the add instruction. */
+	  else if (r_type == R_SPU_ADD_PIC)
+	    continue;
 	  break;
 	}
 
 #ifdef DEBUG
       info->callbacks->info (_( "\ttype = %s (%d), name = %s, symbol index = %ld, "
-	       "offset = %ld, addend = %ld\n"),
+	       "offset = %ld, value = %ld addend = %ld\n"),
 	       howto->name,
 	       (int) r_type,
 	       sym_name,
 	       r_symndx,
 	       (long) rel->r_offset,
+	       (long) relocation,
 	       (long) addend);
 #endif
 	if (((info->shared || htab->emit_fixups) && is_nonpic_reloc)
@@ -2277,6 +2317,18 @@ spu_elf_relocate_section (bfd *output_bfd,
 	       sym_name);
 	    ret = FALSE;
 	  }
+
+	/* When an absolute symbol is being used in a PC-relative
+	   context, we sometimes want the absolute value to be used as
+	   is.  Perhaps all symbols in the ABS section should behave
+	   this way, for now we limit it to symbols that start with
+	   __ABS__. */
+	if (sec && bfd_is_abs_section (sec) 
+	    && howto->pc_relative
+	    && strncmp (sym_name, "__ABS__", 7) == 0)
+	  relocation += input_section->output_section->vma 
+			+ input_section->output_offset
+			+ rel->r_offset - rel->r_addend;
 
 	r = _bfd_final_link_relocate (howto,
 				      input_bfd,
@@ -2371,6 +2423,17 @@ spu_elf_gc_mark_hook (asection *sec,
                      Elf_Internal_Rela *rel ATTRIBUTE_UNUSED, struct elf_link_hash_entry *h,
                      Elf_Internal_Sym *sym)
 {
+  struct spu_link_hash_table *htab = spu_hash_table (info);
+  if (htab->init_ctors && !htab->init_ctors->gc_mark
+      && strncmp (sec->name, ".ctors", 6) == 0
+      && (sec->name[6] == 0 || sec->name[6] == '.'))
+    _bfd_elf_gc_mark (info, htab->init_ctors, spu_elf_gc_mark_hook);
+
+  if (htab->fini_dtors && !htab->fini_dtors->gc_mark
+      && strncmp (sec->name, ".dtors", 6) == 0
+      && (sec->name[6] == 0 || sec->name[6] == '.'))
+      _bfd_elf_gc_mark (info, htab->fini_dtors, spu_elf_gc_mark_hook);
+
   if (h != NULL)
     {
       switch (h->root.type)
@@ -2734,7 +2797,6 @@ static bfd_boolean
 spu_elf_create_fixup_section (bfd *abfd, struct bfd_link_info *info)
 {
   struct spu_link_hash_table *htab = spu_hash_table (info);
-  struct elf_link_hash_entry *h;
   asection *s;
   flagword flags;
 
@@ -2753,11 +2815,6 @@ spu_elf_create_fixup_section (bfd *abfd, struct bfd_link_info *info)
     return FALSE;
   htab->sfixup = s;
 
-  /* Defined in the linker script, but we create it explicitly here so
-   * it is hidden. */
-  h = _bfd_elf_define_linkage_sym (abfd, info, s, "__fixup_start");
-  if (h == NULL)
-    return FALSE;
   return TRUE;
 }
 
@@ -2767,7 +2824,7 @@ spu_elf_create_dynamic_sections (bfd *abfd, struct bfd_link_info *info)
 #ifdef DEBUG
   info->callbacks->info ( _("spu_elf_create_dynamic_sections called for %B\n"), abfd);
 #endif
-  if (!spu_elf_create_fixup_section (abfd, info))
+  if (info->shared && !spu_elf_create_fixup_section (abfd, info))
     return FALSE;
 
   if (info->executable)
@@ -2848,6 +2905,13 @@ spu_elf_check_relocs (bfd *abfd,
   int num_glob_dats;
   struct spu_elf_fixup* fixups = 0;
 
+  if (htab->init_ctors == NULL
+      && strcmp (sec->name, ".init.ctors") == 0)
+    htab->init_ctors = sec;
+  if (htab->fini_dtors == NULL
+      && strcmp (sec->name, ".fini.dtors") == 0)
+    htab->fini_dtors = sec;
+
   if (info->relocatable)
     return TRUE;
 
@@ -2906,6 +2970,7 @@ spu_elf_check_relocs (bfd *abfd,
 	{
 	case R_SPU_PPU32:
 	case R_SPU_PPU64:
+	  sec->flags |= SEC_KEEP;
 	  break;
 
 	  /* The following relocations don't need to propagate the
@@ -2918,6 +2983,9 @@ spu_elf_check_relocs (bfd *abfd,
 	  /* These are just markers.  */
 	case R_SPU_NONE:
 	case R_SPU_max:
+	  break;
+
+	case R_SPU_ADD_PIC:
 	  break;
 
 	case R_SPU_REL32:
@@ -2954,20 +3022,15 @@ spu_elf_check_relocs (bfd *abfd,
 	     may need to keep relocations for symbols satisfied by a
 	     dynamic library if we manage to avoid copy relocs for the
 	     symbol.  */
-	  if (((info->shared && !info->pie)
+	  if ((info->shared
 	        && h != NULL && !h->forced_local
 	        && (! info->symbolic
 		    || h->root.type == bfd_link_hash_defweak
 		    || !h->def_regular))
-	      || ((!info->shared || info->pie)
+	      || (!info->shared
 		  && h != NULL && !h->forced_local
 		  && (h->root.type == bfd_link_hash_defweak
-		      || !h->def_regular))
-	      || (info->pie
-		  && h != NULL 
-		  && r_type == R_SPU_GLOB_DAT)
-	      || (htab->emit_fixups
-		  && r_type == R_SPU_GLOB_DAT))
+		      || !h->def_regular)))
 	    {
 	      struct spu_elf_dyn_relocs *p;
 	      struct spu_elf_dyn_relocs **head;
@@ -3041,13 +3104,12 @@ spu_elf_check_relocs (bfd *abfd,
 		    p->pie_count += 1;
 		}
 
-	      if (r_type == R_SPU_GLOB_DAT)
-		if (fixups)
-		  {
-		    fixups->h = h ? h : (struct elf_link_hash_entry *)-1;
-		    fixups->r_offset = rel->r_offset;
-		    fixups++;
-		  }
+	    }
+	  if (htab->emit_fixups && r_type == R_SPU_GLOB_DAT)
+	    {
+	      fixups->h = h ? h : (struct elf_link_hash_entry *)-1;
+	      fixups->r_offset = rel->r_offset;
+	      fixups++;
 	    }
 
 	  break;
@@ -3151,72 +3213,33 @@ allocate_dynrelocs (struct elf_link_hash_entry *h, void *inf)
      dynamic pc-relative relocs against symbols which turn out to be
      defined in regular objects.  For the normal shared case, discard
      space for relocs that have become local due to symbol visibility
-     changes.  */
+     changes.  
 
-  if (info->shared && !info->pie)
+     Also discard relocs on undefined weak syms with non-default
+     visibility.  */
+
+  if ((info->shared
+       && (ELF_ST_VISIBILITY (h->other) == STV_DEFAULT
+	   || h->root.type != bfd_link_hash_undefweak)
+       && !h->forced_local
+       && !info->executable)
+      || (!info->shared
+	  && !h->forced_local
+	  && h->def_dynamic
+	  && !h->def_regular))
     {
-      /* Also discard relocs on undefined weak syms with non-default
-	 visibility.  */
-      if (eh->dyn_relocs != NULL
-	  && h->root.type == bfd_link_hash_undefweak)
-	{
-	  if (ELF_ST_VISIBILITY (h->other) != STV_DEFAULT)
-	    eh->dyn_relocs = NULL;
+      if (! bfd_elf_link_record_dynamic_symbol (info, h))
+	return FALSE;
 
-	  /* Make sure undefined weak symbols are output as a dynamic
-	     symbol in PIEs.  */
-	  else if (h->dynindx == -1
-		   && !h->forced_local)
-	    {
-	      if (! bfd_elf_link_record_dynamic_symbol (info, h))
-		return FALSE;
-	    }
+      /* Finally, allocate space.  */
+      for (p = eh->dyn_relocs; p != NULL; p = p->next)
+	{
+	  asection *sreloc = elf_section_data (p->sec)->sreloc;
+	  sreloc->size += p->count * sizeof (Elf32_External_Rela);
 	}
     }
   else
-    {
-      /* For the non-shared case, discard space for relocs against
-	 symbols which turn out to need copy relocs or are not
-	 dynamic.  */
-
-      if (h->def_dynamic
-	  && !h->def_regular)
-	{
-	  /* Make sure this symbol is output as a dynamic symbol.
-	     Undefined weak syms won't yet be marked as dynamic.  */
-	  if (h->dynindx == -1
-	      && !h->forced_local)
-	    {
-	      if (! bfd_elf_link_record_dynamic_symbol (info, h))
-		return FALSE;
-	    }
-
-	  /* If that succeeded, we know we'll be keeping all the
-	     relocs.  */
-	  if (h->dynindx != -1)
-	    goto keep;
-	}
-      else if (info->pie || htab->emit_fixups)
-	{
-	  int c = 0;
-	  for (p = eh->dyn_relocs; p != NULL; p = p->next)
-	    c += p->count = p->pie_count;
-	  if (c && !htab->emit_fixups)
-	    goto keep;
-
-	}
-
-      eh->dyn_relocs = NULL;
-
-    keep: ;
-    }
-
-  /* Finally, allocate space.  */
-  for (p = eh->dyn_relocs; p != NULL; p = p->next)
-    {
-      asection *sreloc = elf_section_data (p->sec)->sreloc;
-      sreloc->size += p->count * sizeof (Elf32_External_Rela);
-    }
+    eh->dyn_relocs = NULL;
 
   return TRUE;
 }
@@ -3250,6 +3273,59 @@ readonly_dynrelocs (struct elf_link_hash_entry *h, void *info)
 	}
     }
   return TRUE;
+}
+
+struct section_size_data {
+  const char *name;
+  int len;
+  int count;
+};
+static void
+count_sections (bfd *abfd ATTRIBUTE_UNUSED,
+		asection *section, void *data)
+{
+  struct section_size_data *s = data;
+  if ((section->flags & SEC_EXCLUDE)
+      || strncmp (section->name, s->name, s->len) != 0)
+    return;
+  if (section->name[s->len] == 0 || section->name[s->len] == '.')
+    s->count++;
+}
+
+static void
+exclude_section (bfd *abfd ATTRIBUTE_UNUSED,
+		 asection *section, void *data)
+{
+  char *name = data;
+  if (strcmp (section->name, name) == 0)
+    {
+      section->flags |= SEC_EXCLUDE;
+      section->output_section = bfd_abs_section_ptr;
+    }
+}
+
+/* Count the number of input sections that start with NAME, not
+ * including sections that end with "_head" or "_tail".  When the count
+ * is 0, exclude the input sections in EXCLUDE0 and EXCLUDE1. */
+static void
+strip_crt_sections (struct bfd_link_info *info, const char *name,
+		    int len, const char *exclude0, const char *exclude1)
+{
+  struct section_size_data ssd;
+  bfd *ibfd;
+  ssd.name = name;
+  ssd.len = len;
+  ssd.count = 0;
+  for (ibfd = info->input_bfds; ibfd != NULL; ibfd = ibfd->link_next)
+    bfd_map_over_sections (ibfd, count_sections, &ssd);
+  if (ssd.count == 0)
+    {
+      for (ibfd = info->input_bfds; ibfd != NULL; ibfd = ibfd->link_next)
+	bfd_map_over_sections (ibfd, exclude_section, (void *)exclude0);
+      if (exclude1)
+	for (ibfd = info->input_bfds; ibfd != NULL; ibfd = ibfd->link_next)
+	  bfd_map_over_sections (ibfd, exclude_section, (void *)exclude1);
+    }
 }
 
 static bfd_boolean
@@ -3348,7 +3424,8 @@ spu_elf_size_dynamic_sections (bfd *output_bfd,
 	    if ((p = elf_section_data (s)->local_dynrel) != 0)
 	      for (base_end = 0, i = 0; p[i].h; i++)
 		if ((p[i].h == (struct elf_link_hash_entry *)-1
-		     || !spu_elf_hash_entry (p[i].h)->dyn_relocs)
+		     || (!spu_elf_hash_entry (p[i].h)->dyn_relocs
+		         && strncmp (p[i].h->root.root.string, "__ABS__", 7)))
 		    && p[i].r_offset >= base_end)
 		  {
 		    base_end = (p[i].r_offset & ~(bfd_vma)15) + 16;
@@ -3356,11 +3433,30 @@ spu_elf_size_dynamic_sections (bfd *output_bfd,
 		  }
 	}
 
-      /* We always have a NULL fixup as a sentinel */
-      sfixup->size = (fixup_count + 1) * FIXUP_RECORD_SIZE;
-      sfixup->contents = (bfd_byte *) bfd_zalloc (dynobj, sfixup->size);
-      if (sfixup->contents == NULL)
-	return FALSE;
+      if (fixup_count == 0)
+	{
+	  /* Remove the .init.fixups section when there are no fixups. */
+	  for (ibfd = info->input_bfds; ibfd != NULL; ibfd = ibfd->link_next)
+	    {
+	      bfd_map_over_sections (ibfd, exclude_section, ".init.fixups");
+	      bfd_map_over_sections (ibfd, exclude_section, ".fixup_head");
+	    }
+	  sfixup->flags |= SEC_EXCLUDE;
+	}
+      else
+	{
+	  /* We always have a NULL fixup as a sentinel */
+	  sfixup->size = (fixup_count + 1) * FIXUP_RECORD_SIZE;
+	  sfixup->contents = (bfd_byte *) bfd_zalloc (dynobj, sfixup->size);
+	  if (sfixup->contents == NULL)
+	    return FALSE;
+	}
+    }
+
+  if (htab->strip_crt)
+    {
+      strip_crt_sections (info, ".ctors", 6, ".init.ctors", NULL);
+      strip_crt_sections (info, ".dtors", 6, ".fini.dtors", NULL);
     }
 
   if (htab->elf.dynamic_sections_created)

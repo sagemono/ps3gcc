@@ -144,6 +144,9 @@ enum c_tree_index
     CTI_STRING_TYPE,
     CTI_CONST_STRING_TYPE,
 
+    CTI_WSTRING_TYPE,
+    CTI_CONST_WSTRING_TYPE,
+
     /* Type for boolean expressions (bool in C++, int in C).  */
     CTI_TRUTHVALUE_TYPE,
     CTI_TRUTHVALUE_TRUE,
@@ -194,6 +197,9 @@ struct c_common_identifier GTY(())
 #define int_array_type_node		c_global_trees[CTI_INT_ARRAY_TYPE]
 #define string_type_node		c_global_trees[CTI_STRING_TYPE]
 #define const_string_type_node		c_global_trees[CTI_CONST_STRING_TYPE]
+
+#define wstring_type_node		c_global_trees[CTI_WSTRING_TYPE]
+#define const_wstring_type_node		c_global_trees[CTI_CONST_WSTRING_TYPE]
 
 #define default_function_type		c_global_trees[CTI_DEFAULT_FUNCTION_TYPE]
 

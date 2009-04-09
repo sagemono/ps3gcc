@@ -57,11 +57,11 @@
 	
 	.file		"crtn.asm"
 
-	.section	".init"
+	.section	".init.tail","ax"
 	;;
 	FUNC_END
 	
-	.section	".fini"
+	.section	".fini.tail","ax"
 	;;
 	FUNC_END
 	

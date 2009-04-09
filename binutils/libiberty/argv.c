@@ -566,13 +566,17 @@ create_response_file (basename, argv)
   /* dont emit commnad name into the response file */
   while (*argv != NULL)
     {
-      char *string;
+      const char *string;
       unsigned i, len;
 #ifdef _WIN32
       int quote = 0;
 #endif
-      if (**argv == NULL)
-	continue;
+      if (!strcmp (*argv, "-use-response-file") || **argv == NULL)
+	{
+	  ++argv;
+	  continue;
+	}
+
       string = *argv;
       len = strlen (string);
       for (i = 0; i < len; i++)

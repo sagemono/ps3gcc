@@ -24,7 +24,7 @@
 # Each language makefile fragment must provide the following targets:
 #
 # foo.all.build, foo.all.cross, foo.start.encap, foo.rest.encap,
-# foo.install-normal, foo.install-common, foo.install-man,
+# foo.install-normal, foo.install-common, foo.install-man, foo.pdf,
 # foo.uninstall, foo.distdir,
 # foo.mostlyclean, foo.clean, foo.distclean,
 # foo.maintainer-clean, foo.stage1, foo.stage2, foo.stage3, foo.stage4
@@ -163,6 +163,8 @@ treelang.srcinfo: doc/treelang.info
 
 dvi:: doc/treelang.dvi
 
+treelang.pdf: doc/treelang.pdf
+
 TEXI_TREELANG_FILES = treelang/treelang.texi \
 	 $(docdir)/include/gcc-common.texi \
 	 $(docdir)/include/gpl.texi \
@@ -175,6 +177,9 @@ doc/treelang.info: $(TEXI_TREELANG_FILES)
 
 doc/treelang.dvi: $(TEXI_TREELANG_FILES)
 	$(TEXI2DVI) -I $(abs_docdir)/include -o $@ $<
+
+doc/treelang.pdf: $(TEXI_TREELANG_FILES)
+	$(TEXI2PDF) -I $(abs_docdir)/include -o $@ $<
 
 html:: $(htmldir)/treelang/index.html
 

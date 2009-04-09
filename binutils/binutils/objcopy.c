@@ -2153,7 +2153,7 @@ setup_section (bfd *ibfd, sec_ptr isection, void *obfdarg)
   size = bfd_section_size (ibfd, isection);
   if (copy_byte >= 0)
     size = (size + interleave - 1) / interleave;
-  if (p != NULL && p->set_pad)
+  if (p != NULL && p->set_pad && size % p->pad_align)
     size += p->pad_align - (size % p->pad_align);
   if (! bfd_set_section_size (obfd, osection, size))
     {
@@ -3092,7 +3092,7 @@ copy_main (int argc, char *argv[])
 
 	    s = strchr (optarg, '=');
 	    if (s == NULL)
-	      fatal (_("bad format for %s"), "--set-section-align");
+	      fatal (_("bad format for %s"), "--set-section-pad");
 
 	    len = s - optarg;
 	    name = xmalloc (len + 1);

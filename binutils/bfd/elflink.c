@@ -3556,6 +3556,17 @@ elf_link_add_object_symbols (bfd *abfd, struct bfd_link_info *info)
       common = bed->common_definition (isym);
 
       bind = ELF_ST_BIND (isym->st_info);
+
+      /* When including symbols with --just-symbols, convert STB_GLOBAL
+       * to STB_WEAK so duplicate symbols are ignored. */
+      if (bind == STB_GLOBAL 
+	  && abfd->sections != NULL
+	  && abfd->sections->sec_info_type == ELF_INFO_TYPE_JUST_SYMS)
+	{
+	  isym->st_info = ELF_ST_INFO (STB_WEAK, ELF_ST_TYPE (isym->st_info));
+	  bind = STB_WEAK;
+	}
+
       if (bind == STB_LOCAL)
 	{
 	  /* This should be impossible, since ELF requires that all

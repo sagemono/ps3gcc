@@ -1031,6 +1031,12 @@ struct elf_backend_data
 			       bfd_boolean *, bfd_boolean *,
 			       bfd *, asection **);
 
+  /* Read and convert symbols to internal format. See
+   * _bfd_elf_get_elf_syms in elf.c.  */
+  Elf_Internal_Sym *(*get_elf_syms)
+    (bfd *, Elf_Internal_Shdr *, size_t, size_t,
+     Elf_Internal_Sym *, void *, Elf_External_Sym_Shndx *);
+
   /* Used to handle bad SHF_LINK_ORDER input.  */
   bfd_error_handler_type link_order_error_handler;
 
@@ -1435,6 +1441,9 @@ extern char *bfd_elf_string_from_elf_section
 extern char *bfd_elf_get_str_section
   (bfd *, unsigned);
 extern Elf_Internal_Sym *bfd_elf_get_elf_syms
+  (bfd *, Elf_Internal_Shdr *, size_t, size_t, Elf_Internal_Sym *, void *,
+   Elf_External_Sym_Shndx *);
+extern Elf_Internal_Sym *_bfd_elf_get_elf_syms
   (bfd *, Elf_Internal_Shdr *, size_t, size_t, Elf_Internal_Sym *, void *,
    Elf_External_Sym_Shndx *);
 extern const char *bfd_elf_sym_name

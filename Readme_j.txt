@@ -1,5 +1,5 @@
 [SCE CONFIDENTIAL DOCUMENT]
-                    Copyright(C) 2008 Sony Computer Entertainment Inc.
+                    Copyright(C) 2009 Sony Computer Entertainment Inc.
                                                    All Rights Reserved.
 ======================================================================
 このパッケージには、Cell OS Lv-2 ツールチェーンのソースファイルが含ま
@@ -15,7 +15,7 @@
 メントを参照してください。
 例:
     mkdir work/src
-    unzip toolchain-src-2.5.0-GCC411.zip -d work/src
+    unzip toolchain-src-2.7.0-GCC411.zip -d work/src
     mkdir work/build
     cd work/build
     ../src/build.sh

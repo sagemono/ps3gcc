@@ -178,7 +178,7 @@ static int export_flag;                 /* true if -bE */
 static int aix64_flag;			/* true if -b64 */
 static int aixrtl_flag;			/* true if -brtl */
 #endif
-static int use_response_flag = 0;	/* true if --use-response-file, sce local, bugzilla #8169 */
+static int use_response_flag = 0;	/* true if -use-response-file, sce local, bugzilla #8169 */
 /* sce local, bugzilla #10990
    Filename for the response file.
    This variable is set in the function, collect_execute, 
@@ -1192,6 +1192,17 @@ main (int argc, char **argv)
 		}
 	      break;
 
+	    case 'u':
+              /* begin sce local, bugzilla #8169 */
+              if (!strcmp (arg, "-use-response-file"))
+                {
+                  use_response_flag = 1;
+		  ld1--;
+		  ld2--;
+                }
+              /* end sce local */
+	      break;
+
 	    case 'v':
 	      if (arg[2] == '\0')
 		vflag = 1;
@@ -1223,12 +1234,6 @@ main (int argc, char **argv)
 		  ld1--;
 		  ld2--;
 		}
-	      /* begin sce local, bugzilla #8169 */
-	      else if (strcmp (arg, "--use-response-file") == 0)
-		{
-		  use_response_flag = 1;
-		}
-	      /* end sce local */
 	      /* begin sce local bugzilla 37796 */
 	      else if (strncmp (arg, ALT_LD_OPTSTR, sizeof (ALT_LD_OPTSTR) - 1) == 0)
 		{

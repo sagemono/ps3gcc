@@ -146,6 +146,7 @@ install-data: all
 install-strip: install
 installdirs:
 installcheck:
+install-pdf:
 uninstall:
 
 info dvi ps pdf html:

@@ -209,6 +209,7 @@ static struct arg_encode arg_encode[A_MAX] = {
   { 14,  0, 0,       0,  16383,    0,   -1,  0 }, /* A_U14 */
   { 16,  7, 0,  -32768,  65535,    0,   -1,  BFD_RELOC_SPU_IMM16 }, /* A_X16 */
   { 18,  7, 0,       0, 262143,    0,   -1,  BFD_RELOC_SPU_IMM18 }, /* A_U18 */
+  {  0,  0, 0,       0,     -1,    0,   -1,  BFD_RELOC_SPU_ADD_PIC }, /* A_SYMBOL */
 };
 
 /* Some flags for handling errors.  This is very hackish and added after
@@ -971,7 +972,8 @@ md_apply_fix (fixS *fixP, valueT * valP, segT seg ATTRIBUTE_UNUSED)
   fixP->fx_addnumber = val;
 
   if (fixP->fx_r_type == BFD_RELOC_SPU_PPU32
-      || fixP->fx_r_type == BFD_RELOC_SPU_PPU64)
+      || fixP->fx_r_type == BFD_RELOC_SPU_PPU64
+      || fixP->fx_r_type == BFD_RELOC_SPU_ADD_PIC)
     return;
 
   if (fixP->fx_addsy == NULL && fixP->fx_pcrel == 0)

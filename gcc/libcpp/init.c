@@ -559,13 +559,25 @@ read_original_directory (cpp_reader *pfile)
 
   if (pfile->cb.dir_change)
     {
-      char *debugdir = (char *) alloca (token->val.str.len - 3);
+      cpp_string s = { 0, 0 };
+      if (cpp_interpret_string_notranslate (pfile, &token->val.str, 1,
+					    &s, false))
+	{
+	  char *text = (char *)s.text;
+	  text[s.len-3] = 0;
+	  pfile->cb.dir_change (pfile, text);
+	  free (s.text);
+	}
+      else
+	{
+	  char *debugdir = (char *) alloca (token->val.str.len - 3);
 
-      memcpy (debugdir, (const char *) token->val.str.text + 1,
-	      token->val.str.len - 4);
-      debugdir[token->val.str.len - 4] = '\0';
+	  memcpy (debugdir, (const char *) token->val.str.text + 1,
+		  token->val.str.len - 4);
+	  debugdir[token->val.str.len - 4] = '\0';
 
-      pfile->cb.dir_change (pfile, debugdir);
+	  pfile->cb.dir_change (pfile, debugdir);
+	}
     }      
 }
 

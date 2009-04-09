@@ -341,7 +341,8 @@ regrename_optimize (void)
 	      extract_insn (last->insn);
 	      for (i = 0; i < recog_data.n_operands; i++)
 		{
-		  if (new_reg == REGNO (*recog_data.operand_loc[i])
+		  if (REG_P (*recog_data.operand_loc[i])
+		      && new_reg == REGNO (*recog_data.operand_loc[i])
 		      && reg != REGNO (*recog_data.operand_loc[i])
 		      && recog_data.operand_type[i] == OP_OUT)
 		    used = 1;

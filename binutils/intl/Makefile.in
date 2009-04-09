@@ -149,8 +149,8 @@ uninstall:
 	  rm -f $(gettextsrcdir)/$$file; \
 	done
 
-.PHONY: html info dvi
-html info dvi:
+.PHONY: html info dvi pdf install-pdf
+html info dvi pdf install-pdf:
 
 .PHONY: install-html
 install-html:

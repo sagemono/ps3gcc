@@ -114,7 +114,7 @@
        (and (match_operand 0 "immediate_operand")
 	    (match_test "arith_immediate_p (op, mode, -0x200, 0x1ff)"))))
 
-(define_predicate "imm_t_operand"
+(define_predicate "imm_u_operand"
   (and (match_code "const_int,const_vector")
        (and (match_operand 0 "immediate_operand")
 	    (match_test "arith_immediate_p (op, mode, 0, 0x1ff) || arith_immediate_p (op, mode, 0xfe00, 0xffff)"))))
@@ -125,4 +125,14 @@
   (and (match_code "eq,ne")
        (ior (match_test "GET_MODE (XEXP (op, 0)) == HImode")
 	    (match_test "GET_MODE (XEXP (op, 0)) == SImode"))))
+
+(define_predicate "spu_inv_exp2_operand"
+  (and (match_code "const_double,const_vector")
+       (and (match_operand 0 "immediate_operand")
+	    (match_test "exp2_immediate_p (op, mode, -126, 0)"))))
+
+(define_predicate "spu_exp2_operand"
+  (and (match_code "const_double,const_vector")
+       (and (match_operand 0 "immediate_operand")
+	    (match_test "exp2_immediate_p (op, mode, 0, 127)"))))
 

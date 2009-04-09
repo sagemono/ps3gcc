@@ -3,7 +3,7 @@
    Sony Computer Entertainment, Inc.,
    Toshiba Corporation,
    International Business Machines Corporation,
-   2001,2002,2003,2004,2005.
+   2001,2002,2003,2004,2005,2008
 
    This file is free software; you can redistribute it and/or modify it under
    the terms of the GNU General Public License as published by the Free
@@ -82,8 +82,7 @@ enum spu_float_accuracy { SPU_FP_COMPAT, SPU_FP_ACCURATE, SPU_FP_FAST };
 
 /* Default target_flags if no switches specified.  */
 #ifndef TARGET_DEFAULT
-#define TARGET_DEFAULT (MASK_BRANCH_HINTS | MASK_VECTOR_SIMPLIFY \
-		       | MASK_WARN_RELOC | MASK_SAFE_DMA)
+#define TARGET_DEFAULT (MASK_BRANCH_HINTS | MASK_VECTOR_SIMPLIFY | MASK_SAFE_DMA)
 #endif
 
 /* Target machine storage layout */
@@ -179,7 +178,7 @@ enum spu_float_accuracy { SPU_FP_COMPAT, SPU_FP_ACCURATE, SPU_FP_FAST };
    from 0 to just below FIRST_PSEUDO_REGISTER.
    All registers that the compiler knows about must be given numbers,
    even those that are not normally considered general registers.  */
-#define FIRST_PSEUDO_REGISTER 131
+#define FIRST_PSEUDO_REGISTER 132
 
 #define FIXED_REGISTERS {			    \
     1, 1, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, \
@@ -190,7 +189,7 @@ enum spu_float_accuracy { SPU_FP_COMPAT, SPU_FP_ACCURATE, SPU_FP_FAST };
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, \
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, \
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, \
-    1, 1, 1 \
+    1, 1, 1, 1 \
 }
 
 #define CALL_USED_REGISTERS {			    \
@@ -202,7 +201,7 @@ enum spu_float_accuracy { SPU_FP_COMPAT, SPU_FP_ACCURATE, SPU_FP_FAST };
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, \
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, \
     0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, \
-    1, 1, 1 \
+    1, 1, 1, 1 \
 }
 
 #define CONDITIONAL_REGISTER_USAGE \
@@ -274,6 +273,10 @@ enum spu_float_accuracy { SPU_FP_COMPAT, SPU_FP_ACCURATE, SPU_FP_FAST };
 #define DEFAULT_PCC_STRUCT_RETURN 0
 
 #define HBR_REGNUM 130
+
+/* This register is used to create dependencies between the channel
+ * instruction.  It represents the internal state they modify. */
+#define CHANNEL_REGNUM 131
 
 
 /* Define the classes of registers for register constraints in the
@@ -826,7 +829,7 @@ extern struct rtx_def *spu_compare_op1;
  "$80", "$81", "$82", "$83", "$84", "$85", "$86", "$87", "$88", "$89", "$90", "$91", "$92", "$93", "$94", "$95", \
  "$96", "$97", "$98", "$99", "$100", "$101", "$102", "$103", "$104", "$105", "$106", "$107", "$108", "$109", "$110", "$111", \
  "$112", "$113", "$114", "$115", "$116", "$117", "$118", "$119", "$120", "$121", "$122", "$123", "$124", "$125", "$126", "$127", \
- "$vfp", "$vap", "hbr" \
+ "$vfp", "$vap", "hbr", "channel" \
 }
 
 #define SCRATCH_REG_0 2

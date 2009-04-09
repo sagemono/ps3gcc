@@ -268,6 +268,8 @@ APUOP(M_ROTHMI,		RI7,	0x07d,	"rothmi",	_A3(A_T,A_A,A_S6),	00012,	FX3)	/* ROT%MI 
 APUOP(M_ROTMAHI,	RI7,	0x07e,	"rotmahi",	_A3(A_T,A_A,A_S6),	00012,	FX3)	/* ROTMA%I       RT<-RA<<I7 */
 APUOP(M_SHLHI,		RI7,	0x07f,	"shlhi",	_A3(A_T,A_A,A_U5),	00012,	FX3)	/* SHL%I         RT<-RA<<I7 */
 APUOP(M_A,		RR,	0x0c0,	"a",		_A3(A_T,A_A,A_B),		00112,	FX2)	/* Add%          RT<-RA+RB */
+/* Allow a symbol as a 4th arg to force an R_SPU_ADD_PIC relocation for this instruction */
+APUOP(M_ADD_PIC,	RR,	0x0c0,	"a",		_A4(A_T,A_A,A_B,A_SYMBOL),		00112,	FX2)	/* Add%          RT<-RA+RB */
 APUOP(M_AH,		RR,	0x0c8,	"ah",		_A3(A_T,A_A,A_B),		00112,	FX2)	/* Add%          RT<-RA+RB */
 APUOP(M_SF,		RR,	0x040,	"sf",		_A3(A_T,A_A,A_B),		00112,	FX2)	/* SubFrom%      RT<-RB-RA */
 APUOP(M_SFH,		RR,	0x048,	"sfh",		_A3(A_T,A_A,A_B),		00112,	FX2)	/* SubFrom%      RT<-RB-RA */

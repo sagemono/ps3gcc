@@ -3363,7 +3363,7 @@ elim_reg_cond (rtx x, unsigned int regno)
 
   if (COMPARISON_P (x))
     {
-      if (REGNO (XEXP (x, 0)) == regno)
+      if (REG_P (XEXP (x, 0)) && REGNO (XEXP (x, 0)) == regno)
 	return const0_rtx;
       return x;
     }

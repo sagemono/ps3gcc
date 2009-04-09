@@ -61,6 +61,7 @@ extern int immediate_load_p			(rtx op, enum machine_mode mode);
 extern int logical_immediate_p			(rtx op, enum machine_mode mode); 
 extern int iohl_immediate_p			(rtx op, enum machine_mode mode); 
 extern int arith_immediate_p			(rtx op, enum machine_mode mode, HOST_WIDE_INT low, HOST_WIDE_INT high); 
+extern bool exp2_immediate_p			(rtx op, enum machine_mode mode, int low, int high);
 extern int spu_legitimate_constant_p		(rtx x); 
 extern int spu_legitimate_address		(enum machine_mode mode, rtx x, int reg_ok_strict, int for_split); 
 extern rtx spu_legitimize_address		(rtx x, rtx oldx, enum machine_mode mode); 
@@ -93,6 +94,7 @@ extern rtx spu_gen_subreg			(enum machine_mode mode, rtx x);
 extern void spu_expand_vector_init		(rtx target, rtx vals); 
 extern void constant_to_array			(enum machine_mode mode, rtx x, unsigned char arr[16]);
 extern rtx array_to_constant			(enum machine_mode mode, unsigned char arr[16]);
+extern rtx spu_gen_exp2				(enum machine_mode mode, rtx x);
 
 extern bool satisfies_constraint_A (rtx op);
 extern bool satisfies_constraint_B (rtx op);
@@ -120,7 +122,9 @@ extern bool satisfies_constraint_f (rtx op);
 extern bool satisfies_constraint_j (rtx op);
 extern bool satisfies_constraint_k (rtx op);
 extern bool satisfies_constraint_l (rtx op);
-extern bool satisfies_constraint_t (rtx op);
+extern bool satisfies_constraint_u (rtx op);
+extern bool satisfies_constraint_v (rtx op);
+extern bool satisfies_constraint_w (rtx op);
 extern bool constraint_satisfied_p (rtx op, int c);
 
 extern const char* spu_emit_pgo_info (rtx *ops, rtx insn);

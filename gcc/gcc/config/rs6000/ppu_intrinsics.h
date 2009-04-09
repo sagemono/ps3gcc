@@ -1,4 +1,4 @@
- /* PPU intrinsics as defined by the C/C++ Language extension for Cell BEA.
+/* PPU intrinsics as defined by the C/C++ Language extension for Cell BEA.
    Copyright (C) 2007, 2008 Free Software Foundation, Inc.
 
    This file is free software; you can redistribute it and/or modify it under
@@ -188,6 +188,7 @@ typedef int __V4SI __attribute__((vector_size(16)));
 #endif /* __powerpc64__ */
 
 #ifdef __powerpc64__
+/* Work around the hardware bug in the current Cell implementation.  */
 #define __mftb() __extension__					\
   ({ unsigned long long __macro_result;					\
   __asm__ volatile ("1: mftb %[current_tb]\n"			\
@@ -245,10 +246,10 @@ typedef int __V4SI __attribute__((vector_size(16)));
 	   		       | ((ID) & 0xF))) : : "memory")
 
 #define __protected_unlimited_stream_set(DIRECTION, ADDR, ID)	\
-	__dcbt_TH1000 ((ADDR), (DIRECTION)>>1, 0, (ID))
+	__dcbt_TH1000 ((ADDR), (DIRECTION)>>1, 1, (ID))
 
 #define __protected_stream_set(DIRECTION, ADDR, ID)	\
-	__dcbt_TH1000 ((ADDR), (DIRECTION)>>1, 1, (ID))
+	__dcbt_TH1000 ((ADDR), (DIRECTION)>>1, 0, (ID))
 
 #define __protected_stream_stop_all()			\
 	__dcbt_TH1010 (0, 3, 0, 0, 0, 0)
@@ -256,8 +257,8 @@ typedef int __V4SI __attribute__((vector_size(16)));
 #define __protected_stream_stop(ID)			\
 	__dcbt_TH1010 (0, 2, 0, 0, 0, (ID))
 
-#define __protected_stream_count(CNT, ID)		\
-	__dcbt_TH1010 (0, 0, (CNT), 0, 0, (ID))
+#define __protected_stream_count(COUNT, ID)		\
+	__dcbt_TH1010 (0, 0, (COUNT), 0, 0, (ID))
 
 #define __protected_stream_go()				\
 	__dcbt_TH1010 (1, 0, 0, 0, 0, 0)
@@ -548,7 +549,7 @@ static __inline__ double
 __frsqrte(double x)
 {
   double r;
-  __asm__("frsqrte %0,%1" : "=f"(r) : "f"(x));
+  __asm__("frsqrte %0,%1" : "=f" (r) : "f"(x));
   return r;
 }
 

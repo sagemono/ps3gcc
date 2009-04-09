@@ -45,6 +45,7 @@ static const struct c_pch_matching
   const char *flag_name;
 } pch_matching[] = {
   { &flag_exceptions, "-fexceptions" },
+  { &flag_strict_aliasing, "-fstrict-aliasing" },
   { &flag_unit_at_a_time, "-funit-at-a-time" }
 };
 
@@ -372,6 +373,7 @@ c_common_read_pch (cpp_reader *pfile, const char *name,
   if (f == NULL)
     {
       cpp_errno (pfile, CPP_DL_ERROR, "calling fdopen");
+      close (fd);
       return;
     }
 
@@ -380,6 +382,7 @@ c_common_read_pch (cpp_reader *pfile, const char *name,
   if (fread (&h, sizeof (h), 1, f) != 1)
     {
       cpp_errno (pfile, CPP_DL_ERROR, "reading");
+      fclose (f);
       return;
     }
 
@@ -413,7 +416,10 @@ c_common_read_pch (cpp_reader *pfile, const char *name,
   gt_pch_restore (f);
 
   if (cpp_read_state (pfile, name, f, smd) != 0)
-    return;
+    {
+      fclose (f);
+      return;
+    }
 
   fclose (f);
   

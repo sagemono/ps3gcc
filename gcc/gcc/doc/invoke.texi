@@ -13453,7 +13453,7 @@ for any cases where this rule is relaxed.
 @item Each of the following options must be the same when building and using
 the precompiled header:
 
-@gccoptlist{-fexceptions -funit-at-a-time}
+@gccoptlist{-fexceptions -funit-at-a-time -fstrict-aliasing}
 
 @item
 Some other command-line options starting with @option{-f},

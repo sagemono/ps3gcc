@@ -1564,9 +1564,15 @@ record_reg_classes (int n_alts, int n_ops, rtx *ops,
 		  c = *++p;
 		  break;
 
+		case '!':
+		  alt_cost += 100;
+		  break;
+
 		case '?':
 		  alt_cost += 2;
-		case '!':  case '#':  case '&':
+		  break;
+
+		case '#':  case '&':
 		case '0':  case '1':  case '2':  case '3':  case '4':
 		case '5':  case '6':  case '7':  case '8':  case '9':
 		  break;

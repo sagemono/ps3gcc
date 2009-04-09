@@ -89,6 +89,8 @@ extern const char *expandargv PARAMS ((int *, char ***, int *));
 /* Create response file from argv and return the replaced argument string. */
 extern char * create_response_file PARAMS ((const char *, const char * const * argv));
 
+extern int check_argument_length PARAMS ((const char * argv0, const char * const * argv));
+
 /* Return the last component of a path name.  Note that we can't use a
    prototype here because the parameter is declared inconsistently
    across different systems, sometimes as "char *" and sometimes as

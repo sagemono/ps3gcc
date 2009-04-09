@@ -409,9 +409,6 @@ expand_start_catch_block (tree decl)
   tree exp;
   tree type;
 
-  if (! doing_eh (1))
-    return NULL_TREE;
-
   /* Make sure this declaration is reasonable.  */
   if (decl && !complete_ptr_ref_or_void_ptr_p (TREE_TYPE (decl), NULL_TREE))
     decl = NULL_TREE;
@@ -420,6 +417,41 @@ expand_start_catch_block (tree decl)
     type = prepare_eh_type (TREE_TYPE (decl));
   else
     type = NULL_TREE;
+
+  /* If we are not doing exceptions then finish up the
+     variable and push it to the current scope. */
+  if (! doing_eh (1))
+    {
+      tree init = NULL_TREE;
+
+      if (!decl)
+        return NULL_TREE;
+
+      /* Make sure we mark the catch param as used, otherwise we'll get a
+         warning about an unused ((anonymous)).  */
+      TREE_USED (decl) = 1;
+
+      /* Let `cp_finish_decl' know that this initializer is ok.  */
+      DECL_INITIAL (decl) = error_mark_node;
+      decl = pushdecl (decl);
+
+      if (TREE_CODE (TREE_TYPE (decl)) == REFERENCE_TYPE)
+	init = build_int_cst (TREE_TYPE (decl), 0);
+
+      if (TYPE_NEEDS_CONSTRUCTING (TREE_TYPE (decl)))
+        {
+	  tree type = TREE_TYPE (decl);
+	  type = build_reference_type (type);
+	  init = build_int_cst (type, 0);
+	  init = convert_from_reference (init);
+	}
+
+      start_decl_1 (decl);
+      cp_finish_decl (decl, init,
+      		      /*init_const_expr_p=*/false, NULL_TREE,
+		      LOOKUP_ONLYCONVERTING|DIRECT_BIND);
+      return type;
+    }
 
   if (decl && decl_is_java_type (type, 1))
     {
@@ -615,6 +647,19 @@ build_throw (tree exp)
     {
       if (!is_admissible_throw_operand (exp))
 	return error_mark_node;
+    }
+
+  /* If we are ignoring exceptions, build a trap for a throw statement. */
+  if (flag_ignore_exceptions)
+    {
+      tree trap = build_function_call (built_in_decls[BUILT_IN_TRAP],
+                                       NULL_TREE);
+
+      /* exp could have side effects so include it also.  */
+      if (!exp)
+        return trap;
+      exp = decay_conversion (exp);
+      return build2 (COMPOUND_EXPR, void_type_node, exp, trap);
     }
 
   if (! doing_eh (1))

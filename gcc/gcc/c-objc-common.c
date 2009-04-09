@@ -74,8 +74,9 @@ c_cannot_inline_tree_fn (tree *fnp)
 		     && DECL_DECLARED_INLINE_P (fn)
 		     && !DECL_IN_SYSTEM_HEADER (fn));
 
-  if (flag_really_no_inline
-      && lookup_attribute ("always_inline", DECL_ATTRIBUTES (fn)) == NULL)
+  tree always_inline = lookup_attribute ("always_inline", DECL_ATTRIBUTES (fn));
+ 
+  if (flag_really_no_inline && always_inline == NULL)
     {
       if (do_warning)
 	warning (OPT_Winline, "function %q+F can never be inlined because it "
@@ -85,7 +86,9 @@ c_cannot_inline_tree_fn (tree *fnp)
 
   /* Don't auto-inline anything that might not be bound within
      this unit of translation.  */
-  if (!DECL_DECLARED_INLINE_P (fn) && !targetm.binds_local_p (fn))
+  if (always_inline == NULL
+      && !DECL_DECLARED_INLINE_P (fn)
+      && !targetm.binds_local_p (fn))
     {
       if (do_warning)
 	warning (OPT_Winline, "function %q+F can never be inlined because it "

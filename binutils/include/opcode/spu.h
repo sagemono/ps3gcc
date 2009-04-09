@@ -68,6 +68,7 @@ typedef enum {
   A_U14,
   A_X16,
   A_U18,
+  A_SYMBOL,
   A_MAX
 } spu_aformat;
 

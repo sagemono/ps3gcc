@@ -297,6 +297,9 @@ static GTY(()) unsigned fde_table_in_use;
 /* A list of call frame insns for the CIE.  */
 static GTY(()) dw_cfi_ref cie_cfi_head;
 
+/* Whether at least 1 function was placed in the text section.  */
+static GTY(()) unsigned uses_text_section;
+
 #if defined (DWARF2_DEBUGGING_INFO) || defined (DWARF2_UNWIND_INFO)
 /* Some DWARF extensions (e.g., MIPS/SGI) implement a subprogram
    attribute that accelerates the lookup of the FDE associated
@@ -2522,6 +2525,16 @@ dwarf2out_begin_prologue (unsigned int line ATTRIBUTE_UNUSED,
   if (! dwarf2out_do_frame ())
     return;
 #endif
+
+  /* Keep track of when we use the text section so output_aranges
+     doesn't generate a reference to text_section_label when the text
+     section ends up empty.  We assume it is the text section unless it
+     is named with something other than .text. */
+  if (in_section
+      && (in_section == text_section
+	  || (in_section->common.flags & SECTION_NAMED) == 0
+	  || strncmp (".text", in_section->named.name, 5) == 0))
+    uses_text_section = 1;
 
   /* Expand the fde table if necessary.  */
   if (fde_table_in_use == fde_table_allocated)
@@ -6796,7 +6809,8 @@ size_of_aranges (void)
   size = DWARF_ARANGES_HEADER_SIZE;
 
   /* Count the address/length pair for this compilation unit.  */
-  size += 2 * DWARF2_ADDR_SIZE;
+  if (uses_text_section)
+    size += 2 * DWARF2_ADDR_SIZE;
   size += 2 * DWARF2_ADDR_SIZE * arange_table_in_use;
 
   /* Count the two zero words used to terminated the address range table.  */
@@ -7409,9 +7423,13 @@ output_aranges (void)
 	dw2_asm_output_data (2, 0, NULL);
     }
 
-  dw2_asm_output_addr (DWARF2_ADDR_SIZE, text_section_label, "Address");
-  dw2_asm_output_delta (DWARF2_ADDR_SIZE, text_end_label,
-			text_section_label, "Length");
+  if (uses_text_section)
+    {
+      dw2_asm_output_addr (DWARF2_ADDR_SIZE, text_section_label, "Address");
+      dw2_asm_output_delta (DWARF2_ADDR_SIZE, text_end_label,
+			    text_section_label, "Length");
+    }
+
   if (flag_reorder_blocks_and_partition)
     {
       dw2_asm_output_addr (DWARF2_ADDR_SIZE, cold_text_section_label, 

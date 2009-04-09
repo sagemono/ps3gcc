@@ -85,6 +85,7 @@ static int spu_naked_function_p 		(tree func);
 static int spu_init_fini_function_p 		(tree func);
 static int mem_is_padded_component_ref		(rtx x);
 static int reg_aligned_for_addr			(rtx x, int aligned);
+static bool spu_cannot_modify_jumps_p 		(void);
 
 static void fix_range (const char *);
 
@@ -209,6 +210,10 @@ static int spu_sched_adjust_priority PARAMS((rtx, int));
 #undef TARGET_SCHED_ADJUST_PRIORITY
 #define TARGET_SCHED_ADJUST_PRIORITY spu_sched_adjust_priority
 
+static bool spu_sched_no_barrier_for_unspec_volatile (rtx, rtx);
+#undef TARGET_SCHED_NO_BARRIER_FOR_UNSPEC_VOLATILE
+#define TARGET_SCHED_NO_BARRIER_FOR_UNSPEC_VOLATILE spu_sched_no_barrier_for_unspec_volatile
+
 const struct attribute_spec spu_attribute_table[];
 #undef  TARGET_ATTRIBUTE_TABLE
 #define TARGET_ATTRIBUTE_TABLE spu_attribute_table
@@ -303,6 +308,9 @@ static bool spu_ms_bitfield_layout_p (tree);
 static bool spu_reverse_bitfields_p (tree);
 #undef TARGET_REVERSE_BITFIELDS_P
 #define TARGET_REVERSE_BITFIELDS_P spu_reverse_bitfields_p
+
+#undef TARGET_CANNOT_MODIFY_JUMPS_P
+#define TARGET_CANNOT_MODIFY_JUMPS_P spu_cannot_modify_jumps_p
 
 struct gcc_target targetm = TARGET_INITIALIZER;
 
@@ -1402,6 +1410,13 @@ print_operand (FILE * file, rtx x, int code)
       output_addr_const (file, GEN_INT (val));
       return;
 
+    case 'v':
+    case 'w':
+      constant_to_array (mode, x, arr);
+      val = (((arr[0] << 1) + (arr[1] >> 7)) & 0xff) - 127;
+      output_addr_const (file, GEN_INT (code == 'w' ? -val : val));
+      return;
+
     case 0:
       if (xcode == REG)
 	fprintf (file, "%s", reg_names[REGNO (x)]);
@@ -1414,7 +1429,7 @@ print_operand (FILE * file, rtx x, int code)
       return;
 
       /* unsed letters
-	              o qr   vw yz
+	              o qr t    yz
 	AB            OPQR  UVWXYZ */
     default:
       output_operand_lossage ("invalid %%xn code");
@@ -1533,7 +1548,7 @@ spu_split_immediate (rtx * ops)
 	  if (flag_pic)
 	    {
 	      rtx pic_reg = get_pic_reg ();
-	      emit_insn (gen_addsi3 (ops[0], ops[0], pic_reg));
+	      emit_insn (gen_add_pic (ops[0], ops[0], pic_reg, ops[1]));
 	      gcc_assert (current_function_uses_pic_offset_table);
 	    }
 	  return flag_pic || c == IC_IL2s;
@@ -1926,6 +1941,13 @@ spu_expand_epilogue (bool sibcall_p)
       || total_size > 0)
     total_size += STACK_POINTER_OFFSET;
 
+  /* Load the link register early to improve the chance of hinting it. */
+  if (REGNO (scratch_reg_0) != LINK_REGISTER_REGNUM
+      && !current_function_is_leaf
+      && !current_function_calls_alloca
+      && total_size + 16 <= 0x1fff)
+    frame_emit_load (LINK_REGISTER_REGNUM, sp_reg, total_size + 16);
+
   if (total_size > 0)
     {
       if (current_function_calls_alloca)
@@ -1946,10 +1968,11 @@ spu_expand_epilogue (bool sibcall_p)
 	}
     }
 
-  if (!current_function_is_leaf || REGNO (scratch_reg_0) == LINK_REGISTER_REGNUM)
-    {
-      frame_emit_load (LINK_REGISTER_REGNUM, sp_reg, 16);
-    }
+  if (REGNO (scratch_reg_0) == LINK_REGISTER_REGNUM
+      || (!current_function_is_leaf
+          && (current_function_calls_alloca
+	      || total_size + 16 > 0x1fff)))
+    frame_emit_load (LINK_REGISTER_REGNUM, sp_reg, 16);
 
   if (!sibcall_p)
     {
@@ -2781,7 +2804,7 @@ static void
 spu_machine_dependent_reorg (void)
 {
   basic_block bb;
-  rtx branch, insn, note;
+  rtx branch, insn, note, block_insn;
   rtx branch_target = 0;
   int branch_addr = 0, insn_addr, required_dist = 0;
   int i, max;
@@ -2813,7 +2836,7 @@ spu_machine_dependent_reorg (void)
   for (i = n_basic_blocks-1; i >= 0; i--)
     {
       bb = BASIC_BLOCK (i);
-      branch = 0;
+      block_insn = branch = 0;
       if (spu_bb_info[i].prop_jump)
 	{
 	  branch = spu_bb_info[i].prop_jump;
@@ -2852,21 +2875,31 @@ spu_machine_dependent_reorg (void)
 		  if (insn != BB_END (bb)
 		      && branch_addr - next_addr >= required_dist)
 		    {
+		      if (block_insn && GET_CODE (branch_target) == REG
+			  && branch_addr - next_addr < 24 * 4)
+			recog_memoized (emit_insn_before (gen_blockage (), block_insn));
 		      if (dump_file)
 			fprintf(dump_file, "hint for %i in block %i before %i\n",
 				INSN_UID (branch), bb->index, INSN_UID (next));
 		      spu_emit_branch_hint (next, branch, branch_target,
 					    branch_addr - next_addr);
 		    }
-		  branch = 0;
+		  block_insn = branch = 0;
 		}
+	      /* When a hint target is a register, scheduling might
+	         cause the hint to get too close to the branch.  We
+	         prevent this by inserting a blockage instruction
+		 with at least 8 insns between. */
+	      if (branch && GET_CODE (branch_target) == REG
+		  && branch_addr - insn_addr == 8 * 4)
+		block_insn = insn;
 
 	      /* JUMP_P will only be true at the end of a block.  When
 	       * branch is already set it means we've previously decided
 	       * to propagate a hint for that branch into this block. */
 	      if (CALL_P (insn) || (JUMP_P (insn) && !branch))
 		{
-		  branch = 0;
+		  block_insn = branch = 0;
 		  if ((branch_target = get_branch_target(insn)))
 		    {
 		      branch = insn;
@@ -2924,7 +2957,8 @@ spu_machine_dependent_reorg (void)
 		   && EDGE_COUNT (prev->preds) == 1
 		   && EDGE_PRED (prev, 0)->src == prev2
 		   && prev2->loop_depth == bb->loop_depth
-		   && GET_CODE (branch_target) != REG)
+		   && (GET_CODE (branch_target) != REG
+		       || REGNO (branch_target) == LINK_REGISTER_REGNUM))
 	    prop = prev;
 
 	  /* Don't propagate when:
@@ -2959,7 +2993,6 @@ spu_machine_dependent_reorg (void)
 	      spu_emit_branch_hint (NEXT_INSN (insn), branch, branch_target,
 				    branch_addr - next_addr);
 	    }
-	  branch = 0;
 	}
     }
   free(spu_bb_info);
@@ -3177,7 +3210,6 @@ get_pipe(rtx insn)
 
     case TYPE_FX2:
     case TYPE_FX3:
-    case TYPE_SPR:
     case TYPE_NOP:
     case TYPE_FXB:
     case TYPE_FPD:
@@ -3193,10 +3225,22 @@ get_pipe(rtx insn)
     case TYPE_MULTI1:
     case TYPE_HBR:
     case TYPE_IPREFETCH:
+    case TYPE_SPR:
       return 1;
     default:
       abort();
     }
+}
+
+static bool
+channel_insn_p (rtx insn)
+{
+  return INSN_CODE (insn) == CODE_FOR_spu_rdch_clobber
+	 || INSN_CODE (insn) == CODE_FOR_spu_rchcnt_clobber
+	 || INSN_CODE (insn) == CODE_FOR_spu_wrch_clobber
+	 || INSN_CODE (insn) == CODE_FOR_spu_rdch_noclobber
+	 || INSN_CODE (insn) == CODE_FOR_spu_rchcnt_noclobber
+	 || INSN_CODE (insn) == CODE_FOR_spu_wrch_noclobber;
 }
 
 /* This is used to keep track of insn alignment.  Set to 0 at the
@@ -3390,7 +3434,6 @@ spu_sched_reorder (FILE *file ATTRIBUTE_UNUSED, int verbose ATTRIBUTE_UNUSED,
 	  case TYPE_CONVERT:
 	  case TYPE_FX2:
 	  case TYPE_FX3:
-	  case TYPE_SPR:
 	  case TYPE_NOP:
 	  case TYPE_FXB:
 	  case TYPE_FPD:
@@ -3406,6 +3449,7 @@ spu_sched_reorder (FILE *file ATTRIBUTE_UNUSED, int verbose ATTRIBUTE_UNUSED,
 	  case TYPE_BR:
 	  case TYPE_MULTI1:
 	  case TYPE_HBR:
+	  case TYPE_SPR:
 	    pipe_1 = i;
 	    break;
 	  case TYPE_IPREFETCH:
@@ -3661,6 +3705,13 @@ spu_sched_adjust_cost (rtx insn, rtx link, rtx dep_insn, int cost)
   if (JUMP_P (insn) && REG_NOTE_KIND (link) == REG_DEP_ANTI)
     return INSN_COST(dep_insn) - 3;
 
+  /* The channel instructions have fake dependencies on register 131 to
+   * prevent scheduling across each other, but it doesn't cause a stall.
+   * We ignore the case where the result of a rdch is being used in a
+   * wrch; it should cause a stall. */
+  if (channel_insn_p (insn) && channel_insn_p (dep_insn))
+    return 1;
+
   return cost;
 }
 
@@ -3671,6 +3722,13 @@ spu_sched_adjust_priority (
 {
   return priority;
 }
+
+static bool
+spu_sched_no_barrier_for_unspec_volatile (rtx insn, rtx unspec ATTRIBUTE_UNUSED)
+{
+  return channel_insn_p (insn);
+}
+
 
 /* Create a CONST_DOUBLE from a string.  */
 
@@ -4015,6 +4073,58 @@ arith_immediate_p (rtx op, enum machine_mode mode,
   val = trunc_int_for_mode (val, mode);
 
   return val >= low && val <= high;
+}
+
+/* TRUE when op is an immediate and an exact power of 2, and given that
+   OP is 2^scale, scale >= LOW && scale <= HIGH.  When OP is a vector,
+   all entries must be the same. */
+bool
+exp2_immediate_p (rtx op, enum machine_mode mode, int low, int high)
+{
+  enum machine_mode int_mode;
+  HOST_WIDE_INT val;
+  unsigned char arr[16];
+  int bytes, i, j;
+
+  gcc_assert (GET_CODE (op) == CONST_INT || GET_CODE (op) == CONST_DOUBLE
+	      || GET_CODE (op) == CONST_VECTOR);
+
+  if (GET_CODE (op) == CONST_VECTOR
+      && !const_vector_immediate_p (op))
+    return 0;
+
+  if (GET_MODE (op) != VOIDmode)
+    mode = GET_MODE (op);
+
+  constant_to_array (mode, op, arr);
+
+  if (VECTOR_MODE_P (mode))
+    mode = GET_MODE_INNER (mode);
+
+  bytes = GET_MODE_SIZE (mode);
+  int_mode = mode_for_size (GET_MODE_BITSIZE (mode), MODE_INT, 0);
+
+  /* Check that bytes are repeated. */
+  for (i = bytes; i < 16; i += bytes)
+    for (j = 0; j < bytes; j++)
+      if (arr[j] != arr[i + j])
+	return 0;
+
+  val = arr[0];
+  for (j = 1; j < bytes; j++)
+    val = (val << 8) | arr[j];
+
+  val = trunc_int_for_mode (val, int_mode);
+
+  /* Currently, we only handle SFmode */
+  gcc_assert (mode == SFmode);
+  if (mode == SFmode)
+    {
+      int exp = (val >> 23) - 127;
+      return val > 0 && (val & 0x007fffff) == 0
+	     &&  exp >= low && exp <= high;
+    }
+  return FALSE;
 }
 
 /* We only reject CONST_VECTOR's that contain symbolic addresses, but we
@@ -5642,8 +5752,10 @@ spu_rtx_costs (rtx x, int code, int outer_code ATTRIBUTE_UNUSED,
 	  *total = COSTS_N_INSNS (2);
 	return true;
     case UNSPEC:
+	/* An UNSPEC_CONVERT really costs nothing, but we say it has a
+	   high cost so it will get folded away when possible. */
 	if (XINT(x, 1) == UNSPEC_CONVERT)
-	  *total = COSTS_N_INSNS (0);
+	  *total = COSTS_N_INSNS (8);
 	else
 	  *total = COSTS_N_INSNS (4);
 	return true;
@@ -6167,8 +6279,7 @@ spu_simplify_unspec (rtx x, rtx c0, rtx c1, rtx c2)
 	if ((GET_CODE (op0) == CONST_INT
 	     || GET_CODE (op0) == CONST_DOUBLE
 	     || GET_CODE (op0) == CONST_VECTOR)
-	    &&  mode_op0 != VOIDmode
-	    && GET_MODE_SIZE (mode_op0) >= GET_MODE_SIZE (GET_MODE (x)))
+	    &&  mode_op0 != VOIDmode)
 	  {
 	    constant_to_array(mode_op0, op0, arr0);
 	    return array_to_constant(mode, arr0);
@@ -7035,7 +7146,7 @@ satisfies_constraint_T (rtx op)
 }
 
 bool
-satisfies_constraint_t (rtx op)
+satisfies_constraint_u (rtx op)
 {
   switch (GET_CODE (op))
     {
@@ -7050,10 +7161,38 @@ satisfies_constraint_t (rtx op)
           || arith_immediate_p (op, SImode, 0xfe00, 0xffff));
 }
 
+bool
+satisfies_constraint_v (rtx op)
+{
+  switch (GET_CODE (op))
+    {
+    case CONST_DOUBLE:
+    case CONST_VECTOR:
+      break;
+    default:
+      return false;
+    }
+  return exp2_immediate_p (op, VOIDmode, 0, 127);
+}
+
+bool
+satisfies_constraint_w (rtx op)
+{
+  switch (GET_CODE (op))
+    {
+    case CONST_DOUBLE:
+    case CONST_VECTOR:
+      break;
+    default:
+      return false;
+    }
+  return exp2_immediate_p (op, VOIDmode, -126, 0);
+}
+
 /*       ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz
  * GCC:      ffffiiiiiiii     x x        x x   xxxx xx
- * SPU:  xxxx    xxx xxxxxxxxx x xxx xx x   xxx       x
- * FREE:     ffff   i               a  a  a        a   aaaaaa
+ * SPU:  xxxx    xxx xxxxxxxxx x xxx xx x   xxx        xxx
+ * FREE:     ffff   i               a  a  a        a  a   aaa
  * x - used
  * a - available
  * i - available for integer immediates
@@ -7091,7 +7230,9 @@ constraint_satisfied_p (rtx op, int c)
     case 'j': return satisfies_constraint_j (op);
     case 'k': return satisfies_constraint_k (op);
     case 'l': return satisfies_constraint_l (op);
-    case 't': return satisfies_constraint_t (op);
+    case 'u': return satisfies_constraint_u (op);
+    case 'v': return satisfies_constraint_v (op);
+    case 'w': return satisfies_constraint_w (op);
     default: break;
     }
   return false;
@@ -7302,4 +7443,43 @@ spu_notice_static_storage_vars (tree vars)
       tree var = TREE_VALUE (v);
       warning (0, "%Jstatic initializer/destructor for %qD leads to a run-time relocation", var, var);
     }
+}
+
+/* Generate a constant or register which contains 2^SCALE.  We assume
+   the result is valid for MODE.  Currently, MODE must be V4SFmode and
+   SCALE must be SImode. */
+rtx
+spu_gen_exp2 (enum machine_mode mode, rtx scale)
+{
+  gcc_assert (mode == V4SFmode);
+  gcc_assert (GET_MODE (scale) == SImode || GET_CODE (scale) == CONST_INT);
+  if (GET_CODE (scale) != CONST_INT)
+    {
+      /* unsigned int exp = (127 + scale) << 23;
+	__vector float m = (__vector float) spu_splats (exp); */
+      rtx reg = force_reg (SImode, scale);
+      rtx exp = gen_reg_rtx (SImode);
+      rtx mul = gen_reg_rtx (mode);
+      emit_insn (gen_addsi3 (exp, reg, GEN_INT (127)));
+      emit_insn (gen_ashlsi3 (exp, exp, GEN_INT (23)));
+      emit_insn (gen_spu_splats (mul, gen_rtx_SUBREG (GET_MODE_INNER (mode), exp, 0)));
+      return mul;
+    }
+  else 
+    {
+      HOST_WIDE_INT exp = 127 + INTVAL (scale);
+      unsigned char arr[16];
+      arr[0] = arr[4] = arr[8] = arr[12] = exp >> 1;
+      arr[1] = arr[5] = arr[9] = arr[13] = exp << 7;
+      arr[2] = arr[6] = arr[10] = arr[14] = 0;
+      arr[3] = arr[7] = arr[11] = arr[15] = 0;
+      return array_to_constant (mode, arr);
+    }
+}
+
+static bool
+spu_cannot_modify_jumps_p (void)
+{
+  /* Disable basic block reordering for naked functions */
+  return reload_completed && spu_naked_function_p (current_function_decl);
 }

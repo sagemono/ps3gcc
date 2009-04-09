@@ -411,6 +411,10 @@ fexceptions
 Common Report Var(flag_exceptions)
 Enable exception handling
 
+fignore-exceptions
+Common Report Var(flag_ignore_exceptions) Init(0)
+Ignore exception handling in the source (exception handling has to be off also)
+
 fexpensive-optimizations
 Common Report Var(flag_expensive_optimizations)
 Perform a number of minor, expensive optimizations

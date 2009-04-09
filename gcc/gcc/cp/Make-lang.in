@@ -24,8 +24,8 @@
 # Each language makefile fragment must provide the following targets:
 #
 # foo.all.build, foo.all.cross, foo.start.encap, foo.rest.encap,
-# foo.install-normal, foo.install-common, foo.install-man,
-# foo.uninstall,
+# foo.install-normal, foo.install-common, foo.install-man, foo.install-pdf
+# foo.pdf, foo.uninstall,
 # foo.mostlyclean, foo.clean, foo.distclean,
 # foo.maintainer-clean, foo.stage1, foo.stage2, foo.stage3, foo.stage4
 #
@@ -122,6 +122,8 @@ c++.all.cross: g++-cross$(exeext)
 c++.start.encap: g++$(exeext)
 c++.rest.encap:
 c++.info:
+c++.pdf:
+c++.install-pdf:
 c++.srcinfo:
 c++.srcextra:
 

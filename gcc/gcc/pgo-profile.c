@@ -37,7 +37,7 @@
 #include "tree-pass.h"
 #include "value-prof.h"
 #include "ggc.h"
-#include "tm_p.h" // for DBX_REGISTER_NUMBER
+#include "tm_p.h" /* for DBX_REGISTER_NUMBER */
 
 #include "pgo/pgo.h"
 
@@ -126,7 +126,7 @@ pgo_gen_value_profiler (histogram_value value, unsigned tag, unsigned base)
     {
       case HIST_TYPE_INTERVAL:
       {
-	//t = GCOV_COUNTER_V_INTERVAL;
+	/*t = GCOV_COUNTER_V_INTERVAL; */
 	pgo_info = build_pgo_insn (tag, counterno, val,
 				   value->hdata.intvl.int_start,
 				   value->hdata.intvl.steps,
@@ -135,19 +135,19 @@ pgo_gen_value_profiler (histogram_value value, unsigned tag, unsigned base)
       }
       case HIST_TYPE_POW2:
       {
-	//t = GCOV_COUNTER_V_POW2;
+	/*t = GCOV_COUNTER_V_POW2; */
 	pgo_info = build_pgo0_insn (tag, counterno, val);
 	break;
       }
       case HIST_TYPE_SINGLE_VALUE:
       {
-	//t = GCOV_COUNTER_V_SINGLE;
+	/*t = GCOV_COUNTER_V_SINGLE; */
 	pgo_info = build_pgo0_insn (tag, counterno, val);
 	break;
       }
       case HIST_TYPE_CONST_DELTA:
       {
-	//t = GCOV_COUNTER_V_DELTA;
+	/*t = GCOV_COUNTER_V_DELTA; */
 	pgo_info = build_pgo0_insn (tag, counterno, val);
 	break;
       }
@@ -223,7 +223,7 @@ struct profile_hooks pgo_profile_hooks =
 void
 expand_pgo_info_expr (tree exp)
 {
-#if defined (HAVE_pgo_info_arc) || defined (HAVE_pgo_info_value) // FIXME: wip
+#if defined (HAVE_pgo_info_arc) || defined (HAVE_pgo_info_value) /* FIXME: wip */
   unsigned tag = TREE_INT_CST_LOW (TREE_OPERAND (exp, 0));
   rtx rtx_tag = gen_rtx_CONST_INT (VOIDmode, tag);
   rtx rtx_base = gen_rtx_CONST_INT (VOIDmode, TREE_INT_CST_LOW (TREE_OPERAND (exp, 1)));
@@ -267,7 +267,7 @@ get_pgo_rec_nr (unsigned gcov_counter_kind)
 unsigned /*pgo_mode_e*/
 get_pgo_mode (enum machine_mode mode)
 {
-#if 0 // ??? wip
+#if 0 /* ??? wip */
   static const char* const pgo_mode_names[] = { PGO_MODE_NAMES };
   static const enum pgo_mode_e pgo_modes[] = { PGO_MODES };
   const char* name = GET_MODE_NAME (mode);
@@ -281,15 +281,15 @@ get_pgo_mode (enum machine_mode mode)
     case HImode: return PGO_MODE_HI;
     case SImode: return PGO_MODE_SI;
     case DImode: return PGO_MODE_DI;
-#if 0 // fp not supported yet
+#if 0 /* fp not supported yet */
     case SFmode: return PGO_MODE_SF;
     case DFmode: return PGO_MODE_DF;
 #endif
     default: break;
     }
 
-#if 0 // ??? wip
-  // Not a common mode.
+#if 0 /* ??? wip */
+  /* Not a common mode. */
 
   for (i = 0; i < nr_pgo_modes; ++i)
     {

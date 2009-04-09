@@ -199,7 +199,6 @@ _start(int spu_id NOT_USED_IN_STD_MAIN,
 #endif
   si_sp = si_selb(chain, stack_size, si_fsmbi(0x0f00));
 
-
   _init();
 
 #ifdef _STD_MAIN

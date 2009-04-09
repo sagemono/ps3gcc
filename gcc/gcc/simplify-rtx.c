@@ -516,13 +516,15 @@ simplify_unary_operation_1 (enum rtx_code code, enum machine_mode mode, rtx op)
       if (GET_CODE (op) == AND
 	  && GET_CODE (XEXP (op, 0)) == NOT
 	  && GET_CODE (XEXP (op, 1)) == NOT)
-	return simplify_gen_binary (IOR, mode, XEXP (op, 0), XEXP (op, 1));
+	return simplify_gen_binary (IOR, mode, XEXP (XEXP (op, 0), 0),
+					       XEXP (XEXP (op, 1), 0));
 
       /* (not (ior (not X) (not Y)) -> (and X Y).  */
       if (GET_CODE (op) == IOR
 	  && GET_CODE (XEXP (op, 0)) == NOT
 	  && GET_CODE (XEXP (op, 1)) == NOT)
-	return simplify_gen_binary (AND, mode, XEXP (op, 0), XEXP (op, 1));
+	return simplify_gen_binary (AND, mode, XEXP (XEXP (op, 0), 0),
+					       XEXP (XEXP (op, 1), 0));
 
 
       /* (not (ashift 1 X)) is (rotate ~1 X).  We used to do this for
@@ -1803,14 +1805,6 @@ simplify_binary_operation_1 (enum rtx_code code, enum machine_mode mode,
       if (rtx_equal_p (trueop0, trueop1) && ! side_effects_p (op0))
 	return op0;
 
-      /* (and (not X) (not Y)) -> (not (ior X Y)) */
-      if (GET_CODE (op0) == NOT
-          && GET_CODE (op1) == NOT)
-	{
-	  tem = simplify_gen_binary (AND, mode, XEXP (op0, 0), XEXP (op1, 0));
-	  return simplify_gen_unary (NOT, mode, tem, mode);
-	}
-
       /* A | (~A) -> -1 */
       if (((GET_CODE (op0) == NOT && rtx_equal_p (XEXP (op0, 0), op1))
 	   || (GET_CODE (op1) == NOT && rtx_equal_p (XEXP (op1, 0), op0)))
@@ -1956,14 +1950,6 @@ simplify_binary_operation_1 (enum rtx_code code, enum machine_mode mode,
 					 pmop[0], pmop[1]);
 	      return simplify_gen_binary (code, mode, tem, op1);
 	    }
-	}
-
-      /* (and (not X) (not Y)) -> (not (ior X Y)) */
-      if (GET_CODE (op0) == NOT
-          && GET_CODE (op1) == NOT)
-	{
-	  tem = simplify_gen_binary (IOR, mode, XEXP (op0, 0), XEXP (op1, 0));
-	  return simplify_gen_unary (NOT, mode, tem, mode);
 	}
 
       /* (and X (ior (not X) Y) -> (and X Y) */

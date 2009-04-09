@@ -333,7 +333,7 @@ doing_eh (int do_warn)
   if (! flag_exceptions)
     {
       static int warned = 0;
-      if (! warned && do_warn)
+      if (!flag_ignore_exceptions && do_warn && !warned)
 	{
 	  error ("exception handling disabled, use -fexceptions to enable");
 	  warned = 1;
@@ -1745,7 +1745,7 @@ sjlj_mark_call_sites (struct sjlj_lp_info *lp_info)
  		 && GET_CODE (PREV_INSN (boundary)) != CODE_LABEL;
  	       boundary = PREV_INSN (boundary))
  	    if (GET_CODE (PREV_INSN (boundary)) == NOTE
- 		&& NOTE_LINE_NUMBER (boundary) != NOTE_INSN_DELETED)
+ 		&& NOTE_LINE_NUMBER (PREV_INSN(boundary)) != NOTE_INSN_DELETED)
  	      break;
  	  before = find_first_parameter_load (insn, boundary);
  	}

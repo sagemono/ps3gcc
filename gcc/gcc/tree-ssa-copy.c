@@ -114,8 +114,10 @@ may_propagate_copy (tree dest, tree orig)
 	return false;
       else if (!lang_hooks.types_compatible_p (type_d, type_o))
 	return false;
-      else if (get_alias_set (TREE_TYPE (type_d)) != 
-	       get_alias_set (TREE_TYPE (type_o)))
+      else if (TYPE_RESTRICT (type_d)
+	       || TYPE_RESTRICT (type_o)
+	       || get_alias_set (TREE_TYPE (type_d)) != 
+		  get_alias_set (TREE_TYPE (type_o)))
 	return false;
 
       /* Also verify flow-sensitive information is compatible.  */

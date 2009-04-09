@@ -1166,6 +1166,57 @@ move_by_pieces_1 (rtx (*genfun) (rtx, ...), enum machine_mode mode,
     }
 }
 
+
+static void
+move_by_fields_array (rtx to, rtx from, unsigned HOST_WIDE_INT offset,
+                      unsigned HOST_WIDE_INT len, unsigned align, tree type)
+{
+  tree inner_type = TREE_TYPE (type);
+  enum tree_code code = TREE_CODE (inner_type);
+  enum machine_mode mode = TYPE_MODE (inner_type);
+  tree number_of_elements = array_type_nelts (type);
+  HOST_WIDE_INT n = tree_low_cst (number_of_elements, 0);
+  HOST_WIDE_INT size_of_element = TREE_INT_CST_LOW (TYPE_SIZE_UNIT (inner_type));
+  HOST_WIDE_INT i;
+
+  if (to == NULL_RTX)
+    {
+      move_by_pieces (to, from, len, align, 0);
+      return;
+    }
+
+  for (i = 0; i < n + 1; i++)
+    {
+      unsigned HOST_WIDE_INT offset1 = offset + size_of_element * i;
+      if (code == ARRAY_TYPE)
+        {
+	  move_by_fields_array (to, from, offset1,
+		    		size_of_element,
+				align, inner_type);
+	}
+      else if (code == RECORD_TYPE)
+        {
+	  move_by_fields (to, from, offset1,
+		    	  size_of_element,
+			  align, inner_type);
+	}
+      else if (mode != BLKmode)
+	{
+	  rtx to1 = adjust_address (to, mode, offset1);
+	  rtx from1 = adjust_address (from, mode, offset1);
+	  emit_move_insn (to1, from1);
+	}
+      else
+        {
+	  rtx to1 = adjust_address (to, mode, offset1);
+	  rtx from1 = adjust_address (from, mode, offset1);
+	  move_by_pieces (to1, from1,
+			  size_of_element,
+			  TYPE_ALIGN (inner_type), 0);
+	}
+    }
+}
+
 /* Similar to move_by_pieces.  This is only for simple RECORD_TYPES
    which don't contain bitfields, unions or arrays.  Instead of copying
    memory a block at a time, we copy it one field at a time, using the
@@ -1208,42 +1259,89 @@ move_by_fields (rtx to, rtx from, unsigned HOST_WIDE_INT offset,
 	    rtx from1 = adjust_address (from, mode, offset + fld_offset);
 	    if (mode == BLKmode)
 	      {
+	        if (TREE_CODE (TREE_TYPE (t)) == ARRAY_TYPE)
+		  move_by_fields_array (to, from, offset + fld_offset,
+		    			TREE_INT_CST_LOW (DECL_SIZE_UNIT (t)),
+					align, TREE_TYPE (t));
+		else
 		/* fprintf(stderr, "move_by_pieces in move_by_fields.\n"); */
-		move_by_pieces (to1, from1,
-				TREE_INT_CST_LOW (DECL_SIZE_UNIT (t)),
-				DECL_ALIGN (t), 0);
+		  move_by_pieces (to1, from1,
+				  TREE_INT_CST_LOW (DECL_SIZE_UNIT (t)),
+				  DECL_ALIGN (t), 0);
 	      }
 	    else
-	      emit_move_insn(to1, from1);
+	      emit_move_insn (to1, from1);
 	  }
       }
 }
 
+static unsigned HOST_WIDE_INT
+move_by_fields_ninsns_array (tree type)
+{
+  tree inner_type = TREE_TYPE (type);
+  tree number_of_elements = array_type_nelts (type);
+  if (number_of_elements && host_integerp (number_of_elements, 0))
+    {
+      HOST_WIDE_INT n = tree_low_cst (number_of_elements, 0);
+      /* array_type_nelts returns the number of elements minus one,
+         add back the one.  */
+      n += 1;
+
+      /* Don't handle where the array alignment is not equal to
+         the inner alignment. */
+      if (TYPE_ALIGN (type) != TYPE_ALIGN (inner_type))
+        return MOVE_RATIO + 2;
+      /* Variable sized inner types are hard to handle.  */
+      if (!host_integerp (TYPE_SIZE_UNIT (inner_type), 0))
+        return MOVE_RATIO + 2;
+      /* Multiply by the insns of fields if the inner type is
+	 a record type. */
+      if (TREE_CODE (inner_type) == RECORD_TYPE)
+	n *= move_by_fields_ninsns (inner_type);
+      else if (TREE_CODE (inner_type) == ARRAY_TYPE)
+        n *= move_by_fields_ninsns_array (inner_type);
+      else if (TYPE_MODE (inner_type) == BLKmode)
+	return TREE_INT_CST_LOW (TYPE_SIZE_UNIT (type));
+      return n;
+    }
+  else
+    return MOVE_RATIO + 2;
+}
+
 /* For any cases that we don't want to call move_by_fields return a
- * value greater than MOVE_RATIO.  Currently we do this for
- * RECORD_TYPE's with bitfields, arrays, unions or if it has a field
- * with an unknown/zero size.  */
+   value greater than MOVE_RATIO.  Currently we do this for
+   RECORD_TYPE's with bitfields, arrays, unions or if it has a field
+   with an unknown/zero size or has packed fields.  */
 static unsigned HOST_WIDE_INT
 move_by_fields_ninsns (tree type)
 {
   tree t;
   int count = 0;
-  if (TYPE_PACKED(type))
+  if (TYPE_PACKED (type))
     return MOVE_RATIO + 2;
   for (t = TYPE_FIELDS (type); t; t = TREE_CHAIN (t))
     if (TREE_CODE (t) == FIELD_DECL)
       {
-	if (DECL_PACKED(t)
-	    || TYPE_PACKED(TREE_TYPE(t))
-	    || DECL_BIT_FIELD_TYPE(t)
-	    || !DECL_SIZE_UNIT (t))
+        /* If the field or the type is packed, it is a bitfield, the decl
+	   has a non-constant size, or the alignment of the decl does
+	   not match the alignment of the field, then say we cannot by
+	   the movement by fields.  Also don't handle fields which have
+	   variable offset.  */
+	if (DECL_PACKED (t)
+	    || TYPE_PACKED (TREE_TYPE (t))
+	    || DECL_BIT_FIELD_TYPE (t)
+	    || !DECL_SIZE_UNIT (t)
+	    || DECL_ALIGN (t) < TYPE_ALIGN (TREE_TYPE (t)))
 	  return MOVE_RATIO + 2;
 	if (TREE_CODE (TREE_TYPE (t)) == RECORD_TYPE)
 	  count += move_by_fields_ninsns (TREE_TYPE (t));
 	else if (TYPE_MODE (TREE_TYPE (t)) != BLKmode)
 	  ++count;
+	else if (TREE_CODE (TREE_TYPE (t)) == ARRAY_TYPE)
+	   count += move_by_fields_ninsns_array (TREE_TYPE (t));
 	else
 	  {
+	    /* A non constant size decl cannot be done correctly. */
 	    if (TREE_CODE (DECL_SIZE_UNIT (t)) != INTEGER_CST)
 	      return MOVE_RATIO + 2;
 
@@ -1320,15 +1418,13 @@ emit_block_move_type (rtx x, rtx y, rtx size, enum block_op_methods method,
       set_mem_size (y, size);
     }
 
-  if (GET_CODE (size) == CONST_INT && MOVE_BY_PIECES_P (INTVAL (size), align))
-    {
-      if (flag_copy_by_field
-	  && type && TREE_CODE(type) == RECORD_TYPE
-	  && MOVE_BY_FIELDS_P (INTVAL (size), align, type))
-	move_by_fields(x, y, 0, INTVAL (size), align, type);
-      else
-	move_by_pieces (x, y, INTVAL (size), align, 0);
-    }
+  if (GET_CODE (size) == CONST_INT
+      && flag_copy_by_field
+      && type && TREE_CODE (type) == RECORD_TYPE
+      && MOVE_BY_FIELDS_P (INTVAL (size), align, type))
+    move_by_fields (x, y, 0, INTVAL (size), align, type);
+  else if (GET_CODE (size) == CONST_INT && MOVE_BY_PIECES_P (INTVAL (size), align))
+    move_by_pieces (x, y, INTVAL (size), align, 0);
   else if (emit_block_move_via_movmem (x, y, size, align))
     ;
   else if (may_use_call)
