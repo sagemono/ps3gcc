@@ -92,7 +92,7 @@
 #undef LINK_SPEC
 #define LINK_SPEC "%{mlarge-mem: --defsym __stack=0xfffffff0} " \
                   "%{!Ttext*: %{mspurs-job*:%{fPIC|fpic:-Ttext=0x0; :-Ttext=0x4c00}; mspurs-task:-Ttext=0x3000}} " \
-                  "%{mno-fixups: --warn-pic-code}" \
+                  "%{fPIC|fpic: %{!mno-warn-reloc: %{mno-fixups: %{mspurs-job-initialize: --warn-pic-code; : --warn-pic-all}}}} " \
                   "%{shared} %{static} " \
                   "%{fpic|fPIC|shared:%{mno-fixups|nostartfiles:;:--emit-fixups}} " \
                   "%{rdynamic: %{static|shared: ; : -export-dynamic}} "

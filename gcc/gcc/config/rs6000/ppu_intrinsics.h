@@ -598,9 +598,9 @@ __fmuls (float a, float b)
   return d;
 }
 
-static __inline__ float __frsp (float a) __attribute__ ((always_inline));
+static __inline__ float __frsp (double a) __attribute__ ((always_inline));
 static __inline__ float
-__frsp (float a)
+__frsp (double a)
 {
   float d;
   __asm__ ("frsp %0,%1" : "=f" (d) : "f" (a));

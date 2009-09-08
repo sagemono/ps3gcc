@@ -31,6 +31,12 @@
 #include <cxxabi.h>
 #include "unwind-cxx.h"
 
+#ifdef __SPU__
+namespace std {
+  void terminate();
+}
+#endif /* __SPU__ */
+
 #if _GLIBCXX_HOSTED
 #ifdef _GLIBCXX_HAVE_UNISTD_H
 # include <unistd.h>

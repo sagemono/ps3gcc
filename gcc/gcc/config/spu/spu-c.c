@@ -650,7 +650,7 @@ spu_categorize_keyword (const cpp_token *tok)
       cpp_hashnode *__vector_cpp_hashnode =
 	CPP_HASHNODE (GCC_IDENT_TO_HT_IDENT (__vector_keyword));
 
-      if (ident == vector_cpp_hashnode || ident == __vector_cpp_hashnode)
+      if (ident == vector_cpp_hashnode)
 	return __vector_cpp_hashnode;
 
       return ident;
@@ -678,12 +678,19 @@ spu_macro_to_expand (cpp_reader *pfile, const cpp_token *tok)
     }
 
   ident = spu_categorize_keyword (tok);
+
+  if (ident != expand_this)
+    expand_this = NULL;
+
   __vector_cpp_hashnode =
     CPP_HASHNODE (GCC_IDENT_TO_HT_IDENT (__vector_keyword));
 
   if (ident == __vector_cpp_hashnode)
     {
-      tok = _cpp_peek_token (pfile, 0);
+      int idx = 0;
+      do
+	tok = _cpp_peek_token (pfile, idx++);
+      while (tok->type == CPP_PADDING);
       ident = spu_categorize_keyword (tok);
 
       if (ident)
@@ -691,8 +698,12 @@ spu_macro_to_expand (cpp_reader *pfile, const cpp_token *tok)
 	  enum rid rid_code = (enum rid)(ident->rid_code);
 	  if (ident->type == NT_MACRO)
 	    {
-	      (void)cpp_get_token (pfile);
-	      tok = _cpp_peek_token (pfile, 0);
+	      do
+		(void)cpp_get_token (pfile);
+	      while (--idx > 0);
+	      do
+		tok = _cpp_peek_token (pfile, idx++);
+	      while (tok->type == CPP_PADDING);
 	      ident = spu_categorize_keyword (tok);
 	      if (ident)
 		rid_code = (enum rid)(ident->rid_code);

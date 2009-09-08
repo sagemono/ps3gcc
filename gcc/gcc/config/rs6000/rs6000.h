@@ -2338,7 +2338,8 @@ extern char rs6000_reg_names[][8];	/* register names (0 vs. %r0).  */
 /* Define which CODE values are valid.  */
 
 #define PRINT_OPERAND_PUNCT_VALID_P(CODE)  \
-  ((CODE) == '.' || (CODE) == '&')
+  ((CODE) == '.' || (CODE) == '&' || (CODE) == ',' \
+   || (CODE) == ':' || (CODE) == '?' || (CODE) == ';' || (CODE) == '|')
 
 /* Print a memory address as an operand to reference that memory location.  */
 

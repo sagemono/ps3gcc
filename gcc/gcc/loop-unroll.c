@@ -1528,8 +1528,9 @@ decide_unroll_stupid (struct loop *loop, int flags)
   /* Success.  Now force nunroll to be power of 2, as it seems that this
      improves results (partially because of better alignments, partially
      because of some dark magic).  */
+  i = 1;
   if (!(pli && pli->unroll_times > 0))
-    for (i = 1; 2 * i <= nunroll; i *= 2)
+    for (; 2 * i <= nunroll; i *= 2)
       continue;
 
   loop->lpt_decision.decision = LPT_UNROLL_STUPID;

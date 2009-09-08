@@ -5653,6 +5653,14 @@ ppc_force_relocation (fix)
   return generic_force_reloc (fix);
 }
 
+static int anchor_fixup_p (fixS *fix);
+static int
+anchor_fixup_p (fixS *fix)
+{
+  asymbol *bsym = symbol_get_bfdsym (fix->fx_addsy);
+  return (strncmp (bsym->name, ".LANCHOR", 8) == 0);
+}
+
 int
 ppc_fix_adjustable (fix)
      fixS *fix;
@@ -5661,6 +5669,9 @@ ppc_fix_adjustable (fix)
   if (flag_leave_branch_relocs && REMAIN_UNRESOLVED_P(fix))
     return 0;
   /* begin sce local bugzilla 39026 */
+
+  if (fix->fx_addsy && anchor_fixup_p (fix))
+    return 0;
 
   return (fix->fx_r_type != BFD_RELOC_16_GOTOFF
 	  && fix->fx_r_type != BFD_RELOC_LO16_GOTOFF

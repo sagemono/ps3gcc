@@ -1615,6 +1615,10 @@ rs6000_override_options (const char *default_cpu)
       lv2_no_nop_after_bl = 1;
       lv2_no_save_restore_tocbase = 1;
       target_flags &= ~MASK_MINIMAL_TOC;
+      /* Make sure the instructions to load section anchors are hoisted
+         together. */
+      if (flag_section_anchors)
+	PARAM_VALUE (PARAM_MAX_GCSE_PASSES) = 2;
     }
 
   if (TARGET_TOC)
@@ -1632,12 +1636,8 @@ rs6000_override_options (const char *default_cpu)
   if (!optimize_size)
     {
       /* Cell wants to be aligned 8byte for dual issue. */
-      if (rs6000_cpu == PROCESSOR_CELLPPU)
+      if (optimize >= 3 && rs6000_cpu == PROCESSOR_CELLPPU)
 	{
-	  if (align_functions <= 0)
-	    align_functions = 8;
-	  if (align_jumps <= 0)
-	    align_jumps = 8;
 	  if (align_loops <= 0)
 	    align_loops = 8;
  	}
@@ -11464,10 +11464,43 @@ print_operand (FILE *file, rtx x, int code)
 
   switch (code)
     {
+    case ',':
+      /* Write out an instruction after the call to load the TOCBASE */
+      if (!lv2_no_save_restore_tocbase)
+	asm_fprintf (file, "\n\tld 2,40(1)");
+      return;
+
     case '.':
       /* Write out an instruction after the call which may be replaced
 	 with glue code by the loader.  This depends on the AIX version.  */
-      asm_fprintf (file, RS6000_CALL_GLUE);
+      if (!lv2_no_nop_after_bl)
+	{
+	  asm_fprintf (file, "\n\t");
+	  asm_fprintf (file, RS6000_CALL_GLUE);
+	}
+      return;
+
+    case ';':
+      if (lv2_callprof >= 2)
+	asm_fprintf (file, "\n\tnop");
+      return;
+
+    case '|':
+      if (lv2_callprof >= 2)
+	asm_fprintf (file, "nop\n\t");
+      return;
+
+    case ':':
+      if (lv2_callprof >= 2)
+	{
+	  asm_fprintf (file, RS6000_CALL_GLUE);
+	  asm_fprintf (file, "\n\t");
+	}
+      return;
+
+    case '?':
+      if (lv2_callprof >= 1)
+	asm_fprintf (file, "nop\n\tcror 16,16,16\n\t");
       return;
 
       /* %a is output_address.  */
@@ -22062,6 +22095,67 @@ rs6000_delegitimize_address (rtx x)
   
   x = XEXP (x, 0);
   return x;
+}
+
+/* Define this as a function rather than a md pattern for better
+   configuration. */
+rtx
+rs6000_call_indirect_aix64 (rtx value, rtx address, rtx callop)
+{
+  enum machine_mode mode = TARGET_PPC64_LP32 ? SImode : DImode;
+  rtx opd = force_reg (mode, address);
+  rtx toc = gen_rtx_REG (Pmode, 2);
+  rtx stack = gen_rtx_REG (Pmode, 1);
+  rtx funcptr = gen_rtx_MEM (mode, opd);
+  rtx func = gen_reg_rtx (mode);
+  rtx insn;
+
+  start_sequence ();
+  emit_move_insn (func, funcptr);
+
+  if (!lv2_no_save_restore_tocbase)
+    {
+      rtx tocsave =
+	gen_rtx_MEM (Pmode, memory_address (mode, plus_constant (stack, 40)));
+      emit_move_insn (tocsave, toc);
+    }
+
+  /* For PPC64_LP32 we generate this insn after reload to make sure it
+     isn't clobbered. */
+  if (!TARGET_PPC64_LP32 && !lv2_no_save_restore_tocbase)
+    {
+      rtx functoc =
+	gen_rtx_MEM (mode, memory_address (mode, plus_constant (opd, 8)));
+      emit_move_insn (toc, functoc);
+    }
+
+  if (!TARGET_PPC64_LP32)
+    {
+      rtx funcenv =
+	gen_rtx_MEM (mode, memory_address (mode, plus_constant (opd, 16)));
+      emit_move_insn (gen_rtx_REG (Pmode, 11), funcenv);
+    }
+
+  if (value)
+    {
+      if (TARGET_PPC64_LP32)
+	emit_call_insn (gen__call_value_indirect_nonlocal_ppc64_lp32
+			(value, func, callop, opd));
+      else
+	emit_call_insn (gen__call_value_indirect_nonlocal_aix64
+			(value, func, callop));
+    }
+  else
+    {
+      if (TARGET_PPC64_LP32)
+	emit_call_insn (gen__call_indirect_nonlocal_ppc64_lp32
+		   (func, callop, opd));
+      else
+	emit_call_insn (gen__call_indirect_nonlocal_aix64 (func, callop));
+    }
+  insn = get_insns ();
+  end_sequence ();
+  return insn;
 }
 
 #include "gt-rs6000.h"

@@ -8,7 +8,7 @@
    in parentheses.  You may also wish to include a number indicating
    the revision of your modified compiler.  */
 
-#define VERSUFFIX " (SDK270, $Rev: 3019 $)"
+#define VERSUFFIX " (SDK280, $Rev: 3316 $)"
 
 
 /* This is the location of the online document giving instructions for

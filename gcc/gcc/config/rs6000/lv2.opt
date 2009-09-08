@@ -39,12 +39,14 @@ mp32
 Target Report RejectNegative Mask(PPC64_LP32) MaskExists
 same as -mlp32 option
 
+; Added Undocumented because licensee does not use -mno-prxfixup
 mprxfixup
-Target Report RejectNegative
+Target Report RejectNegative Undocumented
 Invoke ppu-lv2-prx-fixup after linking. This is default.
 
+; Added Undocumented because licensee does not use -mno-prxfixup
 mno-prxfixup
-Target Report RejectNegative
+Target Report RejectNegative Undocumented
 Does not invoke ppu-lv2-prx-fixup after linking. Special option for toolchain developer.
 
 mprx
@@ -55,8 +57,9 @@ mprx-with-runtime
 Target Report RejectNegative
 Link objects in PRX mode with the PRX runtime.
 
+; Added Undocumented because licensee does not use -mno-prxfixup
 mlv2-stub
-Target Report RejectNegative
+Target Report RejectNegative Undocumented
 Link with the lv2_stub.a library (even when using -mno-prxfixup)
 
 msn-ld

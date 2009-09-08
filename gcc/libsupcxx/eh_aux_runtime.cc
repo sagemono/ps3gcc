@@ -28,8 +28,10 @@
 // invalidate any other reasons why the executable file might be covered by
 // the GNU General Public License.
 
+#ifndef __SPU__
 #include <typeinfo>
 #include <exception>
+#endif /* __SPU__ */
 #include <cstdlib>
 #include "unwind-cxx.h"
 #include "exception_defines.h"

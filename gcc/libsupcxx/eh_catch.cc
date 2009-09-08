@@ -30,6 +30,9 @@
 
 #include <cstdlib>
 #include "unwind-cxx.h"
+#include "bits/gthr.h"
+
+extern "C" void __eh_thread_cleanup (void);
 
 using namespace __cxxabiv1;
 
@@ -122,6 +125,8 @@ __cxxabiv1::__cxa_end_catch ()
       // Handling for this exception is complete.  Destroy the object.
       globals->caughtExceptions = header->nextException;
       _Unwind_DeleteException (&header->unwindHeader);
+      if (!globals->caughtExceptions)
+        __eh_thread_cleanup();
       return;
     }
   else if (count < 0)

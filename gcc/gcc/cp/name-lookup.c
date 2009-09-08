@@ -785,7 +785,8 @@ pushdecl_maybe_friend (tree x, bool is_friend)
       if (TREE_CODE (x) == TYPE_DECL)
 	{
 	  tree type = TREE_TYPE (x);
-	  if (DECL_IS_BUILTIN (x))
+	  if (DECL_IS_BUILTIN (x)
+	      && strcmp ("__builtin_va_list", IDENTIFIER_POINTER (DECL_NAME (x))))
 	    {
 	      if (TYPE_NAME (type) == 0)
 		TYPE_NAME (type) = x;

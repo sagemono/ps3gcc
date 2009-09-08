@@ -4289,11 +4289,22 @@ process_section_headers (FILE *file)
 	printf ("       %s\n", get_elf_section_flags (section->sh_flags));
     }
 
-  if (!do_section_details)
+  /* begin sce local , Bz #66953 */
+  if (!do_section_details) {
+      if (elf_header.e_ident[EI_OSABI] == ELFOSABI_CELLOSLV2) {
+    printf (_("Key to Flags:\n\
+  W (write), A (alloc), X (execute), M (merge), S (strings)\n\
+  I (info), L (link order), G (group), x (unknown)\n\
+  O (extra OS processing required) o (OS specific), p (processor specific)\n\
+  T (TLS: thread local storage)\n"));
+      } else {
     printf (_("Key to Flags:\n\
   W (write), A (alloc), X (execute), M (merge), S (strings)\n\
   I (info), L (link order), G (group), x (unknown)\n\
   O (extra OS processing required) o (OS specific), p (processor specific)\n"));
+      }
+  }
+  /* end sce local , Bz #66953 */
 
   return 1;
 }

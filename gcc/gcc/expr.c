@@ -1796,7 +1796,7 @@ void
 move_record_from_reg(int first_regno, rtx x, int nregs, tree type)
 {
   tree field;
-  int regno;
+  int regno = first_regno;
   HOST_WIDE_INT offset;
   /* See if the machine can do this with a store multiple insn.  */
 #ifdef HAVE_store_multiple

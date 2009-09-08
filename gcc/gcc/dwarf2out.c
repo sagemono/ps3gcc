@@ -14656,7 +14656,10 @@ dwarf2out_finish (const char *filename)
   /* If it wasn't, we need to give .debug_loc and .debug_ranges an appropriate
      "base address".  Use zero so that these addresses become absolute.  */
   else if (have_location_lists || ranges_table_in_use)
-    add_AT_addr (comp_unit_die, DW_AT_entry_pc, const0_rtx);
+    {
+      add_AT_addr (comp_unit_die, DW_AT_low_pc, const0_rtx);
+      add_AT_addr (comp_unit_die, DW_AT_entry_pc, const0_rtx);
+    }
 
   if (debug_info_level >= DINFO_LEVEL_NORMAL)
     add_AT_lbl_offset (comp_unit_die, DW_AT_stmt_list,

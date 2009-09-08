@@ -50,6 +50,8 @@ typedef sys_lwmutex_t __gthread_recursive_mutex_t;
 typedef sys_lwmutex_attribute_t __gthread_mutexattr_t;
 
 extern int __gthr_lv2_once(__gthread_once_t *,void (*) (void));
+extern void __gthr_lv2_thread_cleanup(__gthread_key_t);
+extern void __gthr_lv2_all_cleanup(void);
 extern int __gthr_lv2_key_create(__gthread_key_t *, void (*) (void *));
 extern int __gthr_lv2_key_delete(__gthread_key_t);
 extern void *__gthr_lv2_getspecific(__gthread_key_t);
@@ -69,6 +71,12 @@ static inline int
 __gthread_once (__gthread_once_t *once, void (*func) (void))
 {
   return __gthr_lv2_once (once, func);
+}
+
+static inline void
+__gthread_cleanup (__gthread_key_t key)
+{
+  __gthr_lv2_thread_cleanup(key);
 }
 
 static inline int

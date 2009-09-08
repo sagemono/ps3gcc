@@ -71,7 +71,7 @@ MULTILIB_MATCHES=fPIC=fpic fPIC=shared fPIC=mfixups
 # Neither gcc or newlib seem to have a standard way to generate multiple
 # crt*.o files.  So we don't use the standard crt0.o name anymore.
 EXTRA_MULTILIB_PARTS = crti.o crtn.o crt1.o crt2.o crt3.o crt4.o spurs_task.o crtend1.o \
-                       init_fixups.o init_zerobss.o init_crtend.o fini_crtbegin.o
+                       init_fixups.o init_zerobss.o init_crtend.o fini_crtbegin.o job_crt.o
 
 LIBGCC = stmp-multilib
 INSTALL_LIBGCC = install-multilib
@@ -140,6 +140,11 @@ $(T)fini_crtbegin.o: $(srcdir)/config/spu/fini_crtbegin.c $(GCC_PASSES)
 	$(GCC_FOR_TARGET) $(GCC_CFLAGS) $(MULTILIB_CFLAGS) $(INCLUDES) \
 	-Os -ffixed-79 \
 	-c -o $(T)fini_crtbegin.o $(srcdir)/config/spu/fini_crtbegin.c
+
+$(T)job_crt.o: $(srcdir)/config/spu/job_crt.c $(GCC_PASSES)
+	$(GCC_FOR_TARGET) $(GCC_CFLAGS) $(MULTILIB_CFLAGS) $(INCLUDES) \
+	-Os \
+	-c -o $(T)job_crt.o $(srcdir)/config/spu/job_crt.c
 
 spu-c.o: $(srcdir)/config/spu/spu-c.c \
     $(srcdir)/config/spu/spu-protos.h \

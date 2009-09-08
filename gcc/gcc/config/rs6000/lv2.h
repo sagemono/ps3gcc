@@ -775,8 +775,8 @@ enum { SIGNAL_FRAMESIZE = 128 };
   "%{YP,*} %{R*} "					 \
   "%{Qy:} %{!Qn:-Qy} "					 \
   "%{mlp64:-melf64ppc} "						\
-  "%{mno-sn-ld|mno-prxfixup: " \
-  "  %{mno-toc: %e-mno-toc can not be used with -mno-sn-ld or -mno-prxfixup}; " \
+  "%{mno-sn-ld: " \
+  "  %{mno-toc: %e-mno-toc can not be used with -mno-sn-ld}; " \
   " :%{!mlp64:--alternative-ld=ps3ppuld --gnu-mode " \
   "    %{fno-exceptions: --no-exceptions} " \
   "    %{mno-toc: --no-toc-restore} " \
@@ -802,7 +802,8 @@ enum { SIGNAL_FRAMESIZE = 128 };
   "%{!mno-sn-ld: -L%R/lib} " \
   "--start-group %{mfast-libc: -lcs; :-lc} -lgcc -lstdc++ -lsupc++ %:if-file-exist(%:prepend-cmddir(../../../target/ppu/lib/libsnc.a) -lsnc)" \
   " %{mlv2-stub|!mno-prxfixup:-llv2_stub; :-llv2} -lsyscall --end-group" \
-  " %{r|mno-prxfixup|T: ; : -T %R/lib/elf64_lv2_prx.x} "
+  " %{r|T: ; : %{!mno-prxfixup: -T %R/lib/elf64_lv2_prx.x ; : %:use-script-file-if-exist(%:prepend-cmddir(../../../non_release_image/target/ppu/lib/elf64_lv2_no_prx.x))}} "
+
 /* TRANSMETA end */
 
 /*  Macro: LIBGCC_SPEC
@@ -908,7 +909,7 @@ enum { SIGNAL_FRAMESIZE = 128 };
 "%{!A:%{!nostdlib:%{!nostartfiles:%E}}} %{T*} " \
 "  %{r|mno-prxfixup: ; :" \
 "     \n " \
-"     %{mforce-prx-fixup|mno-sn-ld:%(prx_fixup) --stub-fix-only %{!o: a.out} %{o*: %*}} " \
+"     %{mforce-prx-fixup|mno-sn-ld:%(prx_fixup) %{--target-help: --target-help;: --stub-fix-only %{!o: a.out} %{o*: %*}}} " \
 "  }" \
 "}}}}}} "
 

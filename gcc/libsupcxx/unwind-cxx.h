@@ -35,8 +35,10 @@
 
 // Level 2: C++ ABI
 
+#ifndef __SPU__
 #include <typeinfo>
 #include <exception>
+#endif /* __SPU__ */
 #include <cstddef>
 #include "unwind.h"
 
@@ -57,8 +59,10 @@ struct __cxa_exception
 
   // The C++ standard has entertaining rules wrt calling set_terminate
   // and set_unexpected in the middle of the exception cleanup process.
+#ifndef __SPU__
   std::unexpected_handler unexpectedHandler;
   std::terminate_handler terminateHandler;
+#endif /* __SPU__ */
 
   // The caught exception stack threads through here.
   __cxa_exception *nextException;
@@ -125,12 +129,14 @@ extern "C" void __cxa_call_unexpected (void *) __attribute__((noreturn));
 
 // Invokes given handler, dying appropriately if the user handler was
 // so inconsiderate as to return.
+#ifndef __SPU__
 extern void __terminate(std::terminate_handler) __attribute__((noreturn));
 extern void __unexpected(std::unexpected_handler) __attribute__((noreturn));
 
  // The current installed user handlers.
 extern std::terminate_handler _Term_handler;
 extern std::unexpected_handler _Unex_handler;
+#endif /* __SPU__ */
 
 // These are explicitly GNU C++ specific.
 

@@ -173,6 +173,7 @@ namespace __cxxabiv1
 #endif
 
 #ifdef __cplusplus
+#ifndef __SPU__
 
 #include <typeinfo>
 
@@ -552,6 +553,7 @@ namespace __cxxabiv1
 // User programs should use the alias `abi'. 
 namespace abi = __cxxabiv1;
 
+#endif /* __SPU__ */
 #endif // __cplusplus
 
 #pragma GCC visibility pop

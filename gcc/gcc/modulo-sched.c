@@ -991,7 +991,7 @@ build_loops_structure (FILE *dumpfile)
 void
 sms_schedule (FILE *dump_file)
 {
-  int save_regmoves;
+  int save_regmoves = 0;
   static int passes = 0;
   rtx insn;
   ddg_ptr *g_arr, g;

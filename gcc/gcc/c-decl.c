@@ -1981,7 +1981,8 @@ warn_if_shadowing (tree new_decl)
 static void
 clone_underlying_type (tree x)
 {
-  if (DECL_IS_BUILTIN (x))
+  if (DECL_IS_BUILTIN (x)
+      && strcmp ("__builtin_va_list", IDENTIFIER_POINTER (DECL_NAME (x))))
     {
       if (TYPE_NAME (TREE_TYPE (x)) == 0)
 	TYPE_NAME (TREE_TYPE (x)) = x;

@@ -182,7 +182,7 @@ char **buildargv (const char *input)
       do
 	{
 	  /* Pick off argv[argc] */
-	  while (ISBLANK (*input))
+	  while (ISSPACE (*input))
 	    {
 	      input++;
 	    }

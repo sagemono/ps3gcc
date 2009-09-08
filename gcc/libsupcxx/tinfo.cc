@@ -28,6 +28,8 @@
 // invalidate any other reasons why the executable file might be covered by
 // the GNU General Public License.
 
+#ifndef __SPU__
+
 #include <bits/c++config.h>
 #include <cstddef>
 #include "tinfo.h"
@@ -741,3 +743,5 @@ __dynamic_cast (const void *src_ptr,    // object started from
 }
 
 } // namespace __cxxabiv1
+
+#endif /* __SPU__ */

@@ -42,7 +42,7 @@
 using namespace __cxxabiv1;
 
 // SCE LOCAL bz56626
-#if defined(__PPU__)
+#if 0 // TLS
 namespace __sce_local
 {
   __cxa_eh_globals* get_global() throw()
@@ -60,97 +60,101 @@ extern "C" __cxa_eh_globals*
 __cxxabiv1::__cxa_get_globals() throw()
 { return __sce_local::get_global(); }
 
-#else // defined(__PPU__)
+#else
 
 // Single-threaded fallback buffer.
-static __cxa_eh_globals globals_static;
+static __cxa_eh_globals eh_globals;
 
 #if __GTHREADS
-static __gthread_key_t globals_key;
-static int use_thread_key = -1;
 
 static void
-get_globals_dtor (void *ptr)
+eh_globals_dtor (void *ptr)
 {
   if (ptr)
     {
-#if 0
-      __cxa_exception *exn, *next;
-      exn = ((__cxa_eh_globals *) ptr)->caughtExceptions;
+      __cxa_eh_globals* g = reinterpret_cast<__cxa_eh_globals*>(ptr);
+      __cxa_exception* exn = g->caughtExceptions;
+      __cxa_exception* next;
       while (exn)
 	{
 	  next = exn->nextException;
 	  _Unwind_DeleteException (&exn->unwindHeader);
 	  exn = next;
 	}
-#endif
       std::free (ptr);
     }
 }
 
-static void
-get_globals_init ()
+struct __eh_globals_init
 {
-  use_thread_key =
-    (__gthread_key_create (&globals_key, get_globals_dtor) == 0);
-}
+  __gthread_key_t	_M_key;
+  bool			_M_init;
 
-static void
-get_globals_init_once ()
-{
-  static __gthread_once_t once = __GTHREAD_ONCE_INIT;
-  if (__gthread_once (&once, get_globals_init) != 0
-      || use_thread_key < 0)
-    use_thread_key = 0;
-}
-#endif
+  __eh_globals_init() : _M_init(false)
+  {
+    if (__gthread_active_p())
+      _M_init = __gthread_key_create(&_M_key, eh_globals_dtor) == 0;
+  }
+
+  ~__eh_globals_init()
+  {
+    if (_M_init)
+      __gthread_key_delete(_M_key);
+  }
+};
+
+static __eh_globals_init init;
 
 extern "C" __cxa_eh_globals *
 __cxxabiv1::__cxa_get_globals_fast () throw()
 {
-#if __GTHREADS
-  if (use_thread_key)
-    return (__cxa_eh_globals *) __gthread_getspecific (globals_key);
+  __cxa_eh_globals* g;
+  if (init._M_init)
+    g = static_cast<__cxa_eh_globals*>(__gthread_getspecific(init._M_key));
   else
-    return &globals_static;
-#else
-  return &globals_static;
-#endif
+    g = &eh_globals;
+  return g;
 }
 
 extern "C" __cxa_eh_globals *
 __cxxabiv1::__cxa_get_globals () throw()
 {
-#if __GTHREADS
-  __cxa_eh_globals *g;
-
-  if (use_thread_key == 0)
-    return &globals_static;
-
-  if (use_thread_key < 0)
+  __cxa_eh_globals* g;
+  if (init._M_init)
     {
-      get_globals_init_once ();
-
-      // Make sure use_thread_key got initialized.
-      if (use_thread_key == 0)
-	return &globals_static;
+      g = static_cast<__cxa_eh_globals*>(__gthread_getspecific(init._M_key));
+      if (!g)
+	{
+	  void* v = std::malloc(sizeof(__cxa_eh_globals));
+	  if (v == 0 || __gthread_setspecific(init._M_key, v) != 0)
+	    std::terminate ();
+	  g = static_cast<__cxa_eh_globals*>(v);
+	  g->caughtExceptions = 0;
+	  g->uncaughtExceptions = 0;
+	}
     }
-
-  g = (__cxa_eh_globals *) __gthread_getspecific (globals_key);
-  if (! g)
-    {
-      if ((g = (__cxa_eh_globals *)
-	   std::malloc (sizeof (__cxa_eh_globals))) == 0
-	  || __gthread_setspecific (globals_key, (void *) g) != 0)
-        std::terminate ();
-      g->caughtExceptions = 0;
-      g->uncaughtExceptions = 0;
-    }
-
+  else
+    g = &eh_globals;
   return g;
-#else
-  return &globals_static;
-#endif
 }
 
-#endif // defined(__PPU__)
+extern "C" void
+__eh_thread_cleanup(void)
+{
+  if (init._M_init)
+    __gthread_cleanup(init._M_key);
+}
+#else
+
+extern "C" __cxa_eh_globals*
+__cxxabiv1::__cxa_get_globals_fast() throw()
+{ return &eh_globals; }
+
+extern "C" __cxa_eh_globals*
+__cxxabiv1::__cxa_get_globals() throw()
+{ return &eh_globals; }
+
+#endif // __GTHREADS
+
+#endif // TLS
+

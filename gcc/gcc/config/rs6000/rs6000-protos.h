@@ -192,4 +192,6 @@ extern const char* rs6000_emit_pgo_info (rtx *ops, rtx insn);
 /* APPLE LOCAL pragma reverse_bitfields, ms_struct */
 extern void darwin_pragma_reverse_bitfields (struct cpp_reader *);
 extern void darwin_pragma_ms_struct (struct cpp_reader *);
+
+extern rtx rs6000_call_indirect_aix64 (rtx, rtx, rtx);
 #endif  /* rs6000-protos.h */

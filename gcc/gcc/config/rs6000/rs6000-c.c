@@ -110,14 +110,13 @@ altivec_categorize_keyword (const cpp_token *tok)
     {
       cpp_hashnode *ident = tok->val.node;
 
-      if (ident == vector_keyword || ident == __vector_keyword)
+      if (ident == vector_keyword)
 	return __vector_keyword;
 
-      if (ident == pixel_keyword || ident ==  __pixel_keyword)
+      if (ident == pixel_keyword)
 	return __pixel_keyword;
 	
-      if (ident == bool_keyword || ident == _Bool_keyword
-	  || ident == __bool_keyword)
+      if (ident == bool_keyword || ident == _Bool_keyword)
 	return __bool_keyword;
 
       return ident;
@@ -133,24 +132,23 @@ altivec_categorize_keyword (const cpp_token *tok)
 cpp_hashnode *
 rs6000_macro_to_expand (cpp_reader *pfile, const cpp_token *tok)
 {
-  static bool vector_keywords_init = false;
   cpp_hashnode *expand_this = tok->val.node;
   cpp_hashnode *ident;
 
-  if (!vector_keywords_init)
-    {
-      init_vector_keywords (pfile);
-      vector_keywords_init = true;
-    }
-
   ident = altivec_categorize_keyword (tok);
+
+  if (ident != expand_this)
+    expand_this = NULL;
 
   if (ident == __vector_keyword)
     {
-      tok = _cpp_peek_token (pfile, 0);
+      int idx = 0;
+      do
+	tok = _cpp_peek_token (pfile, idx++);
+      while (tok->type == CPP_PADDING);
       ident = altivec_categorize_keyword (tok);
 
-      if (ident ==  __pixel_keyword || ident == __bool_keyword)
+      if (ident == __pixel_keyword || ident == __bool_keyword)
 	{
 	  expand_this = __vector_keyword;
 	  expand_bool_pixel = ident;
@@ -160,8 +158,12 @@ rs6000_macro_to_expand (cpp_reader *pfile, const cpp_token *tok)
 	  enum rid rid_code = (enum rid)(ident->rid_code);
 	  if (ident->type == NT_MACRO)
 	    {
-	      (void)cpp_get_token (pfile);
-	      tok = _cpp_peek_token (pfile, 0);
+	      do
+		(void)cpp_get_token (pfile);
+	      while (--idx > 0);
+	      do
+		tok = _cpp_peek_token (pfile, idx++);
+	      while (tok->type == CPP_PADDING);
 	      ident = altivec_categorize_keyword (tok);
 	      if (ident)
 		rid_code = (enum rid)(ident->rid_code);
@@ -175,16 +177,18 @@ rs6000_macro_to_expand (cpp_reader *pfile, const cpp_token *tok)
 	      expand_this = __vector_keyword;
 	      /* If the next keyword is bool or pixel, it
 		 will need to be expanded as well.  */
-	      tok = _cpp_peek_token (pfile, 1);
+	      do
+		tok = _cpp_peek_token (pfile, idx++);
+	      while (tok->type == CPP_PADDING);
 	      ident = altivec_categorize_keyword (tok);
 
-	      if (ident ==  __pixel_keyword || ident == __bool_keyword)
+	      if (ident == __pixel_keyword || ident == __bool_keyword)
 		expand_bool_pixel = ident;
 	    }
 	}
     }
   else if (expand_bool_pixel
-	   && (ident ==  __pixel_keyword || ident == __bool_keyword))
+	   && (ident == __pixel_keyword || ident == __bool_keyword))
     {
       expand_this = expand_bool_pixel;
       expand_bool_pixel = 0;
@@ -2923,7 +2927,7 @@ altivec_build_resolved_builtin (tree *args, int n,
 	  if (!SCALAR_FLOAT_TYPE_P (type)
 	      && !INTEGRAL_TYPE_P (type))
 	    goto nospecialcase;
-
+	  unsigned_p = TYPE_UNSIGNED (type);
 	  switch (TYPE_MODE (type))
 	    {
 	      case SImode:

@@ -45,6 +45,9 @@ static __gthread_mutexattr_t _Mutex_attr = {
 static __gthread_mutex_t once_mutex;
 static __gthread_once_t x_once = __GTHREAD_ONCE_INIT;
 
+void __gthr_lv2_once_ctor(void);
+void __gthr_lv2_once_dtor(void);
+
 /* create once mutex */
 void
 __gthr_lv2_once_ctor(void)
@@ -60,6 +63,88 @@ __gthr_lv2_once_dtor(void)
 {
   if (sys_lwmutex_destroy(&once_mutex) != 0)
     abort();
+}
+
+void
+__gthr_lv2_thread_cleanup(__gthread_key_t key)
+{
+  int i;
+  int use_data = 0;
+  void **data = NULL;
+  struct tls_data_entry *prev = NULL;
+  struct tls_data_entry *p;
+  sys_ppu_thread_t thr;
+  sys_ppu_thread_get_id(&thr);
+
+  if (sys_lwmutex_lock(&key_mutex, 0) == 0)
+    {
+      p = tls_data_list.next;
+      while (p)
+	{
+	  if (p->id == thr)
+	    {
+	      data = p->data;
+	      if (prev == NULL)
+		tls_data_list.next = p->next;
+	      else
+		prev->next = p->next;
+	      break;
+	    }
+	  prev = p;
+	  p = prev->next;
+	}
+
+      for (i = 0; i < KEY_MAX; ++i)
+	{
+	  if (tls_ctrl[i].inuse && tls_ctrl[i].dtor && data[i] != NULL)
+	    {
+	      use_data++;
+	      if (key == i)
+		{
+		  /* destroy a datum */
+		  void *tmp = data[i];
+		  data[i] = NULL;
+		  tls_ctrl[i].dtor(tmp);
+		}
+	    }
+	}
+      if (p && use_data <= 1)
+        free (p);
+      if (sys_lwmutex_unlock(&key_mutex) == 0)
+	return;
+    }
+}
+
+void
+__gthr_lv2_all_cleanup(void)
+{
+  int i;
+  void **data = NULL;
+  struct tls_data_entry *prev;
+  struct tls_data_entry *p;
+
+  if (sys_lwmutex_lock(&key_mutex, 0) == 0)
+    {
+      p = tls_data_list.next;
+      while (p)
+        {
+	  data = p->data;
+	  for (i = 0; i < KEY_MAX; ++i)
+	    {
+	      if (tls_ctrl[i].inuse && tls_ctrl[i].dtor && data[i] != NULL)
+		{
+		  /* destroy a datum */
+		  tls_ctrl[i].dtor(data[i]);
+		}
+	    }
+	  prev = p;
+	  p = prev->next;
+	  free (prev);
+	}
+      tls_data_list.next = NULL;
+      if (sys_lwmutex_unlock(&key_mutex) == 0)
+        return;
+    }
 }
 
 int
@@ -87,6 +172,7 @@ init (void)
 {
   if (sys_lwmutex_create(&key_mutex, &key_mutex_attr) != 0)
     abort();
+  atexit (__gthr_lv2_all_cleanup);
 }
 
 int
@@ -159,6 +245,7 @@ __gthr_lv2_getspecific (__gthread_key_t key)
 int
 __gthr_lv2_setspecific (__gthread_key_t key, const void *ptr)
 {
+  int i;
   int ret=1;
   struct tls_data_entry *p;
   sys_ppu_thread_t thr;
@@ -183,6 +270,8 @@ __gthr_lv2_setspecific (__gthread_key_t key, const void *ptr)
 			(sizeof(struct tls_data_entry))) == NULL)
           abort();
         else {
+	  for (i = 0; i < KEY_MAX; i++)
+	    p->data[i] = NULL;
           p->next = tls_data_list.next;
           p->data[key] = (void *)ptr;
           p->id = thr;

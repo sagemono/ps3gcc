@@ -362,6 +362,8 @@ static const char *prepend_target_system_root_function (int, const char **);
 static const char *prepend_cmddir_function (int, const char **);/* begin sce local, bugzilla #11401 */
 static const char *subst_if_file_exist (int, const char **);
 static const char *version_compare_spec_function (int, const char **);
+/* sce local, bugzilla #71843 */
+static const char *use_script_file_if_exist (int , char **);
 
 /* The Specs Language
 
@@ -1636,6 +1638,7 @@ static const struct spec_function static_spec_functions[] =
   { "prepend-cmddir",             prepend_cmddir_function }, /* begin sce local */
   { "if-file-exist",              subst_if_file_exist },
   { "version-compare",	 	  version_compare_spec_function },
+  { "use-script-file-if-exist", use_script_file_if_exist },
   { 0, 0 }
 };
 
@@ -4267,6 +4270,7 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
 	  switches[n_switches].args      = 0;
 	  switches[n_switches].live_cond = SWITCH_OK;
 	  switches[n_switches].validated = 0;
+	  switches[n_switches].ordering  = 0;
 
 	  n_switches++;
 	}
@@ -4277,6 +4281,7 @@ warranty; not even for MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.\n\n"
 	  switches[n_switches].args      = 0;
 	  switches[n_switches].live_cond = SWITCH_OK;
 	  switches[n_switches].validated = 0;
+	  switches[n_switches].ordering  = 0;
 
 	  n_switches++;
 	}
@@ -8196,6 +8201,25 @@ prepend_cmddir_function (int argc, const char **argv)
   free (progdir);
   return value;
 }
+
+/* bz71843 */
+static const char*
+use_script_file_if_exist (int argc, char **argv)
+{
+  struct stat stat_result;
+
+  if (argc == 1 && stat (argv[0], &stat_result) == 0)
+    {
+      /** !!! nobody free the memory at retval... !!!*/
+      char *retval = xmalloc (sizeof ("-T ") + strlen (argv[0]));
+      sprintf (retval, "-T %s", argv[0]);
+                    
+      return retval;
+    }
+            
+    return "";
+}
+
 /* end sce local */
 
 /* */

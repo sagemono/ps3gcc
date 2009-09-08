@@ -5321,7 +5321,7 @@ cp_parser_delete_expression (cp_parser* parser)
 static tree
 cp_parser_maybe_cell_vector_literal (cp_parser *parser, tree type)
 {
-  tree expr;
+  tree expr = 0;
   bool vector_literal_p = false;
   bool scalar_p = true;
   bool expr_list_p = false;

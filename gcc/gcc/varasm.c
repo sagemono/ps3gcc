@@ -5934,6 +5934,13 @@ default_asm_output_anchor (rtx symbol)
   sprintf (buffer, ". + " HOST_WIDE_INT_PRINT_DEC,
 	   SYMBOL_REF_BLOCK_OFFSET (symbol));
   ASM_OUTPUT_DEF (asm_out_file, XSTR (symbol, 0), buffer);
+#ifdef ASM_OUTPUT_SIZE_DIRECTIVE
+  if (!flag_inhibit_size_directive && SYMBOL_REF_BLOCK (symbol))
+    {
+      struct object_block *block = SYMBOL_REF_BLOCK (symbol);
+      ASM_OUTPUT_SIZE_DIRECTIVE (asm_out_file, XSTR (symbol, 0), block->size);
+    }
+#endif
 }
 #endif
 
