@@ -231,17 +231,15 @@ _exit(int rc)
 #elif defined (_SPURS_TASK)
   cellSpursTaskExit(rc);
 #else
-  /* Some self modifying code to return 'rc' in the 'stop' insn. */
-  asm volatile (
-    "	ori     $3, %0,0\n"
-    "	lqr     $4, 1f\n"
-    "	cbd     $5, 1f+3($sp)\n"
-    "	shufb   $0, %0, $4, $5\n"
-    "	stqr    $0, 1f\n"
-    "	sync\n"
-    "1:\n"
-    "	stop    0x2000\n"
-    : : "r" (rc) );
+  {
+    /* Create a 'stop' insn on the stack that returns 'rc'. */
+    __vector signed int stop_insn = {0x00002000, 0x2000, 0x2000, 0x2000};
+    register __vector signed int *si_sp asm("$sp");
+    stop_insn |= spu_promote(rc & 0xff, 0);
+    si_sp[1] = stop_insn;
+    si_sync();
+    ((void (*)())&si_sp[1])();
+  }
 #endif
 }
 

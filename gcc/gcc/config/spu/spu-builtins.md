@@ -666,6 +666,12 @@
   [(set_attr "type" "fpd")])
 
 ;; control
+;; SCE local: bz67084
+(define_insn "snpause"
+  [(unspec_volatile [(const_int 0)] UNSPEC_SNPAUSE)]
+  ""
+  "stopd 0,1,1")
+
 (define_insn "spu_stop"
   [(unspec_volatile [(match_operand:SI 0 "const_int_operand" "M")] UNSPEC_STOP)]
   ""
@@ -875,6 +881,7 @@
   ""
   "wrch\t$ch%0,%1"
   [(set_attr "type" "spr")])
+
 
 (define_expand "spu_splats" 
   [(set (match_operand 0 "spu_reg_operand" "")

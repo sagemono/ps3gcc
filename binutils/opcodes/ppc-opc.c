@@ -567,7 +567,7 @@ const struct powerpc_operand powerpc_operands[] =
 
   /* sce local bugzilla 11789 */
 #define TH MTMSRD_L + 1
-  { 4, 21, insert_th, NULL, 0 },
+  { 4, 21, insert_th, NULL, PPC_OPERAND_OPTIONAL },
 };
 
 /* Version 2 of the PowerPC User ISA is compatible with POWER4.

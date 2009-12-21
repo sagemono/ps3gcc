@@ -2497,6 +2497,8 @@ md_assemble (str)
 
       if (ex.X_op == O_illegal)
 	as_bad (_("illegal operand"));
+      else if (ex.X_op == O_absent)
+	as_bad (_("missing operand"));
       else if (ex.X_op == O_register)
 	{
 	  insn = ppc_insert_operand (insn, operand, ex.X_add_number,

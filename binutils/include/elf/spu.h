@@ -21,6 +21,15 @@
 #ifndef _ELF_SPU_H
 #define _ELF_SPU_H
 
+/* values for e_flags filed in the ELF file header 
+   to specify a SPU runtime model. */
+#define EF_SPU_DEFAULT               0x0
+#define EF_SPU_SPURS_JOB             0x1
+#define EF_SPU_SPURS_JOB_INITIALIZE  0x2
+#define EF_SPU_SPURS_TASK            0x3
+/* 4-7 is reserved for future use. */
+#define EF_SPU_MASK                  0x7
+
 #include "elf/reloc-macros.h"
 
 /* elf32-spu.c depends on these being consecutive. */

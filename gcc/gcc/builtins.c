@@ -5019,6 +5019,16 @@ expand_builtin_trap (void)
   emit_barrier ();
 }
 
+/** SCE local: bz67084 **/
+void
+expand_builtin_snpause (void)
+{
+#ifdef HAVE_snpause
+  emit_insn (gen_snpause ());
+#endif
+}
+
+
 /* Expand a call to fabs, fabsf or fabsl with arguments ARGLIST.
    Return 0 if a normal call should be emitted rather than expanding
    the function inline.  If convenient, the result should be placed
@@ -6628,6 +6638,11 @@ expand_builtin (tree exp, rtx target, rtx subtarget, enum machine_mode mode,
 
     case BUILT_IN_TRAP:
       expand_builtin_trap ();
+      return const0_rtx;
+
+    /** SCE local: bz67084 **/
+    case BUILT_IN_SNPAUSE:
+      expand_builtin_snpause ();
       return const0_rtx;
 
     case BUILT_IN_PRINTF:

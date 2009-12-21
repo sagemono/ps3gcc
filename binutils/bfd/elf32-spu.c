@@ -523,7 +523,14 @@ bfd_boolean
 spu_elf_create_sections (bfd *output_bfd ATTRIBUTE_UNUSED,
 			 struct bfd_link_info *info)
 {
+  struct spu_link_hash_table *htab = spu_hash_table (info);
   bfd *ibfd;
+  asection *s;
+  flagword flags;
+
+#ifdef DEBUG
+  info->callbacks->info ( _("spu_elf_create_sections called\n"));
+#endif
 
   for (ibfd = info->input_bfds; ibfd != NULL; ibfd = ibfd->link_next)
     if (bfd_get_section_by_name (ibfd, SPU_PTNOTE_SPUNAME) != NULL)
@@ -532,12 +539,10 @@ spu_elf_create_sections (bfd *output_bfd ATTRIBUTE_UNUSED,
   if (ibfd == NULL)
     {
       /* Make SPU_PTNOTE_SPUNAME section.  */
-      asection *s;
       size_t name_len;
       size_t name_size;
       size_t size;
       bfd_byte *data;
-      flagword flags;
 
       ibfd = info->input_bfds;
       flags = SEC_LOAD | SEC_READONLY | SEC_HAS_CONTENTS | SEC_IN_MEMORY;
@@ -569,6 +574,17 @@ spu_elf_create_sections (bfd *output_bfd ATTRIBUTE_UNUSED,
 	      bfd_get_filename (output_bfd),
 	      name_len < name_size ? name_len : name_size);
       s->contents = data;
+    }
+
+  if (htab->emit_fixups)
+    {
+      ibfd = info->input_bfds;
+      flags = SEC_LOAD | SEC_ALLOC | SEC_READONLY | SEC_HAS_CONTENTS
+	      | SEC_IN_MEMORY | SEC_LINKER_CREATED;
+      s = bfd_make_section_with_flags (ibfd, ".fixup", flags);
+      if (s == NULL || !bfd_set_section_alignment (ibfd, s, 2))
+	return FALSE;
+      htab->sfixup = s;
     }
 
   return TRUE;
@@ -1877,6 +1893,37 @@ spu_elf_emit_fixup (bfd *output_bfd, struct bfd_link_info *info,
     }
 }
 
+/* This is called from check_relocs, allocate_dynrelocs, and
+ * relocate_section.  STRICT is TRUE from the latter 2.
+ */
+static bfd_boolean
+needs_dynreloc (struct bfd_link_info *info, struct elf_link_hash_entry *h, int strict)
+{
+  struct spu_link_hash_table *htab = spu_hash_table (info);
+  if ((info->shared || htab->elf.is_relocatable_executable)
+       && (strict
+	   ? (h == NULL
+	      || ELF_ST_VISIBILITY (h->other) == STV_DEFAULT
+	      || h->root.type != bfd_link_hash_undefweak)
+	     && !SYMBOL_CALLS_LOCAL (info, h)
+	   : (h != NULL
+	      && (!info->symbolic
+		  || h->root.type == bfd_link_hash_defweak
+		  || !h->def_regular))))
+    return TRUE;
+
+  if (h != NULL
+      && (strict
+	  ? (h->dynindx != -1
+	     && ((h->def_dynamic && !h->def_regular)
+		 || h->root.type == bfd_link_hash_undefweak
+		 || h->root.type == bfd_link_hash_undefined))
+	  : (h->root.type == bfd_link_hash_defweak
+	     || !h->def_regular)))
+    return TRUE;
+  return FALSE;
+}
+
 /* Apply RELOCS to CONTENTS of INPUT_SECTION from INPUT_BFD.  */
 
 static bfd_boolean
@@ -2141,16 +2188,7 @@ spu_elf_relocate_section (bfd *output_bfd,
 	    break;
 	  /* Fall thru.  */
 
-	  if ((info->shared
-	       && (h == NULL
-		   || ELF_ST_VISIBILITY (h->other) == STV_DEFAULT
-		   || h->root.type != bfd_link_hash_undefweak)
-	       && !SYMBOL_CALLS_LOCAL (info, h))
-	      || (!info->shared
-		  && h != NULL
-		  && h->dynindx != -1
-		  && h->def_dynamic
-		  && !h->def_regular))
+	  if (needs_dynreloc (info, h, 1))
 	    {
 	      int skip;
 
@@ -2469,7 +2507,7 @@ spu_elf_final_write_processing (bfd * abfd, bfd_boolean linker)
 
   BFD_ASSERT (elf_elfheader (abfd)->e_ident[EI_CLASS] == ELFCLASS32);
   BFD_ASSERT (elf_elfheader (abfd)->e_ident[EI_DATA] == ELFDATA2MSB);
-  BFD_ASSERT (elf_elfheader (abfd)->e_flags == 0);
+  BFD_ASSERT ((elf_elfheader (abfd)->e_flags & ~EF_SPU_MASK) == 0);
 
   /* Verify that elf_howto_table is in the correct order. */
   {
@@ -2794,38 +2832,11 @@ _bfd_elf_spu_get_relocated_section_contents (bfd *abfd, struct bfd_link_info *li
 }
 
 static bfd_boolean
-spu_elf_create_fixup_section (bfd *abfd, struct bfd_link_info *info)
-{
-  struct spu_link_hash_table *htab = spu_hash_table (info);
-  asection *s;
-  flagword flags;
-
-#ifdef DEBUG
-  info->callbacks->info ( _("spu_elf_create_fixup_section called for %B\n"), abfd);
-#endif
-
-  if (!htab->emit_fixups)
-    return TRUE;
-
-  flags = SEC_LOAD | SEC_ALLOC | SEC_READONLY | SEC_HAS_CONTENTS | SEC_IN_MEMORY
-          | SEC_LINKER_CREATED;
-  s = bfd_make_section_with_flags (abfd, ".fixup", flags);
-  if (s == NULL
-      || ! bfd_set_section_alignment (abfd, s, 2))
-    return FALSE;
-  htab->sfixup = s;
-
-  return TRUE;
-}
-
-static bfd_boolean
 spu_elf_create_dynamic_sections (bfd *abfd, struct bfd_link_info *info)
 {
 #ifdef DEBUG
   info->callbacks->info ( _("spu_elf_create_dynamic_sections called for %B\n"), abfd);
 #endif
-  if (info->shared && !spu_elf_create_fixup_section (abfd, info))
-    return FALSE;
 
   if (info->executable)
     {
@@ -3022,15 +3033,7 @@ spu_elf_check_relocs (bfd *abfd,
 	     may need to keep relocations for symbols satisfied by a
 	     dynamic library if we manage to avoid copy relocs for the
 	     symbol.  */
-	  if ((info->shared
-	        && h != NULL && !h->forced_local
-	        && (! info->symbolic
-		    || h->root.type == bfd_link_hash_defweak
-		    || !h->def_regular))
-	      || (!info->shared
-		  && h != NULL && !h->forced_local
-		  && (h->root.type == bfd_link_hash_defweak
-		      || !h->def_regular)))
+	  if (needs_dynreloc (info, h, 0))
 	    {
 	      struct spu_elf_dyn_relocs *p;
 	      struct spu_elf_dyn_relocs **head;
@@ -3060,8 +3063,6 @@ spu_elf_check_relocs (bfd *abfd,
 		  if (htab->elf.dynobj == NULL)
 		    {
 		      htab->elf.dynobj = abfd;
-		      if (!spu_elf_create_fixup_section (abfd, info))
-			return FALSE;
 		    }
 		  sreloc = bfd_get_section_by_name (htab->elf.dynobj, name);
 		  if (sreloc == NULL)
@@ -3105,6 +3106,9 @@ spu_elf_check_relocs (bfd *abfd,
 		}
 
 	    }
+	  /* Record all R_SPU_GLOB_DAT relocations as a possible fixup.
+	     We record a reference to the symbol.  If it ends up being a
+	     dynamic symbol we will not create a fixup for it. */
 	  if (htab->emit_fixups && r_type == R_SPU_GLOB_DAT)
 	    {
 	      fixups->h = h ? h : (struct elf_link_hash_entry *)-1;
@@ -3218,15 +3222,7 @@ allocate_dynrelocs (struct elf_link_hash_entry *h, void *inf)
      Also discard relocs on undefined weak syms with non-default
      visibility.  */
 
-  if ((info->shared
-       && (ELF_ST_VISIBILITY (h->other) == STV_DEFAULT
-	   || h->root.type != bfd_link_hash_undefweak)
-       && !h->forced_local
-       && !info->executable)
-      || (!info->shared
-	  && !h->forced_local
-	  && h->def_dynamic
-	  && !h->def_regular))
+  if (needs_dynreloc (info, h, 1))
     {
       if (! bfd_elf_link_record_dynamic_symbol (info, h))
 	return FALSE;
@@ -3328,6 +3324,85 @@ strip_crt_sections (struct bfd_link_info *info, const char *name,
     }
 }
 
+bfd_boolean
+spu_elf_size_sections (bfd * output_bfd ATTRIBUTE_UNUSED,
+		       struct bfd_link_info *info)
+{
+  struct spu_link_hash_table *htab;
+#ifdef DEBUG
+  info->callbacks->info (_("spu_elf_size_sections called\n"));
+#endif
+  htab = spu_hash_table (info);
+  if (htab->emit_fixups)
+    {
+      asection *sfixup = htab->sfixup;
+      asection *s;
+      struct spu_elf_fixup *p;
+      int fixup_count = 0;
+      int i;
+      bfd *ibfd;
+      bfd_vma base_end;
+
+      for (ibfd = info->input_bfds; ibfd != NULL; ibfd = ibfd->link_next)
+	{
+
+	  if (bfd_get_flavour (ibfd) != bfd_target_elf_flavour)
+	    continue;
+
+	  /* Count an upper bound for the size of .fixup.   It is an
+	   * upper bound because this will not merge fixups of different
+	   * sections into a single fixup record.  */
+	  for (s = ibfd->sections; s != NULL; s = s->next)
+	    if ((p = elf_section_data (s)->local_dynrel) != 0)
+	      for (base_end = 0, i = 0; p[i].h; i++)
+		if ((p[i].h == (struct elf_link_hash_entry *) -1
+		     || (!spu_elf_hash_entry (p[i].h)->dyn_relocs
+			 && strncmp (p[i].h->root.root.string, "__ABS__", 7)))
+		    && p[i].r_offset >= base_end)
+		  {
+		    base_end = (p[i].r_offset & ~(bfd_vma) 15) + 16;
+		    fixup_count++;
+#ifdef DEBUG
+		    info->callbacks->info (_("  count fixup for %s, sec %A in %B\n"),
+					   (p[i].h
+					    && p[i].h != (struct elf_link_hash_entry *) -1
+					    && p[i].h->root.root.string
+					    ? p[i].h->root.root.string
+					    : "<unknown>"),
+					   s, ibfd);
+#endif
+		  }
+	}
+
+      if (fixup_count == 0)
+	{
+	  /* Remove the .init.fixups section when there are no fixups. */
+	  for (ibfd = info->input_bfds; ibfd != NULL; ibfd = ibfd->link_next)
+	    {
+	      bfd_map_over_sections (ibfd, exclude_section, ".init.fixups");
+	      bfd_map_over_sections (ibfd, exclude_section, ".fixup_head");
+	    }
+	  sfixup->flags |= SEC_EXCLUDE;
+	}
+      else
+	{
+	  /* We always have a NULL fixup as a sentinel */
+	  sfixup->size = (fixup_count + 1) * FIXUP_RECORD_SIZE;
+	  sfixup->contents =
+	    (bfd_byte *) bfd_zalloc (info->input_bfds, sfixup->size);
+	  if (sfixup->contents == NULL)
+	    return FALSE;
+	}
+    }
+
+  if (htab->strip_crt)
+    {
+      strip_crt_sections (info, ".ctors", 6, ".init.ctors", NULL);
+      strip_crt_sections (info, ".dtors", 6, ".fini.dtors", NULL);
+    }
+  return TRUE;
+}
+
 static bfd_boolean
 spu_elf_size_dynamic_sections (bfd *output_bfd,
 			       struct bfd_link_info *info)
@@ -3399,64 +3474,6 @@ spu_elf_size_dynamic_sections (bfd *output_bfd,
       sec->contents = bfd_zalloc (dynobj, sec->size);
       if (sec->contents == NULL)
 	return FALSE;
-    }
-
-  if (htab->emit_fixups)
-    {
-      asection *sfixup = htab->sfixup;
-      asection *s;
-      struct spu_elf_fixup *p;
-      int fixup_count = 0;
-      int i;
-      bfd *ibfd;
-      bfd_vma base_end;
-
-      for (ibfd = info->input_bfds; ibfd != NULL; ibfd = ibfd->link_next)
-	{
-
-	  if (bfd_get_flavour (ibfd) != bfd_target_elf_flavour)
-	    continue;
-
-	  /* Count an upper bound for the size of .fixup.   It is an
-	   * upper bound because this will not merge fixups of different
-	   * sections into a single fixup record.  */
-	  for (s = ibfd->sections; s != NULL; s = s->next)
-	    if ((p = elf_section_data (s)->local_dynrel) != 0)
-	      for (base_end = 0, i = 0; p[i].h; i++)
-		if ((p[i].h == (struct elf_link_hash_entry *)-1
-		     || (!spu_elf_hash_entry (p[i].h)->dyn_relocs
-		         && strncmp (p[i].h->root.root.string, "__ABS__", 7)))
-		    && p[i].r_offset >= base_end)
-		  {
-		    base_end = (p[i].r_offset & ~(bfd_vma)15) + 16;
-		    fixup_count++;
-		  }
-	}
-
-      if (fixup_count == 0)
-	{
-	  /* Remove the .init.fixups section when there are no fixups. */
-	  for (ibfd = info->input_bfds; ibfd != NULL; ibfd = ibfd->link_next)
-	    {
-	      bfd_map_over_sections (ibfd, exclude_section, ".init.fixups");
-	      bfd_map_over_sections (ibfd, exclude_section, ".fixup_head");
-	    }
-	  sfixup->flags |= SEC_EXCLUDE;
-	}
-      else
-	{
-	  /* We always have a NULL fixup as a sentinel */
-	  sfixup->size = (fixup_count + 1) * FIXUP_RECORD_SIZE;
-	  sfixup->contents = (bfd_byte *) bfd_zalloc (dynobj, sfixup->size);
-	  if (sfixup->contents == NULL)
-	    return FALSE;
-	}
-    }
-
-  if (htab->strip_crt)
-    {
-      strip_crt_sections (info, ".ctors", 6, ".init.ctors", NULL);
-      strip_crt_sections (info, ".dtors", 6, ".fini.dtors", NULL);
     }
 
   if (htab->elf.dynamic_sections_created)

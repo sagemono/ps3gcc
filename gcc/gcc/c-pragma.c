@@ -949,6 +949,91 @@ handle_pragma_option (cpp_reader * ARG_UNUSED (dummy))
     GCC_BAD ("malformed #pragma option, ignored");
 }
 
+struct comment_t {
+  struct comment_t *next;
+  unsigned type;
+  char *commentstr;
+};
+
+struct comment_t *comment_list = NULL;
+struct comment_t *comment_tail = NULL;
+
+void
+pragma_comment_output (void)
+{
+  if (comment_list)
+    {
+      int i;
+      struct comment_t *t;
+      struct comment_t *p = comment_list;
+
+      fprintf(asm_out_file, "\t.section \".linker_cmd\"\n");
+      do {
+        fprintf(asm_out_file, "\t.word 1, %d\n", strlen (p->commentstr) + 1);
+        fprintf(asm_out_file, "\t.byte   %#x", p->commentstr[0]);
+	for (i = 1; i < strlen (p->commentstr) + 1; i++)
+          fprintf(asm_out_file, ", %#x", p->commentstr[i]);
+	fprintf(asm_out_file, "\n");
+	free ((void *)p->commentstr);
+	t = p;
+	p = p->next;
+	free ((void *)t);
+      } while (p);
+      fprintf (asm_out_file, "\t.previous\n");
+    }
+}
+
+/* #pragma comment (lib, "libname") */
+static void
+handle_pragma_comment (cpp_reader * ARG_UNUSED (dummy))
+{
+  tree x;
+
+  if (c_lex (&x) != CPP_OPEN_PAREN)
+    GCC_BAD ("missing %<(%> after %<#pragma comment%> - ignored");
+
+  if (c_lex (&x) == CPP_NAME)
+    {
+      size_t len;
+      const char *libname;
+      struct comment_t *p;
+      const char *op = IDENTIFIER_POINTER (x);
+
+      if (!strcmp (op, "compiler") || !strcmp (op, "exestr")
+	  || !strcmp (op , "linker") || !strcmp (op, "user"))
+	GCC_BAD2 ("gcc does no support %qs type for %<#pragma comment%>", op);
+      else if (strcmp (op, "lib"))
+	GCC_BAD2 ("unknown type %qs for %<#pragma comment%> - ignored", op);
+
+      if (c_lex (&x) != CPP_COMMA)
+	GCC_BAD ("malformed %<#pragma comment(lib, \"libname\")%> - ignored");
+
+      if (c_lex (&x) != CPP_STRING)
+	GCC_BAD ("malformed %<#pragma comment(lib, \"libname\")%> - ignored");
+
+      libname = TREE_STRING_POINTER (x);
+      len = strlen (libname) + 1;
+      p = XCNEW(struct comment_t);
+      p->commentstr = XNEWVEC(char, len);
+      memcpy (p->commentstr, libname, len);
+
+      if (comment_list)
+	comment_tail->next = p;
+      else
+	comment_list = p;
+
+      comment_tail = p;
+
+      if (c_lex (&x) != CPP_CLOSE_PAREN)
+	GCC_BAD ("malformed %<#pragma comment(lib, \"libname\")%> - ignored");
+    }
+  else
+    GCC_BAD ("malformed %<#pragma comment%> - ignored");
+
+  if(c_lex (&x) != CPP_EOF)
+    warning (OPT_Wpragmas, "junk at end of %<#pragma comment%>");
+}
+
 /* Set up front-end pragmas.  */
 void
 init_pragma (void)
@@ -976,6 +1061,8 @@ init_pragma (void)
   pli = 0;
 
   c_register_pragma (0, "option", handle_pragma_option);
+
+  c_register_pragma (0, "comment", handle_pragma_comment);
 
 #ifdef REGISTER_TARGET_PRAGMAS
   REGISTER_TARGET_PRAGMAS ();

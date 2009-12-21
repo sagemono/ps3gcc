@@ -5,6 +5,8 @@
 cat >>e${EMULATION_NAME}.c <<EOF
 #include "ldctor.h"
 #include "elf32-spu.h"
+#include "libbfd.h"
+#include "elf/spu.h"
 
 /* Non-zero to perform stack space analysis.  */
 static int stack_analysis = 0;
@@ -25,6 +27,9 @@ static bfd_vma local_store_hi = 0x3ffff;
 
 /* Whether to strip unneeded crt sections */
 static int strip_crt;
+
+/* The option value specified by --set-eflags option */
+static unsigned int option_value_set_eflags;
 
 static int
 is_spu_target (void)
@@ -68,6 +73,8 @@ spu_before_allocation (void)
     }
 
   gld${EMULATION_NAME}_before_allocation ();
+
+  spu_elf_size_sections (output_bfd, &link_info);
 }
 
 /* Final emulation specific call.  */
@@ -86,6 +93,9 @@ spu_finish (void)
       if (s != NULL)
 	einfo ("%X%P: %A exceeds local store range\n", s);
     }
+
+   /* Set EFLAGS */
+   elf_elfheader(output_bfd)->e_flags |= option_value_set_eflags;
 }
 
 /* This is a convenitent point to tell BFD about target specific flags.
@@ -115,6 +125,7 @@ PARSE_AND_LIST_PROLOGUE='
 #define OPTION_SPU_WARN_PIC_CODE	(OPTION_SPU_WARN_PIC_ALL + 1)
 #define OPTION_SPU_EMIT_FIXUPS		(OPTION_SPU_WARN_PIC_CODE + 1)
 #define OPTION_SPU_STRIP_CRT		(OPTION_SPU_EMIT_FIXUPS + 1)
+#define OPTION_SPU_SET_EFLAGS		(OPTION_SPU_STRIP_CRT + 1)
 '
 
 PARSE_AND_LIST_LONGOPTS='
@@ -126,6 +137,7 @@ PARSE_AND_LIST_LONGOPTS='
   { "warn-pic-code", no_argument, NULL, OPTION_SPU_WARN_PIC_CODE },
   { "emit-fixups", no_argument, NULL, OPTION_SPU_EMIT_FIXUPS },
   { "strip-crt", no_argument, NULL, OPTION_SPU_STRIP_CRT },
+  { "set-eflags", required_argument, NULL, OPTION_SPU_SET_EFLAGS },
 '
 
 PARSE_AND_LIST_OPTIONS='
@@ -137,7 +149,8 @@ PARSE_AND_LIST_OPTIONS='
   --warn-pic-all        Warn about non-PIC references in code or data.\n\
   --warn-pic-code       Warn about non-PIC references in code.\n\
   --emit-fixups         Emit fixups in .fixup.\n\
-  --strip-crt           Strip unneeded sections from crt files.\n"
+  --strip-crt           Strip unneeded sections from crt files.\n\
+  --set-eflags          Set specified bits to eflags field in the elf file header.\n"
 		   ));
 '
 
@@ -183,6 +196,27 @@ PARSE_AND_LIST_ARGS_CASES='
     case OPTION_SPU_STRIP_CRT:
       strip_crt = 1;
       break;
+
+    case OPTION_SPU_SET_EFLAGS:
+    {
+      unsigned long long v = 0x0; 
+      if (strncmp(optarg, "spurs-job", sizeof("spurs-job")) == 0)
+        v = EF_SPU_SPURS_JOB;
+      else if (strncmp(optarg,  "spurs-job-initialize", sizeof("spurs-job-initialize")) == 0)
+        v = EF_SPU_SPURS_JOB_INITIALIZE;
+      else if (strncmp(optarg,  "spurs-task", sizeof("spurs-task")) == 0)
+        v = EF_SPU_SPURS_TASK;
+      else
+        {
+          char * term;
+           v = strtoul(optarg, &term, 0);
+           if (*term !=  0 || v > EF_SPU_SPURS_TASK)
+             (*_bfd_error_handler)(_("illegal value is specifed to --set-eflags option."));
+         }
+       option_value_set_eflags = v;
+       break;
+      }
+
 '
 
 LDEMUL_AFTER_OPEN=spu_after_open

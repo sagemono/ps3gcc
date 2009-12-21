@@ -82,6 +82,7 @@ Software Foundation, 51 Franklin Street, Fifth Floor, Boston, MA
 #include "value-prof.h"
 #include "alloc-pool.h"
 #include "tree-mudflap.h"
+#include "c-pragma.h"
 
 #if defined (DWARF2_UNWIND_INFO) || defined (DWARF2_DEBUGGING_INFO)
 #include "dwarf2out.h"
@@ -1054,6 +1055,8 @@ compile_file (void)
      assemble_external calls from the front end, but the RTL
      expander can also generate them.  */
   process_pending_assemble_externals ();
+
+  pragma_comment_output ();
 
   /* Attach a special .ident directive to the end of the file to identify
      the version of GCC which compiled this code.  The format of the .ident

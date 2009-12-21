@@ -109,6 +109,9 @@ lang_specific_driver (int *in_argc, const char *const **in_argv,
   /* The total number of arguments with the new stuff.  */
   int num_args = 1;
 
+  /* A flag for PRX */
+  int flag_for_prx = 0;
+
   argc = *in_argc;
   argv = *in_argv;
   added_libraries = *in_added_libraries;
@@ -195,6 +198,12 @@ lang_specific_driver (int *in_argc, const char *const **in_argv,
 	    shared_libgcc = 0;
 	  else if (DEFAULT_WORD_SWITCH_TAKES_ARG (&argv[i][1]))
 	    i++;
+	  else if (!strcmp (argv[i], "-mprx") ||
+               !strcmp (argv[i], "-mprx-with-runtime"))
+        {
+          /* set a flag for generating PRX */
+          flag_for_prx = 1;
+        }
 	  else
 	    /* Pass other options through.  */
 	    continue;
@@ -315,19 +324,25 @@ lang_specific_driver (int *in_argc, const char *const **in_argv,
   /* Add `-lstdc++' if we haven't already done so.  */
   if (library > 0)
     {
-      arglist[j] = saw_profile_flag ? LIBSTDCXX_PROFILE : LIBSTDCXX;
-      if (arglist[j][0] != '-' || arglist[j][1] == 'l')
-	added_libraries++;
-      j++;
+      if (!flag_for_prx)
+        {
+          arglist[j] = saw_profile_flag ? LIBSTDCXX_PROFILE : LIBSTDCXX;
+          if (arglist[j][0] != '-' || arglist[j][1] == 'l')
+            added_libraries++;
+          j++;
+        }
     }
   if (saw_math)
     arglist[j++] = saw_math;
   else if (library > 0 && need_math)
     {
-      arglist[j] = saw_profile_flag ? MATH_LIBRARY_PROFILE : MATH_LIBRARY;
-      if (arglist[j][0] != '-' || arglist[j][1] == 'l')
-	added_libraries++;
-      j++;
+      if (!flag_for_prx)
+        {
+          arglist[j] = saw_profile_flag ? MATH_LIBRARY_PROFILE : MATH_LIBRARY;
+          if (arglist[j][0] != '-' || arglist[j][1] == 'l')
+            added_libraries++;
+          j++;
+        }
     }
   if (saw_libc)
     arglist[j++] = saw_libc;

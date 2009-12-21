@@ -65,37 +65,44 @@
 #define ASM_ONLY_SPEC  "%{mwarn-stop0:-mwarn-stop0}"
 
 #undef  STARTFILE_SPEC
-#define STARTFILE_SPEC	"%{mspurs-job:job_start_gcc%O%s; " \
-                        "  mspurs-job-initialize:job_start_w_crt%O%s job_crt%O%s; " \
-		        "  mcellsim|mspusim:cs-crt0%O%s; " \
+#define STARTFILE_SPEC	\
+			"%{mspurs-job:job_start_gcc%O%s; " \
+			"  mspurs-job-initialize:job_start_w_crt%O%s job_crt%O%s crti%O%s %{fpic|fPIC: %{!mno-fixups:init_fixups%O%s}} %{mzerobss:init_zerobss%O%s} init_crtend%O%s;" \
+			"  mcellsim|mspusim:cs-crt0%O%s; " \
 			"  :--strip-crt " \
-			   "%{cstdmain:crt2%O%s; " \
-                           "  mraw|mapusim:crt3%O%s; " \
-                           "  mis:crt4%O%s; " \
-                           "  mspurs-task:spurs_task%O%s; " \
-                           "  shared:; " \
-                           "  :crt1%O%s} " \
-			   "crti%O%s "\
-                           "%{fpic|fPIC|shared: %{!mno-fixups:init_fixups%O%s}} " \
-			   "%{mzerobss:init_zerobss%O%s} " \
-                           "init_crtend%O%s} "
+			"     %{cstdmain:crt2%O%s; " \
+			"       mraw|mapusim:crt3%O%s; " \
+			"       mis:crt4%O%s; " \
+			"       mspurs-task:spurs_task%O%s; " \
+			"       shared:dll_crt%O%s; " \
+			"       :crt1%O%s " \
+			"     } " \
+			"  crti%O%s "\
+			"  %{fpic|fPIC|shared: %{!mno-fixups:init_fixups%O%s}} " \
+			"  %{mzerobss:init_zerobss%O%s} " \
+			"  init_crtend%O%s "\
+			" } "
 
 #undef  ENDFILE_SPEC
-#define ENDFILE_SPEC	"%{mspurs-job*|mcellsim|mspusim:crtend1%O%s; :fini_crtbegin%O%s crtn%O%s} "
+#define ENDFILE_SPEC	"%{mspurs-job|mcellsim|mspusim:crtend1%O%s; :fini_crtbegin%O%s crtn%O%s} "
 
 #undef LIB_SPEC
 #define LIB_SPEC "--start-group %{!shared:-lc -lgcc -lstdc++ -lsupc++} " \
 		 "%{mspurs-task|mspurs-job|mspurs-job-initialize:-lspurs -lsync} " \
-		 "%{mraw:-lrawspu; mapusim:-lapusim; mcellsim|mspusim:-lcellsim; mis: ; :-lsputhread} " \
+		 "%{mraw:-lrawspu; mapusim:-lapusim; mcellsim|mspusim:-lcellsim; mis: ; shared: ; :-lsputhread} " \
 		 "--end-group" \
 
 #undef LINK_SPEC
 #define LINK_SPEC "%{mlarge-mem: --defsym __stack=0xfffffff0} " \
                   "%{!Ttext*: %{mspurs-job*:%{fPIC|fpic:-Ttext=0x0; :-Ttext=0x4c00}; mspurs-task:-Ttext=0x3000}} " \
-                  "%{fPIC|fpic: %{!mno-warn-reloc: %{mno-fixups: %{mspurs-job-initialize: --warn-pic-code; : --warn-pic-all}}}} " \
+                  "%{fPIC|fpic|shared: %{!mno-warn-reloc: %{mno-fixups: --warn-pic-all}}} " \
                   "%{shared} %{static} " \
-                  "%{fpic|fPIC|shared:%{mno-fixups|nostartfiles:;:--emit-fixups}} " \
-                  "%{rdynamic: %{static|shared: ; : -export-dynamic}} "
+                  "%{fpic|fPIC|shared:%{mno-fixups:;:--emit-fixups}} " \
+                  "%{fpic|fPIC: -q} " \
+                  "%{rdynamic: %{static|shared: ; : -export-dynamic}} " \
+                  "%{mspurs-job: --set-eflags=spurs-job} " \
+                  "%{mspurs-job-initialize: --set-eflags=spurs-job-initialize} " \
+                  "%{mspurs-task: --set-eflags=spurs-task} "
 
 #undef LINK_GCC_C_SEQUENCE_SPEC 
 #define LINK_GCC_C_SEQUENCE_SPEC "%L"

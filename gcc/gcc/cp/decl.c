@@ -3663,8 +3663,18 @@ groktypename (cp_decl_specifier_seq *type_specifiers,
   attrs = type_specifiers->attributes;
   type_specifiers->attributes = NULL_TREE;
   type = grokdeclarator (declarator, type_specifiers, TYPENAME, 0, &attrs);
-  if (attrs)
-    cplus_decl_attributes (&type, attrs, 0);
+  if (attrs && type != error_mark_node)
+    {
+      if (CLASS_TYPE_P (type))
+	error ("ignoring attributes applied to class type %qT"
+	       " outside of definition", type);
+      else if (IS_AGGR_TYPE (type))
+	/* A template type parameter or other dependent type.  */
+	error ("ignoring attributes applied to dependent "
+	       "type %qT without an associated declaration", type);
+      else
+	cplus_decl_attributes (&type, attrs, 0);
+    }
   return type;
 }
 

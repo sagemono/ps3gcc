@@ -149,6 +149,7 @@
  (UNSPEC_REALIGN_LOAD   49)
  (UNSPEC_MASK_FOR_LOAD  50)
  (UNSPEC_ADD_PIC        51)
+ (UNSPEC_SNPAUSE        52)     ; SCE local: bz67084
   ])
 
 (include "predicates.md")

@@ -2301,6 +2301,7 @@ static const struct bfd_elf_special_section special_sections_i[] =
 static const struct bfd_elf_special_section special_sections_l[] =
 {
   { ".line",           5,  0, SHT_PROGBITS, 0 },
+  { ".linker_cmd",    11,  0, SHT_LOUSER + 0x444C4E53, 0 },
   { NULL,              0,  0, 0,            0 }
 };
 

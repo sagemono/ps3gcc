@@ -86,7 +86,7 @@ OTHER_READONLY_SECTIONS="
 
 INIT_START='KEEP (*(.init.head)) KEEP(*(.init.fixups)) *(.init.zerobss) *(.init.ctors)'
 INIT_END='KEEP (*(.init.tail));'
-FINI_START='KEEP (*(.fini.head));'
+FINI_START='KEEP (*(.fini.head)) KEEP(*(.fini.atexit));'
 FINI_END='*(.fini.dtors); KEEP (*(.fini.tail));'
 
 CTOR_START='KEEP (*(.ctors_head));'

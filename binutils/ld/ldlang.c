@@ -763,6 +763,26 @@ new_statement (enum statement_enum type,
   return new;
 }
 
+static void
+lang_statement_insert (lang_statement_list_type *list,
+		       lang_input_statement_type *insert,
+		       lang_statement_union_type *element)
+{
+  lang_statement_union_type *p;
+
+  for (p = list->head; p != NULL; p = p->header.next)
+    {
+      if (&p->input_statement == insert)
+	{
+	  lang_statement_union_type *t;
+	  t = p->header.next;
+	  p->header.next = element;
+	  element->header.next = t;
+	  break;
+	}
+    }
+}
+
 /* Build a new input file node for the language.  There are several
    ways in which we treat an input file, eg, we only look at symbols,
    or prefix it with a -l etc.
@@ -776,12 +796,21 @@ static lang_input_statement_type *
 new_afile (const char *name,
 	   lang_input_file_enum_type file_type,
 	   const char *target,
-	   bfd_boolean add_to_list)
+	   bfd_boolean add_to_list,
+	   lang_input_statement_type *insert)
 {
   lang_input_statement_type *p;
 
   if (add_to_list)
-    p = new_stat (lang_input_statement, stat_ptr);
+    {
+      p = stat_alloc (sizeof (lang_input_statement_type));
+      p->header.type = lang_input_statement_enum;
+      p->header.next = NULL;
+      if (insert)
+	lang_statement_insert (stat_ptr, insert, (lang_statement_union_type *)p);
+      else
+	lang_statement_append (stat_ptr, (lang_statement_union_type *)p, &p->header.next);
+    }
   else
     {
       p = stat_alloc (sizeof (lang_input_statement_type));
@@ -868,7 +897,7 @@ lang_add_input_file (const char *name,
 		     const char *target)
 {
   lang_has_input_file = TRUE;
-  return new_afile (name, file_type, target, TRUE);
+  return new_afile (name, file_type, target, TRUE, NULL);
 }
 
 struct out_section_hash_entry
@@ -1887,6 +1916,9 @@ lang_add_section (lang_statement_list_type *ptr,
       && (flags & SEC_DEBUGGING) != 0)
     discard = TRUE;
 
+  if (!strcmp (output->name, ".linker_cmd"))
+    discard = TRUE;
+
   if (discard)
     {
       if (section->output_section == NULL)
@@ -2242,7 +2274,7 @@ lookup_name (const char *name)
 
   if (search == NULL)
     search = new_afile (name, lang_input_file_is_search_file_enum,
-			default_target, FALSE);
+			default_target, FALSE, NULL);
 
   /* If we have already added this file, or this file is not real
      (FIXME: can that ever actually happen?) or the name is NULL
@@ -2326,6 +2358,7 @@ load_symbols (lang_input_statement_type *entry,
 	      lang_statement_list_type *place)
 {
   char **matching;
+  asection *ase;
 
   if (entry->loaded)
     return TRUE;
@@ -2407,6 +2440,25 @@ load_symbols (lang_input_statement_type *entry,
       break;
 
     case bfd_object:
+       for (ase = entry->the_bfd->sections; ase != NULL; ase = ase->next)
+	{
+	  if (!strcmp (ase->name, ".linker_cmd"))
+	    {
+              char *contents;
+	      char *name;
+              bfd_size_type len;
+
+              len = ase->size;
+              contents = xmalloc (len);
+              if (bfd_get_section_contents (entry->the_bfd, ase, contents, 0, len))
+                {
+		  name = (char *) xmalloc (strlen (&contents[4]) + 1);
+		  strcpy (name, &contents[4]);
+                  new_afile (name, lang_input_file_is_l_enum, NULL, TRUE, entry);
+                }
+              free (contents);
+	    }
+	}
       ldlang_add_file (entry);
       if (trace_files || trace_file_tries)
 	info_msg ("%I\n", entry);

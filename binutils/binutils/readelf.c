@@ -162,6 +162,7 @@ static int do_debugging;
 static int do_arch;
 static int do_notes;
 static int is_32bit_elf;
+static int do_hexadecimal;
 
 struct group_list
 {
@@ -215,6 +216,7 @@ typedef enum print_mode
   DEC_5,
   UNSIGNED,
   PREFIX_HEX,
+  PREFIX_HEX_5,
   FULL_HEX,
   LONG_HEX
 }
@@ -406,12 +408,13 @@ print_vma (bfd_vma vma, print_mode mode)
 	  return printf ("%8.8lx", (unsigned long) vma);
 
 	case DEC_5:
-	  if (vma <= 99999)
-	    return printf ("%5ld", (long) vma);
-	  /* Drop through.  */
+	  return printf ("%5ld", (long) vma);
 
 	case PREFIX_HEX:
 	  return printf ("0x%lx", (unsigned long) vma);
+
+	case PREFIX_HEX_5:
+	  return printf ("0x%5.5lx", (unsigned long) vma);
 
 	case HEX:
 	  return printf ("%lx", (unsigned long) vma);
@@ -449,6 +452,13 @@ print_vma (bfd_vma vma, print_mode mode)
 	  return nc + print_hex_vma (vma);
 #endif
 
+	case PREFIX_HEX_5:
+#if BFD_HOST_64BIT_LONG
+	  return printf ("0x%5.5lx", vma);
+#else
+	  return printf ("0x%5.5lx", _bfd_int64_low (vma));
+#endif
+
 	case DEC:
 #if BFD_HOST_64BIT_LONG
 	  return printf ("%ld", vma);
@@ -458,15 +468,9 @@ print_vma (bfd_vma vma, print_mode mode)
 
 	case DEC_5:
 #if BFD_HOST_64BIT_LONG
-	  if (vma <= 99999)
-	    return printf ("%5ld", vma);
-	  else
-	    return printf ("%#lx", vma);
+	  return printf ("%5ld", vma);
 #else
-	  if (vma <= 99999)
-	    return printf ("%5ld", _bfd_int64_low (vma));
-	  else
-	    return print_hex_vma (vma);
+	  return printf ("%5ld", _bfd_int64_low (vma));
 #endif
 
 	case UNSIGNED:
@@ -2634,6 +2638,7 @@ get_section_type_name (unsigned int sh_type)
 }
 
 #define OPTION_DEBUG_DUMP	512
+#define OPTION_HEXADECIMAL	1024
 
 static struct option options[] =
 {
@@ -2659,6 +2664,7 @@ static struct option options[] =
   {"hex-dump",	       required_argument, 0, 'x'},
   {"debug-dump",       optional_argument, 0, OPTION_DEBUG_DUMP},
   {"unwind",	       no_argument, 0, 'u'},
+  {"hexadecimal",      no_argument, 0, OPTION_HEXADECIMAL},
 #ifdef SUPPORT_DISASSEMBLY
   {"instruction-dump", required_argument, 0, 'i'},
 #endif
@@ -2696,7 +2702,8 @@ usage (void)
   -x --hex-dump=<number> Dump the contents of section <number>\n\
   -w[liaprmfFsoR] or\n\
   --debug-dump[=line,=info,=abbrev,=pubnames,=aranges,=macro,=frames,=str,=loc,=Ranges]\n\
-                         Display the contents of DWARF2 debug sections\n"));
+                         Display the contents of DWARF2 debug sections\n\
+  --hexadecimal          The numerical value is displayed by the hexadecimal number\n"));
 #ifdef SUPPORT_DISASSEMBLY
   fprintf (stdout, _("\
   -i --instruction-dump=<number>\n\
@@ -3000,6 +3007,9 @@ parse_args (int argc, char **argv)
 		    p++;
 		}
 	    }
+	  break;
+	case OPTION_HEXADECIMAL:
+	  do_hexadecimal = 1;
 	  break;
 #ifdef SUPPORT_DISASSEMBLY
 	case 'i':
@@ -7013,9 +7023,9 @@ process_symbol_table (FILE *file)
 
       printf (_("\nSymbol table for image:\n"));
       if (is_32bit_elf)
-	printf (_("  Num Buc:    Value  Size   Type   Bind Vis      Ndx Name\n"));
+	printf (_("  Num Buc:      Value    Size   Type   Bind Vis      Ndx Name\n"));
       else
-	printf (_("  Num Buc:    Value          Size   Type   Bind Vis      Ndx Name\n"));
+	printf (_("  Num Buc:      Value        Size   Type   Bind Vis      Ndx Name\n"));
 
       for (hn = 0; hn < nbuckets; hn++)
 	{
@@ -7029,13 +7039,13 @@ process_symbol_table (FILE *file)
 
 	      psym = dynamic_symbols + si;
 
-	      n = print_vma (si, DEC_5);
+	      n = print_vma (si, do_hexadecimal ? PREFIX_HEX_5 : DEC_5);
 	      if (n < 5)
 		fputs ("     " + n, stdout);
 	      printf (" %3lu: ", hn);
-	      print_vma (psym->st_value, LONG_HEX);
+	      print_vma (psym->st_value, do_hexadecimal ? FULL_HEX : LONG_HEX);
 	      putchar (' ');
-	      print_vma (psym->st_size, DEC_5);
+	      print_vma (psym->st_size, do_hexadecimal ? PREFIX_HEX_5 : DEC_5);
 
 	      printf ("  %6s", get_symbol_type (ELF_ST_TYPE (psym->st_info)));
 	      printf (" %6s",  get_symbol_binding (ELF_ST_BIND (psym->st_info)));
@@ -7077,9 +7087,9 @@ process_symbol_table (FILE *file)
 		  SECTION_NAME (section),
 		  (unsigned long) (section->sh_size / section->sh_entsize));
 	  if (is_32bit_elf)
-	    printf (_("   Num:    Value  Size Type    Bind   Vis      Ndx Name\n"));
+	    printf (_("   Num:      Value    Size Type    Bind   Vis      Ndx Name\n"));
 	  else
-	    printf (_("   Num:    Value          Size Type    Bind   Vis      Ndx Name\n"));
+	    printf (_("   Num:      Value        Size Type    Bind   Vis      Ndx Name\n"));
 
 	  symtab = GET_ELF_SYMBOLS (file, section);
 	  if (symtab == NULL)
@@ -7106,9 +7116,9 @@ process_symbol_table (FILE *file)
 	       si++, psym++)
 	    {
 	      printf ("%6d: ", si);
-	      print_vma (psym->st_value, LONG_HEX);
+	      print_vma (psym->st_value, do_hexadecimal ? FULL_HEX : LONG_HEX);
 	      putchar (' ');
-	      print_vma (psym->st_size, DEC_5);
+	      print_vma (psym->st_size, do_hexadecimal ? PREFIX_HEX_5 : DEC_5);
 	      printf (" %-7s", get_symbol_type (ELF_ST_TYPE (psym->st_info)));
 	      printf (" %-6s", get_symbol_binding (ELF_ST_BIND (psym->st_info)));
 	      printf (" %-3s", get_symbol_visibility (ELF_ST_VISIBILITY (psym->st_other)));

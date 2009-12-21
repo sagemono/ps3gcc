@@ -3,7 +3,7 @@
 # Copyright(C) 2009 Sony Computer Entertainment Inc.
 # All Rights Reserved.
 
-# This script builds and installs spu-lv2 toolchain for SDK2.8.0-GCC411-Jul29.  The
+# This script builds and installs spu-lv2 toolchain for SDK3.0.0-GCC411.  The
 # existing toolchain directory is backed up as "host-linux/spu.~N~" where
 # N is a generated number.
 # If environment variable CELLSDK is set, it should be the directory where
