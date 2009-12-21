@@ -135,6 +135,9 @@ rs6000_macro_to_expand (cpp_reader *pfile, const cpp_token *tok)
   cpp_hashnode *expand_this = tok->val.node;
   cpp_hashnode *ident;
 
+  if (CPP_OPTION (pfile, valid_pch))
+    init_vector_keywords (pfile);
+
   ident = altivec_categorize_keyword (tok);
 
   if (ident != expand_this)

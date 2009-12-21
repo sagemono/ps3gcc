@@ -527,6 +527,7 @@ cpp_valid_state (cpp_reader *r, const char *name, int fd)
   free (undeftab);
 
   /* We win!  */
+  CPP_OPTION (r, valid_pch) = 1;
   return 0;
 
  error:

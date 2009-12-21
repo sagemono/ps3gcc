@@ -446,6 +446,8 @@ struct cpp_options
 
   /* True means error callback should be used for diagnostics.  */
   bool client_diagnostic;
+
+  bool valid_pch;
 };
 
 /* Callback for header lookup for HEADER, which is the name of a

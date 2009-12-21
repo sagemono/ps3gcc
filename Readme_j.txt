@@ -2,63 +2,63 @@
                     Copyright(C) 2009 Sony Computer Entertainment Inc.
                                                    All Rights Reserved.
 ======================================================================
-���̃p�b�P�[�W�ɂ́ACell OS Lv-2 �c�[���`�F�[���̃\�[�X�t�@�C�����܂�
-��Ă��܂��B���̃p�b�P�[�W���g���ăc�[���`�F�[���̍č\�z���s���ꍇ�ɂ́A
-�ʃp�b�P�[�W�Œ񋟂��Ă���ACell OS Lv-2 �c�[���`�F�[�����A�K��̃f�B��
-�N�g���ł���/usr/local/cell�ɃC���X�g�[�����Ă������A�C���X�g�[��
-�����f�B���N�g���������ϐ�CELLSDK�ɐݒ肷��K�v������܂��B
+このパッケージには、Cell OS Lv-2 ツールチェーンのソースファイルが含ま
+れています。このパッケージを使ってツールチェーンの再構築を行う場合には、
+別パッケージで提供している、Cell OS Lv-2 ツールチェーンを、規定のディレ
+クトリである/usr/local/cellにインストールしておくか、インストール
+したディレクトリ名を環境変数CELLSDKに設定する必要があります。
 
-�X�N���v�gbuild.sh���N������ƁALinux�ł̃c�[���`�F�[���̍č\�z���s���
-�܂��Bbuild.sh�́Abuild-ppu-lv2.sh��build-spu-lv2.sh���g�p���Ă��܂��B�c
-�[���`�F�[�����C���X�g�[������f�B���N�g���ƁA�č\�z�Ɏg����Ɨp�f�B��
-�N�g���́A���ϐ��ɂ��ύX���邱�Ƃ��ł��܂��B�ڍׂ͊e�X�N���v�g�̃R
-�����g���Q�Ƃ��Ă��������B
-��:
+スクリプトbuild.shを起動すると、Linux版のツールチェーンの再構築が行われ
+ます。build.shは、build-ppu-lv2.shとbuild-spu-lv2.shを使用しています。ツ
+ールチェーンをインストールするディレクトリと、再構築に使う作業用ディレ
+クトリは、環境変数により変更することができます。詳細は各スクリプトのコ
+メントを参照してください。
+例:
     mkdir work/src
-    unzip toolchain-src-2.8.0-GCC411.zip -d work/src
+    unzip toolchain-src-2.8.0-GCC411-Jul29.zip -d work/src
     mkdir work/build
     cd work/build
     ../src/build.sh
-�X�N���v�gbuild-mingw.sh�́AWindows�ł̃c�[���`�F�[�����ALinux���ō�
-�\�z���邽�߂��̂ł��B�č\�z�ɂ́AMinGW�����^�C�����K�v�ƂȂ�܂��B�ȉ�
-�̓�̃t�@�C�����_�E�����[�h���āAmingw�f�B���N�g���ɒu���Ă��������B
+スクリプトbuild-mingw.shは、Windows版のツールチェーンを、Linux環境で再
+構築するためものです。再構築には、MinGWランタイムが必要となります。以下
+の二つのファイルをダウンロードして、mingwディレクトリに置いてください。
   mingw-runtime-3.3.tar.gz
     http://sourceforge.net/forum/forum.php?forum_id=372259
   w32api-2.5.tar.gz
     http://sourceforge.net/forum/forum.php?forum_id=352558
-build-mingw.sh�́Abuild-lm.sh�Abuild-mp-lv2.sh�Abuild-ms-lv2.sh���g�p��
-�Ă��܂��B�c�[���`�F�[�����C���X�g�[������f�B���N�g���ƁA�č\�z�Ɏg����
-�Ɨp�f�B���N�g���́A���ϐ��ɂ��ύX���邱�Ƃ��ł��܂��B�ڍׂ͊e�X�N��
-�v�g�̃R�����g���Q�Ƃ��Ă��������B
+build-mingw.shは、build-lm.sh、build-mp-lv2.sh、build-ms-lv2.shを使用し
+ています。ツールチェーンをインストールするディレクトリと、再構築に使う作
+業用ディレクトリは、環境変数により変更することができます。詳細は各スクリ
+プトのコメントを参照してください。
 
-���݂̎d�l�͎b��I�Ȃ��̂ł���A�\���Ȃ��ύX�����ꍇ������܂��B
+現在の仕様は暫定的なものであり、予告なく変更される場合があります。
 ----------------------------------------------------------------------
-�p�b�P�[�W�\��
+パッケージ構成
 ----------------------------------------------------------------------
 Readme_j.txt
 Readme_e.txt
-build.sh                Linux�Ńc�[���`�F�[���̍č\�z�p�X�N���v�g
-build-ppu-lv2.sh        Lv-2��PPU�c�[���`�F�[���̍č\�z�p�X�N���v�g
-build-spu-lv2.sh        Lv-2��SPU�c�[���`�F�[���̍č\�z�p�X�N���v�g
-build-mingw.sh          Windows�Ńc�[���`�F�[���̍č\�z�p�X�N���v�g
-build-lm.sh             Linux->Windows�c�[���`�F�[���̍č\�z�p�X�N���v�g
-build-mp-lv2.sh         Windows�ł�Lv-2��PPU�c�[���`�F�[���̍č\�z�p�X�N���v�g
-build-ms-lv2.sh         Windows�ł�Lv-2��SPU�c�[���`�F�[���̍č\�z�p�X�N���v�g
-diff-from-gcc           GCC 4.1.2�����Binutils 2.17����̍������
-                        ����ɂ́A���Ђɂ��ύX�_�݂̂��܂܂�܂��B
-binutils/               GNU development tools�\�[�X�t�@�C��
-gcc/                    GNU Compiler Collection (GCC)�\�[�X�t�@�C��
-mingw/                  �_�E�����[�h����MinGW�����^�C����u���ꏊ
+build.sh                Linux版ツールチェーンの再構築用スクリプト
+build-ppu-lv2.sh        Lv-2のPPUツールチェーンの再構築用スクリプト
+build-spu-lv2.sh        Lv-2のSPUツールチェーンの再構築用スクリプト
+build-mingw.sh          Windows版ツールチェーンの再構築用スクリプト
+build-lm.sh             Linux->Windowsツールチェーンの再構築用スクリプト
+build-mp-lv2.sh         Windows版のLv-2のPPUツールチェーンの再構築用スクリプト
+build-ms-lv2.sh         Windows版のLv-2のSPUツールチェーンの再構築用スクリプト
+diff-from-gcc           GCC 4.1.1およびBinutils 2.17からの差分情報
+                        これには、当社による変更点のみが含まれます。
+binutils/               GNU development toolsソースファイル
+gcc/                    GNU Compiler Collection (GCC)ソースファイル
+mingw/                  ダウンロードしたMinGWランタイムを置く場所
 
 ----------------------------------------------------------------------
-�g�p�����E����
+使用許諾・制限
 ----------------------------------------------------------------------
-���̃\�t�g�E�F�A�̎g�p�����A�g�p�����͋M�ЂƓ���(������Ѓ\�j�[�E
-�R���s���[�^�G���^�e�C�������g)�Ƃ̊Ԃɒ�������Ă���_��ɏ����܂��B
+このソフトウェアの使用許諾、使用制限は貴社と当社(株式会社ソニー・
+コンピュータエンタテインメント)との間に締結されている契約に準じます。
 
 ----------------------------------------------------------------------
-���W�Ɋւ��钍�ӏ���
+商標に関する注意書き
 ----------------------------------------------------------------------
-�p�b�P�[�W���ɋL�ڂ���Ă����Ж��A���i���͈�ʂɊe�Ђ̏��W�܂���
-�o�^���W�ł��B
-�Ȃ��A�{������(R)�A(TM)�}�[�N�͖��L���Ă��Ȃ��ꍇ������܂��B
+パッケージ内に記載されている会社名、製品名は一般に各社の商標または
+登録商標です。
+なお、本文中に(R)、(TM)マークは明記していない場合があります。
