@@ -351,7 +351,7 @@ stab_write_symbol (struct stab_write_handle *info, int type, int desc,
       h = string_hash_lookup (&info->strhash, string, TRUE, TRUE);
       if (h == NULL)
 	{
-	  non_fatal (_("string_hash_lookup failed: %s"),
+	  non_fatal (_("error: string_hash_lookup failed: %s"),
 		     bfd_errmsg (bfd_get_error ()));
 	  return FALSE;
 	}
@@ -485,7 +485,7 @@ write_stabs_in_sections_debugging_info (bfd *abfd, void *dhandle,
       || !bfd_hash_table_init (&info.typedef_hash.table, string_hash_newfunc,
 			       sizeof (struct string_hash_entry)))
     {
-      non_fatal ("bfd_hash_table_init_failed: %s",
+      non_fatal ("error: bfd_hash_table_init_failed: %s",
 		 bfd_errmsg (bfd_get_error ()));
       return FALSE;
     }
@@ -1914,7 +1914,7 @@ stab_typdef (void *p, const char *name)
   h = string_hash_lookup (&info->typedef_hash, name, TRUE, FALSE);
   if (h == NULL)
     {
-      non_fatal (_("string_hash_lookup failed: %s"),
+      non_fatal (_("error: string_hash_lookup failed: %s"),
 		 bfd_errmsg (bfd_get_error ()));
       return FALSE;
     }

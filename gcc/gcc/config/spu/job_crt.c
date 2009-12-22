@@ -45,11 +45,6 @@ typedef struct CellSpursJob256 CellSpursJob256;
 void _cellSpursJobCrtAuxInitialize(CellSpursJobContext2 *pContext, CellSpursJob256 *pJob256);
 void _cellSpursJobCrtAuxFinalize(CellSpursJobContext2 *pContext, CellSpursJob256 *pJob256);
 
-#define _ALWAYS_INLINE_  __attribute__((always_inline)) static inline
-
-static unsigned int __fixup_start2[0] __attribute__((section(".fixup_head", "a"), aligned(4), used));
-register unsigned int si_r126 asm ("$126");
-
 
 /* ----------------------------------------------------------------------- */
 
@@ -61,19 +56,6 @@ void _exit(void) {
 	  __asm__ volatile("stopd $0,$0,$0\n");
 }
 
-
-static void __fini_unfixups (void)
-{
-	unsigned int * fixup = __fixup_start2;
-	__vector unsigned int sbase = spu_splats (si_r126);
-	for ( ; *fixup; fixup++)
-    {
-		unsigned int info = *fixup;
-		__vector unsigned int *addr =  
-			(__vector unsigned int *)((si_r126 + info) & -16);
-		*addr = *addr - (sbase & spu_maskw (info));
-    }
-}
 
 /* ----------------------------------------------------------------------- */
 
@@ -90,7 +72,7 @@ void __job_start(CellSpursJobContext2 *ctx, CellSpursJob256 *job) {
 
 	__do_atexit();
 	_fini();
-	__fini_unfixups();
+
 	_cellSpursJobCrtAuxFinalize(ctx, job);
 }
 

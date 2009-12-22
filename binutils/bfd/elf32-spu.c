@@ -28,6 +28,7 @@
 #include "elf-bfd.h"
 #include "elf/spu.h"
 #include "elf32-spu.h"
+#include <stdint.h>
 
 static asection * spu_elf_gc_mark_hook		PARAMS ((asection *, struct bfd_link_info *,
 							Elf_Internal_Rela *, struct elf_link_hash_entry *,
@@ -142,6 +143,212 @@ static struct bfd_elf_special_section const spu_elf_special_sections[]=
   { ".SpuGUID", 8, 0, SHT_PROGBITS, SHF_ALLOC + SHF_EXECINSTR }, /* sce local bugzilla #2878 */
   { NULL, 0, 0, 0, 0 },
 };
+
+
+/* begin SCE local bug 73739 */
+/* 
+ * SHA1 hash calculater for SPU GUID.
+ * This is straight foward implementation of 
+ * FIPS PUB 180-1 (http://www.itl.nist.gov/fipspubs/fip180-1.htm).
+ */
+// 512bit input block
+enum {
+  SHA1_BLOCK_SIZE_BITS  = 512,
+  SHA1_BLOCK_SIZE_BYTES = SHA1_BLOCK_SIZE_BITS/8,
+  SHA1_BLOCK_SIZE_WORDS = SHA1_BLOCK_SIZE_BYTES/sizeof(uint32_t),
+};
+
+static inline uint32_t sha1_rotate_left (uint32_t X, unsigned int n);
+static inline uint32_t sha1_ft_0_19 (uint32_t B, uint32_t C, uint32_t D);
+static inline uint32_t sha1_ft_20_39 (uint32_t B, uint32_t C, uint32_t D);
+static inline uint32_t sha1_ft_40_59 (uint32_t B, uint32_t C, uint32_t D);
+static inline uint32_t sha1_ft_60_79 (uint32_t B, uint32_t C, uint32_t D);
+static void sha1_calculate_512bit_block (uint32_t H[5], uint32_t block[SHA1_BLOCK_SIZE_WORDS]);
+static inline void sha1_embed_length_into_block (uint32_t block[SHA1_BLOCK_SIZE_WORDS], size_t length);
+static void fill_block (uint32_t block[SHA1_BLOCK_SIZE_WORDS], const unsigned char *strm, size_t length);
+static void calculate_sha1 (uint32_t H[5], const unsigned char *bytes, size_t length);
+
+static inline uint32_t
+sha1_rotate_left (uint32_t X, unsigned int n)
+{
+  return (X << n) | (X >> (32 - n));
+}
+
+
+static inline uint32_t
+sha1_ft_0_19 (uint32_t B, uint32_t C, uint32_t D)
+{
+  return (B & C) | ((~ B) & D);
+}
+
+static inline uint32_t
+sha1_ft_20_39 (uint32_t B, uint32_t C, uint32_t D)
+{
+  return B ^ C ^ D;
+}
+
+static inline uint32_t
+sha1_ft_40_59 (uint32_t B, uint32_t C, uint32_t D)
+{
+  return (B & C) | (B & D) | (C & D);
+}
+
+static inline uint32_t
+sha1_ft_60_79 (uint32_t B, uint32_t C, uint32_t D)
+{
+  return B ^ C ^ D;
+}
+
+
+static void
+sha1_calculate_512bit_block (uint32_t H[5], uint32_t block[SHA1_BLOCK_SIZE_WORDS])
+{
+  int t;
+  uint32_t A, B, C, D, E, temp;
+  uint32_t W[80];
+
+  // Step (a)
+  memset (W, 0, sizeof(W));
+  memcpy (W, block, SHA1_BLOCK_SIZE_BYTES);
+
+  // Step (b)
+  for (t = 16; t <= 79; ++t)
+    {
+      uint32_t v = W[t - 3] ^ W[t - 8] ^ W[t - 14] ^ W[t - 16];
+      W[t] = sha1_rotate_left (v, 1);
+    }
+      
+  // Step (c)
+  A = H[0]; B = H[1]; C = H[2]; D = H[3]; E = H[4];  
+
+  // Step (d)
+  for (t = 0; t < 20; ++t)
+    {
+      temp = sha1_rotate_left (A, 5) + sha1_ft_0_19 (B, C, D)  + E + W[t] + 0x5A827999;
+      E = D; D = C; C = sha1_rotate_left (B, 30); B = A; A = temp;
+    }
+  for (t = 20; t < 40; ++t)
+    {
+      temp = sha1_rotate_left (A, 5) + sha1_ft_20_39 (B, C, D) + E + W[t] + 0x6ED9EBA1;
+      E = D; D = C; C = sha1_rotate_left (B, 30); B = A; A = temp;
+    }
+  for (t = 40; t < 60; ++t)
+    {
+      temp = sha1_rotate_left (A, 5) + sha1_ft_40_59 (B, C, D) + E + W[t] + 0x8F1BBCDC;
+      E = D; D = C; C = sha1_rotate_left (B, 30); B = A; A = temp;
+    }
+  for (t = 60; t < 80; ++t)
+    {
+      temp = sha1_rotate_left (A, 5) + sha1_ft_60_79 (B, C, D) + E + W[t] + 0xCA62C1D6;
+      E = D; D = C; C = sha1_rotate_left (B, 30); B = A; A = temp;
+    }
+
+  // Step (e)
+  H[0] += A; H[1] += B; H[2] += C; H[3] += D; H[4] += E;
+}
+
+
+static inline void
+sha1_embed_length_into_block (uint32_t block[SHA1_BLOCK_SIZE_WORDS], size_t length)
+{
+  uint64_t bits = length * 8;
+  block[SHA1_BLOCK_SIZE_WORDS - 2] = bits >> 32;
+  block[SHA1_BLOCK_SIZE_WORDS - 1] = bits & 0xffffffff;
+}
+
+static void
+fill_block
+(uint32_t block[SHA1_BLOCK_SIZE_WORDS], const unsigned char *strm, size_t length)
+{
+  size_t byte_idx, word_idx;
+  size_t floored_length = length - length % sizeof(uint32_t);
+
+  for (byte_idx = 0, word_idx = 0; byte_idx  < floored_length; byte_idx += 4, ++word_idx, strm += 4)
+    block[word_idx] = (strm[0] << 24) | (strm[1] << 16) | (strm[2] << 8) | strm[3];
+
+  if (length != SHA1_BLOCK_SIZE_BYTES)
+    {
+      switch (length % sizeof(uint32_t))
+	{
+	case 0:
+	  block[word_idx] = 0x80 << 24;
+	  break;      
+	case 1:
+	  block[word_idx] = (strm[0] << 24) | (0x80 << 16);
+	  break;
+	case 2:
+	  block[word_idx] = (strm[0] << 24) | (strm[1] << 16) | (0x80 << 8);
+	  break;
+	case 3:
+	  block[word_idx] = (strm[0] << 24) | (strm[1] << 16) | (strm[2]) << 8 | 0x80;
+	  break;
+	}
+      for ( ++word_idx; word_idx < SHA1_BLOCK_SIZE_WORDS; ++word_idx)
+	block[word_idx] = 0x0;
+    }
+}
+
+/*
+ * Caluculate SHA1 hash value for givin byte stream pointed by BYTES, 
+ * whose numebr of bytes is LENGTH.
+ * The result is store in H[5]. H[5] should be allocated by caller.
+ *
+ * This funcition is implemented as multi-thread safe.
+ */
+static void
+calculate_sha1 (uint32_t H[5], const unsigned char *bytes, size_t length)
+{
+  // initialize H buffer
+  H[0] = 0x67452301;
+  H[1] = 0xEFCDAB89;
+  H[2] = 0x98BADCFE;
+  H[3] = 0x10325476;
+  H[4] = 0xC3D2E1F0;
+
+  uint32_t block[SHA1_BLOCK_SIZE_WORDS];
+
+  // calculate hash iteratively for a block whose length 
+  // is a multiple of 512bit.
+  size_t rest_bytes = length;
+  while (rest_bytes >= SHA1_BLOCK_SIZE_BYTES)
+    {
+      fill_block (block, bytes, SHA1_BLOCK_SIZE_BYTES);
+      sha1_calculate_512bit_block (H, block);
+
+      bytes += SHA1_BLOCK_SIZE_BYTES;
+      rest_bytes -= SHA1_BLOCK_SIZE_BYTES;
+    }
+
+  if (rest_bytes > 0)
+    {
+      fill_block (block, bytes, rest_bytes);
+      if (SHA1_BLOCK_SIZE_BYTES - rest_bytes > sizeof(uint32_t) * 2)
+	{
+	  sha1_embed_length_into_block (block, length);
+	  sha1_calculate_512bit_block (H, block);
+	}
+      else
+	{
+	  sha1_calculate_512bit_block (H, block);
+	  
+	  // create new zero-filled block then embed message length.
+	  memset (block, 0x0, SHA1_BLOCK_SIZE_BYTES);
+	  sha1_embed_length_into_block (block, length);
+	  sha1_calculate_512bit_block (H, block);
+	}
+    }
+  else
+    {
+      int wi;
+      block[0] = 0x80000000;
+      for (wi = 1; wi < SHA1_BLOCK_SIZE_WORDS; ++wi)
+	block[wi] = 0x0;
+      sha1_embed_length_into_block (block, length);
+      sha1_calculate_512bit_block (H, block);
+    }
+}
+
+/* end SCE local bug 73739 */
 
 static enum elf_spu_reloc_type
 spu_elf_bfd_to_reloc_type (bfd_reloc_code_real_type code)
@@ -350,6 +557,9 @@ struct spu_link_hash_table
   /* Set when we want to strip unneeded sections from the standard crt
    * files. */
   unsigned int strip_crt : 1;
+
+  /* Set if old algorithm for SPU GUID is requested. */
+  unsigned int old_hash_algorithm : 1;
 };
 
 #define spu_hash_table(p) \
@@ -466,7 +676,8 @@ get_sym_h (struct elf_link_hash_entry **hp,
 	      /* If we are reading symbols into the contents, then
 		 read the global syms too.  This is done to cache
 		 syms for later stack analysis.  */
-	      if ((unsigned char **) locsymsp == &symtab_hdr->contents)
+	      if ((unsigned char **) locsymsp == &symtab_hdr->contents
+		  && symtab_hdr->sh_entsize != 0)
 		symcount = symtab_hdr->sh_size / symtab_hdr->sh_entsize;
 	      locsyms = bfd_elf_get_elf_syms (ibfd, symtab_hdr, symcount, 0,
 					      NULL, NULL, NULL);
@@ -749,6 +960,7 @@ struct call_info
   struct function_info *fun;
   struct call_info *next;
   int is_tail;
+  int is_recursive;
 };
 
 struct function_info
@@ -767,8 +979,10 @@ struct function_info
   asection *sec;
   /* Address range of (this part of) function.  */
   bfd_vma lo, hi;
-  /* Stack usage.  */
+  /* This functions stack usage.  */
   int stack;
+  /* Cumulative stack usage.  */
+  int cstack;
   /* Set if global symbol.  */
   unsigned int global : 1;
   /* Set if known to be start of function (as distinct from a hunk
@@ -780,6 +994,10 @@ struct function_info
   unsigned int visit2 : 1;
   unsigned int marking : 1;
   unsigned int visit3 : 1;
+  unsigned int visit4 : 1;
+  unsigned int has_dynamic_alloc : 1;
+  unsigned int has_indirect_call : 1;
+  unsigned int address_taken : 1;
 };
 
 struct spu_elf_stack_info
@@ -790,6 +1008,75 @@ struct spu_elf_stack_info
      address range belonging to a function.  */
   struct function_info fun[1];
 };
+
+/* Scan for dynamic allocation or indirect calls in FUN, located in SEC. */
+
+static void
+scan_function_insns (struct function_info *fun, asection *sec)
+{
+  bfd_vma offset;
+  int reg[128];
+  int maybe_indirect = 0;
+  int save_sp = 0;
+
+  memset (reg, 0, sizeof (reg));
+  for (offset = fun->lo; offset + 4 <= fun->hi; offset += 4)
+    {
+      unsigned char buf[4];
+      int rt, ra;
+      int imm;
+
+      /* Assume no relocs on stack adjusing insns.  */
+      if (!bfd_get_section_contents (sec->owner, sec, buf, offset, 4))
+	break;
+
+      /* If the first byte after 'bi' is non-zero, assume it is a tail
+         call. */
+      if (maybe_indirect && buf[0] != 0)
+	fun->has_indirect_call = 1;
+      maybe_indirect = 0;
+
+      rt = buf[3] & 0x7f;
+      ra = ((buf[2] & 0x3f) << 1) | (buf[3] >> 7);
+      /* Partly decoded immediate field.  */
+      imm = (buf[1] << 9) | (buf[2] << 1) | (buf[3] >> 7);
+
+      if (buf[0] == 0x24 /* stqd */)
+	{
+	  imm >>= 7;
+	  imm = (imm ^ 0x200) - 0x200;
+	  /* Assume any store of $sp to imm($sp) is saving the back chain. */
+	  if (rt == 1 && ra == 1 && imm < 0)
+	    save_sp++;
+	  /* Assume a store of any $reg to 0($sp) is saving the back chain. */
+	  if (ra == 1 && imm == 0)
+	    save_sp++;
+	}
+      else if (buf[0] == 0x28 && (buf[1] & 0xe0) == 0x80  /* stqx */)
+	{
+	  /* Assume any store of $sp to $sp,$reg is saving the back chain. 
+	     We could track immediates to find out the value in $reg and
+	     make sure it is negative. */
+	  if (rt == 1 && ra == 1)
+	    save_sp++;
+	}
+      else if (buf[0] == 0x35 && (buf[1] & 0xe0) == 0 /* bi */)
+	{
+	  if (ra != 0)
+	    maybe_indirect = 1;
+	}
+      else if (buf[0] == 0x35 && (buf[1] & 0xe0) == 0x20 /* bisl */)
+	fun->has_indirect_call = 1;
+    }
+  
+  /* Assume 'bi' at the end of the function is an indirect tail call. */
+  if (maybe_indirect)
+    fun->has_indirect_call = 1;
+  /* Assume there is dynamic allocation when we save the back chain more
+     than once. */
+  if (save_sp > 1)
+    fun->has_dynamic_alloc = 1;
+}
 
 /* Allocate a struct spu_elf_stack_info with MAX_FUN struct function_info
    entries for section SEC.  */
@@ -894,6 +1181,8 @@ maybe_insert_function (asection *sec,
   sinfo->fun[i].lo = off;
   sinfo->fun[i].hi = off + size;
   sinfo->fun[i].stack = -find_function_stack_adjust (sec, off);
+  sinfo->fun[i].cstack = sinfo->fun[i].stack; 
+  scan_function_insns (&sinfo->fun[i], sec);
   sinfo->num_fun += 1;
   return &sinfo->fun[i];
 }
@@ -1059,7 +1348,8 @@ insert_callee (struct function_info *caller, struct call_info *callee)
   return TRUE;
 }
 
-/* Rummage through the relocs for SEC, looking for function calls.
+/* Rummage through the relocs for SEC, looking for function calls and
+   functions which have had their address taken.
    If CALL_TREE is true, fill in call graph.  If CALL_TREE is false,
    mark destination symbols on calls as being functions.  Also
    look at branches, which may be tail calls or go to hot/cold
@@ -1101,7 +1391,10 @@ mark_functions_via_relocs (asection *sec,
 
       r_type = ELF32_R_TYPE (irela->r_info);
       if (r_type != R_SPU_REL16
-	  && r_type != R_SPU_ADDR16)
+	  && r_type != R_SPU_ADDR16
+	  && r_type != R_SPU_ADDR18
+	  && r_type != R_SPU_ADDR16_HI
+	  && r_type != R_SPU_GLOB_DAT)
 	continue;
 
       r_indx = ELF32_R_SYM (irela->r_info);
@@ -1116,6 +1409,25 @@ mark_functions_via_relocs (asection *sec,
       if (!bfd_get_section_contents (sec->owner, sec, insn,
 				     irela->r_offset, 4))
 	return FALSE;
+
+      if (h)
+	val = h->root.u.def.value;
+      else
+	val = sym->st_value;
+      val += irela->r_addend;
+
+      if (r_type == R_SPU_GLOB_DAT || r_type == R_SPU_ADDR18
+	  || r_type == R_SPU_ADDR16_HI)
+	{
+	  if (spu_elf_section_data (sym_sec)->stack_info)
+	    {
+	      struct function_info *fun = find_function (sym_sec, val, info);
+	      if (fun && fun->lo == val)
+		fun->address_taken = 1;
+	    }
+	  continue;
+	}
+
       if (!is_branch (insn))
 	continue;
 
@@ -1133,12 +1445,6 @@ mark_functions_via_relocs (asection *sec,
 	}
 
       is_call = (insn[0] & 0xfd) == 0x31;
-
-      if (h)
-	val = h->root.u.def.value;
-      else
-	val = sym->st_value;
-      val += irela->r_addend;
 
       if (!call_tree)
 	{
@@ -1177,6 +1483,7 @@ mark_functions_via_relocs (asection *sec,
       if (callee->fun == NULL)
 	return FALSE;
       callee->is_tail = !is_call;
+      callee->is_recursive = 0;
       if (!insert_callee (caller, callee))
 	free (callee);
       else if (!is_call
@@ -1253,13 +1560,26 @@ pasted_function (asection *sec, struct bfd_link_info *info)
 /* We're only interested in code sections.  */
 
 static bfd_boolean
-interesting_section (asection *s, bfd *obfd,
+code_section (asection *s, bfd *obfd,
 		     struct spu_link_hash_table *htab ATTRIBUTE_UNUSED)
 {
   return (s->output_section != NULL
 	  && s->output_section->owner == obfd
 	  && ((s->flags & (SEC_ALLOC | SEC_LOAD | SEC_CODE))
 	      == (SEC_ALLOC | SEC_LOAD | SEC_CODE))
+	  && s->size != 0);
+}
+
+/* We're only interested in data sections.  */
+
+static bfd_boolean
+data_section (asection *s, bfd *obfd,
+		     struct spu_link_hash_table *htab ATTRIBUTE_UNUSED)
+{
+  return (s->output_section != NULL
+	  && s->output_section->owner == obfd
+	  && ((s->flags & (SEC_ALLOC | SEC_LOAD | SEC_CODE))
+	      == (SEC_ALLOC | SEC_LOAD))
 	  && s->size != 0);
 }
 
@@ -1303,19 +1623,23 @@ discover_functions (bfd *output_bfd, struct bfd_link_info *info)
 
       /* Read all the symbols.  */
       symtab_hdr = &elf_tdata (ibfd)->symtab_hdr;
+      /* This can be zero when an object has been stripped. */
+      if (symtab_hdr->sh_entsize == 0)
+	continue;
       symcount = symtab_hdr->sh_size / symtab_hdr->sh_entsize;
       if (symcount == 0)
 	continue;
 
-      syms = (Elf_Internal_Sym *) symtab_hdr->contents;
+      /* symtab_hdr->contents can be set in _bfd_elf_gc_mark, but it
+         will contain only local symbols.  We need all symbols, so we
+         re-read them.  */
+      if (symtab_hdr->contents)
+	free (symtab_hdr->contents);
+      syms = bfd_elf_get_elf_syms (ibfd, symtab_hdr, symcount, 0,
+				   NULL, NULL, NULL);
+      symtab_hdr->contents = (void *) syms;
       if (syms == NULL)
-	{
-	  syms = bfd_elf_get_elf_syms (ibfd, symtab_hdr, symcount, 0,
-				       NULL, NULL, NULL);
-	  symtab_hdr->contents = (void *) syms;
-	  if (syms == NULL)
-	    return FALSE;
-	}
+	return FALSE;
 
       /* Select defined function symbols that are going to be output.  */
       psyms = bfd_malloc ((symcount + 1) * sizeof (*psyms));
@@ -1333,7 +1657,7 @@ discover_functions (bfd *output_bfd, struct bfd_link_info *info)
 	    asection *s;
 
 	    *p = s = bfd_section_from_elf_index (ibfd, sy->st_shndx);
-	    if (s != NULL && interesting_section (s, output_bfd, htab))
+	    if (s != NULL && code_section (s, output_bfd, htab))
 	      *psy++ = sy;
 	  }
       symcount = psy - psyms;
@@ -1375,7 +1699,7 @@ discover_functions (bfd *output_bfd, struct bfd_link_info *info)
 	}
 
       for (sec = ibfd->sections; sec != NULL && !gaps; sec = sec->next)
-	if (interesting_section (sec, output_bfd, htab))
+	if (code_section (sec, output_bfd, htab))
 	  gaps |= check_function_ranges (sec, info);
     }
 
@@ -1393,7 +1717,7 @@ discover_functions (bfd *output_bfd, struct bfd_link_info *info)
 	    continue;
 
 	  for (sec = ibfd->sections; sec != NULL; sec = sec->next)
-	    if (interesting_section (sec, output_bfd, htab)
+	    if (code_section (sec, output_bfd, htab)
 		&& sec->reloc_count != 0)
 	      {
 		if (!mark_functions_via_relocs (sec, info, FALSE))
@@ -1420,7 +1744,7 @@ discover_functions (bfd *output_bfd, struct bfd_link_info *info)
 
 	  gaps = FALSE;
 	  for (sec = ibfd->sections; sec != NULL && !gaps; sec = sec->next)
-	    if (interesting_section (sec, output_bfd, htab))
+	    if (code_section (sec, output_bfd, htab))
 	      gaps |= check_function_ranges (sec, info);
 	  if (!gaps)
 	    continue;
@@ -1446,7 +1770,7 @@ discover_functions (bfd *output_bfd, struct bfd_link_info *info)
 	     the range of such functions to the beginning of the
 	     next symbol of interest.  */
 	  for (sec = ibfd->sections; sec != NULL; sec = sec->next)
-	    if (interesting_section (sec, output_bfd, htab))
+	    if (code_section (sec, output_bfd, htab))
 	      {
 		struct _spu_elf_section_data *sec_data;
 		struct spu_elf_stack_info *sinfo;
@@ -1528,8 +1852,7 @@ call_graph_traverse (struct function_info *fun, struct bfd_link_info *info)
 	  info->callbacks->info (_("Stack analysis will ignore the call "
 				   "from %s to %s\n"),
 				 f1, f2);
-	  *callp = call->next;
-	  continue;
+	  call->is_recursive = TRUE;
 	}
       callp = &call->next;
     }
@@ -1554,7 +1877,8 @@ build_call_tree (bfd *output_bfd, struct bfd_link_info *info)
 
       for (sec = ibfd->sections; sec != NULL; sec = sec->next)
 	{
-	  if (!interesting_section (sec, output_bfd, htab)
+	  if ((!code_section (sec, output_bfd, htab)
+		&& !data_section (sec, output_bfd, htab))
 	      || sec->reloc_count == 0)
 	    continue;
 
@@ -1656,52 +1980,33 @@ sum_stack (struct function_info *fun,
 	   int emit_stack_syms)
 {
   struct call_info *call;
-  struct function_info *max = NULL;
-  bfd_vma max_stack = fun->stack;
+  bfd_vma max_stack = fun->cstack;
   bfd_vma stack;
-  const char *f1;
 
   if (fun->visit3)
     return max_stack;
 
   for (call = fun->call_list; call; call = call->next)
-    {
-      stack = sum_stack (call->fun, info, emit_stack_syms);
-      /* Include caller stack for normal calls, don't do so for
-	 tail calls.  fun->stack here is local stack usage for
-	 this function.  */
-      if (!call->is_tail)
-	stack += fun->stack;
-      if (max_stack < stack)
-	{
+    if (!call->is_recursive)
+      {
+	stack = sum_stack (call->fun, info, emit_stack_syms);
+	/* Include caller stack for normal calls, don't do so for
+	   tail calls.  fun->stack here is local stack usage for
+	   this function.  */
+	if (!call->is_tail)
+	  stack += fun->stack;
+	if (max_stack < stack)
 	  max_stack = stack;
-	  max = call->fun;
-	}
-    }
-
-  f1 = func_name (fun);
-  info->callbacks->minfo (_("%s: 0x%v 0x%v\n"), f1, (bfd_vma)fun->stack, max_stack);
-
-  if (fun->call_list)
-    {
-      info->callbacks->minfo (_("  calls:\n"));
-      for (call = fun->call_list; call; call = call->next)
-	{
-	  const char *f2 = func_name (call->fun);
-	  const char *ann1 = call->fun == max ? "*" : " ";
-	  const char *ann2 = call->is_tail ? "t" : " ";
-
-	  info->callbacks->minfo (_("   %s%s %s\n"), ann1, ann2, f2);
-	}
-    }
+      }
 
   /* Now fun->stack holds cumulative stack.  */
-  fun->stack = max_stack;
+  fun->cstack = max_stack;
   fun->visit3 = TRUE;
 
   if (emit_stack_syms)
     {
       struct spu_link_hash_table *htab = spu_hash_table (info);
+      const char *f1 = func_name (fun);
       char *name = bfd_malloc (18 + strlen (f1));
       struct elf_link_hash_entry *h;
 
@@ -1736,6 +2041,65 @@ sum_stack (struct function_info *fun,
   return max_stack;
 }
 
+/* Print the call graph.  When a function is called from multiple
+   places, the details are repeated because flags can be different.
+   CALLER and CALL are NULL when called for a root function.  DEPTH and
+   NEXT are used for pretty printing.  The callee can only have max
+   stack when CALLER_IS_MAX is TRUE. */
+
+static void
+print_callgraph_info (struct function_info *caller,
+		      struct function_info *callee,
+		      struct call_info *call,
+		      struct bfd_link_info *info,
+		      int depth,
+		      int next,
+		      int caller_is_max)
+{
+  const char *f1 = func_name (callee);
+  const char *ann1 = "*";
+  const char *ann2 = " ";
+  const char *ann3 = " ";
+  const char *ann4 = callee->has_indirect_call ? "i" : " ";
+  const char *ann5 = callee->address_taken ? "a" : " ";
+  const char *ann6 = callee->has_dynamic_alloc ? "d" : " ";
+  const char *ann7 = callee->visit4 ? "^" : " ";
+  int is_max = 1;
+  int i, n;
+  static char buf[32];
+
+  callee->visit4 = TRUE;
+
+  if (caller)
+    {
+      is_max = caller_is_max
+	       && (caller->cstack - caller->stack == callee->cstack
+		   || (call->is_tail && caller->cstack == callee->cstack));
+      ann1 = is_max ? "*" : " ";
+      ann2 = call->is_tail ? "t" : " ";
+      ann3 = call->is_recursive ? "r" : " ";
+    }
+
+  sprintf (buf, "%6d  %6d  %s%s%s%s%s%s%s  ",
+	   callee->cstack, callee->stack,
+	   ann1, ann2, ann3, ann4, ann5, ann6, ann7);
+  info->callbacks->minfo (_("%s"), buf);
+  for (i = 1, n = next; i < depth; i++, n >>= 1)
+    if ((n & 1) && depth < 32)
+      info->callbacks->minfo (_("|  "));
+    else
+      info->callbacks->minfo (_("   "));
+  if (depth > 0)
+    info->callbacks->minfo (_("+- "));
+  info->callbacks->minfo (_("%s\n"), f1);
+  if (call && call->is_recursive)
+    return;
+  for (call = callee->call_list; call; call = call->next)
+    print_callgraph_info (callee, call->fun, call, info, depth + 1,
+			  next | (depth < 32 && call->next ? 1 << depth : 0),
+			  is_max);
+}
+
 /* Provide an estimate of total stack required.  */
 
 static bfd_boolean
@@ -1753,8 +2117,12 @@ spu_elf_stack_analysis (bfd *output_bfd,
     return FALSE;
 
   info->callbacks->info (_("Stack size for call graph root nodes.\n"));
-  info->callbacks->minfo (_("\nStack size for functions.  "
-			    "Annotations: '*' max stack, 't' tail call\n"));
+  info->callbacks->minfo (_("\nStack size for functions.\n"
+			    "Flags: '*' max stack, 't' tail call, 'r' recursive call\n"
+			    "       'i' makes indirect call, 'a' address taken\n"
+			    "       'd' contains dynamic stack allocation, '^' printed above\n"
+			    " Max     Func\n"
+			    " Depth   Stack  Flags    Calls\n"));
   for (ibfd = info->input_bfds; ibfd != NULL; ibfd = ibfd->link_next)
     {
       extern const bfd_target bfd_elf32_spu_vec;
@@ -1781,6 +2149,7 @@ spu_elf_stack_analysis (bfd *output_bfd,
 
 		      stack = sum_stack (&sinfo->fun[i], info,
 					 emit_stack_syms);
+		      print_callgraph_info (0, &sinfo->fun[i], 0, info, 0, 0, 1);
 		      f1 = func_name (&sinfo->fun[i]);
 		      info->callbacks->info (_("  %s: 0x%v\n"),
 					      f1, stack);
@@ -2366,7 +2735,7 @@ spu_elf_relocate_section (bfd *output_bfd,
 	    && strncmp (sym_name, "__ABS__", 7) == 0)
 	  relocation += input_section->output_section->vma 
 			+ input_section->output_offset
-			+ rel->r_offset - rel->r_addend;
+			+ rel->r_offset;
 
 	r = _bfd_final_link_relocate (howto,
 				      input_bfd,
@@ -2773,7 +3142,7 @@ spu_elf_section_processing (bfd * abfd, Elf_Internal_Shdr * i_shdrp)
 	  == (SEC_HAS_CONTENTS | SEC_LOAD | SEC_ALLOC))
       && strcmp (sec->name, ".SpuGUID") != 0)
     {
-      bfd_size_type sec_size, cnt;
+      bfd_size_type sec_size;
       bfd_byte *sec_contents;
 
       sec_size = bfd_get_section_size (i_shdrp->bfd_section);
@@ -2794,14 +3163,25 @@ spu_elf_section_processing (bfd * abfd, Elf_Internal_Shdr * i_shdrp)
       /** to avoid write after read immediately (bugzilla #21381) **/
       real_fseek (bfd_cache_lookup (abfd, CACHE_NORMAL), 0, SEEK_CUR);
 
-      /* Cumulate hash value from the section contents. */
-      /* FIXME: Does this hash function behave well? */
-      for (cnt = 0; cnt < sec_size; ++cnt)
-	spu_guid = spu_guid * 173 + (spu_guid >> 19) + sec_contents[cnt];
+      /* begin sce local buzilla 73739 */
+      /* Changed hash algorithm. */
+      {
+	uint32_t sha1_hash_value[SHA1_BLOCK_SIZE_WORDS];
+	/* calculate SHA1 hash value for each section. */
+	calculate_sha1 (sha1_hash_value, sec_contents, sec_size);
+       
+	/* then, SHA1 hash value is shrunk to one 64bit value */
+	spu_guid ^= (uint64_t)sha1_hash_value[0];
+	spu_guid ^= (uint64_t)sha1_hash_value[1] << 8;
+	spu_guid ^= (uint64_t)sha1_hash_value[2] << 16;
+	spu_guid ^= (uint64_t)sha1_hash_value[3] << 24;
+	spu_guid ^= (uint64_t)sha1_hash_value[4] << 32;
+      }
+      /* begin sce local bugzilla 73749 */
 
       free (sec_contents);
     }
-  /* end sce local */
+    /* end sce local */
   return TRUE;
 }
 

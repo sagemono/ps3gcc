@@ -156,7 +156,7 @@ rs6000_macro_to_expand (cpp_reader *pfile, const cpp_token *tok)
 	  expand_this = __vector_keyword;
 	  expand_bool_pixel = ident;
 	}
-      else if (ident)
+      else if (ident && ident != __vector_keyword)
 	{
 	  enum rid rid_code = (enum rid)(ident->rid_code);
 	  if (ident->type == NT_MACRO)
@@ -2917,7 +2917,8 @@ altivec_build_resolved_builtin (tree *args, int n,
       STRIP_NOPS (arg1);
       /* vec_lvlx (0, &a) is really vec_promote (a, 0) */
       if (zero_p (args[0])
-          && TREE_CODE (arg1) == ADDR_EXPR)
+          && TREE_CODE (arg1) == ADDR_EXPR
+	  && DECL_P (TREE_OPERAND (arg1, 0)))
 	{
 	  int size;
 	  VEC(constructor_elt,gc) *vec;

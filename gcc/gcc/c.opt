@@ -435,6 +435,10 @@ Wpointer-sign
 C ObjC Var(warn_pointer_sign) Init(-1)
 Warn when a pointer differs in signedness in an assignment
 
+Wconstant-expression
+C++ Var(warn_constant_expression) Init(1)
+Warn an integral constant expression not correct.
+
 ansi
 C ObjC C++ ObjC++
 A synonym for -std=c89 (for C) or -std=c++98 (for C++)

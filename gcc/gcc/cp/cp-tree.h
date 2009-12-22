@@ -4053,6 +4053,7 @@ extern int push_tinst_level			(tree);
 extern void pop_tinst_level			(void);
 extern int more_specialized_class		(tree, tree);
 extern int comp_template_parms			(tree, tree);
+extern tree get_template_info			(tree);
 extern int template_class_depth			(tree);
 extern int is_specialization_of			(tree, tree);
 extern bool is_specialization_of_friend		(tree, tree);

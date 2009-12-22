@@ -20,45 +20,30 @@
 /* This back-end maps an SPU object to a PPC64 object file for reading
  * only.  
  *
- * 1) SEC_ALLOC sections are mapped to a single .data section as if the
- *    user had done
+ * 1) When using -I elf64-powerpc-spu, SEC_ALLOC sections are mapped to
+ *    a single .data section as if the user had done
  *      objcopy -O binary -I elf32-spu -B powerpc  <file> tmp.bin
  *      objcopy -O elf64-powerpc -I binary tmp.bin <file>
+ *    When using -I elf64-powerpc-spu-elf, the ELF header, program
+ *    headers and referenced contents are copied into a single .data
+ *    section, and other data in the SPU object is discarded, e.g.,
+ *    debug info and section headers.
  * 2) _binary_<file>_start, _binary_<file>_end, and _binary_<file>_size
  *    symbols are generated at the boundaries of this .data section
  * 3) _binary_start, _binary_end, and _binary_size symbols are generated
  *    with local binding at the boundaries of this .data section
- * 4) R_SPU_PPC32 and R_SPU_PPC64 relocations are mapped to the
+ * 4) All STB_GLOBAL symbols in the SPU object have corresponding
+ *    symbols created which point to their location in this .data
+ *    section.
+ * 5) R_SPU_PPC32 and R_SPU_PPC64 relocations are mapped to the
  *    R_PPC64_ADDR32 and R_PPC64_ADDR64 relocations in .data.rela.
- *
- * TODO: Use program header alignment to set alignment of the .data
- * section.
- *
- * TODO: Include the .bss section as zeroed contents when the
- * __init_zerobss symbol is not defined.  __init_zerobss will be defined
- * when a standard crt file is included that initializes the .bss
- * section to 0.
- *
- * TODO: Some programming models expect the whole SPU ELF file (headers
- * and all) to be in the data section.  Perhaps this can be triggered
- * off of entry point names.  
- *
- * TODO: Allow for an easier way to specify an alternate prefix for the
- * *_start, *_end, and *_size symbols.  The current method is to use
- * objcopy --redefine-sym.
- *
- * TODO:  It is possible to expose all STB_GLOBAL/STV_DEFAULT symbols in
- * the SPU object as _<some_prefix>_<symbol>, but that would bloat the
- * symbol table.  Create a new bind type to export SPU symbols to PPU.
- *
- * TODO: When the SPU object does not have section headers, use program
- * headers to do parts (1) and (2).
- *
+ * 
  * TODO: What about SPU objects that are DYNAMIC?  For now, it doesn't
  * seem there is any use for handling them here.
  *
  * TODO: Should the SPU Name Note section be included?  It seems it is
- * just for debugging
+ * just for debugging.  It is currently included when embedding an elf,
+ * and discarded when embedding a binary image.
  *
  * TODO: Create a .gnu_debuglink section too.  Or, map all of the debug
  * sections to .spu.<GUID>.<debug_section>.
@@ -75,6 +60,8 @@
 #include "elf-bfd.h"
 #include "elf/ppc64.h"
 #include "elf/spu.h"
+
+extern const bfd_target bfd_elf64_powerpc_spu_elf_vec;
 
 #define ONES(n) (((bfd_vma) 1 << ((n) - 1) << 1) - 1)
 
@@ -177,18 +164,17 @@ ppc64_spu_info_to_howto (bfd *abfd ATTRIBUTE_UNUSED, arelent *cache_ptr,
   cache_ptr->howto = &ppc64_spu_howto_raw[r];
 }
 
-/* The default syms we create */
-#define BIN_SYMS 3
-
 struct ppc64_spu_tdata {
   struct elf_obj_tdata elf;
   bfd *spu_bfd;
   asymbol **spu_sympp;
   Elf_Internal_Shdr *hdrs;
   Elf_Internal_Sym *syms;
-  bfd_vma align_power;
+  bfd_vma align;
   bfd_vma low_lma;
   bfd_vma high_lma;
+  bfd_vma high_offset;
+  unsigned int bss_size;
 };
 
 #define DATA_SH_INDEX		1
@@ -197,6 +183,8 @@ struct ppc64_spu_tdata {
 #define STRTAB_SH_INDEX		4
 #define RELA_SH_INDEX		5
 
+/* binary_symbol_prefix is defined in objcopy.c */
+extern char *binary_symbol_prefix __attribute__((weak));
 static char sym_prefix[] = "_binary_";
 
 /* Create a ppc64_spu object.  Invoked via bfd_set_format.  */
@@ -235,8 +223,10 @@ add_string (bfd *abfd, int strtab, const char *name0, const char *name1)
 	  p0 = p1 + 1;
 	}
     }
-  if ((off & -256) != ((off + len0 + len1) & -256))
-    sec->contents = bfd_realloc (sec->contents, ((off + len0 + len1) & -256) + 256);
+  /* contents is allocated in multiples of 256 bytes.  off is the
+     actual number of bytes used. */ 
+  if ((off & -256) != ((off + len0 + len1 + 1) & -256))
+    sec->contents = bfd_realloc (sec->contents, ((off + len0 + len1 + 1) & -256) + 256);
   if (len0)
     memcpy (sec->contents + off, name0, len0);
   if (len1)
@@ -261,11 +251,15 @@ add_symbol (bfd * abfd, bfd_vma value, bfd_vma size, const char *name0,
 
   /* Look for an existing symbol with the same name */
   if (name && lookup)
-    for (i = 0; i < num_syms; i++, sym++)
-      if (sym->st_name == name)
-	return i;
+    {
+      for (i = 0; i < num_syms; i++, sym++)
+	if (sym->st_name == name)
+	  return i;
+    }
+  else
+    i = num_syms;
 
-  /* st_info is the index of the for non-STB_LOCAL symbol.  The first
+  /* sh_info is the index of the for non-STB_LOCAL symbol.  The first
      symbol of the section is always a dummy entry, so this must be
      greater than 1 if there is a non-local symbol. */
   if (sec->sh_info == 0 && bind != STB_LOCAL)
@@ -306,28 +300,41 @@ add_relocation (bfd *abfd, bfd_vma offset, const char *name, unsigned int rtype,
   elf_elfheader(abfd)->e_shnum = 6;
 }
 
+/* Compute the virtual address bounds and the minimal ELF loader bounds. */
 static void
-alloc_section_bounds (bfd *abfd ATTRIBUTE_UNUSED,
-		      asection *section, void *data)
+alloc_segment_bounds (bfd * nbfd, struct ppc64_spu_tdata *ppc64_spu)
 {
-  struct ppc64_spu_tdata *ppc64_spu = data;
-  bfd_vma low, high;
-  if ((section->flags & (SEC_ALLOC | SEC_EXCLUDE | SEC_HAS_CONTENTS | SEC_NEVER_LOAD | SEC_LOAD))
-      != (SEC_ALLOC | SEC_HAS_CONTENTS | SEC_LOAD))
-    return;
-  low = section->lma;
-  high = section->lma + section->size;
-  if (section->alignment_power > ppc64_spu->align_power)
-    ppc64_spu->align_power = section->alignment_power;
-  if (ppc64_spu->high_lma == 0)
+  Elf_Internal_Phdr *phdr;
+  unsigned int i;
+  bfd_vma high, low;
+  ppc64_spu->high_offset = elf_elfheader (nbfd)->e_phoff
+    + elf_elfheader (nbfd)->e_phentsize * elf_elfheader (nbfd)->e_phnum;
+  phdr = elf_tdata (nbfd)->phdr;
+  for (i = 0; i < elf_elfheader (nbfd)->e_phnum; i++, phdr++)
     {
-      ppc64_spu->low_lma = low;
-      ppc64_spu->high_lma = high;
+      if (phdr->p_type == PT_LOAD)
+	{
+	  if (phdr->p_align > ppc64_spu->align)
+	    ppc64_spu->align = phdr->p_align;
+	  low = phdr->p_vaddr;
+	  high = phdr->p_vaddr + phdr->p_filesz;
+	  if (ppc64_spu->high_lma == 0)
+	    {
+	      ppc64_spu->low_lma = low;
+	      ppc64_spu->high_lma = high;
+	    }
+	  else if (high > ppc64_spu->high_lma)
+	    ppc64_spu->high_lma = high;
+	  else if (low < ppc64_spu->low_lma)
+	    ppc64_spu->low_lma = low;
+	}
+      if (phdr->p_type == PT_LOAD || phdr->p_type == PT_NOTE)
+	{
+	  high = phdr->p_offset + phdr->p_filesz;
+	  if (high > ppc64_spu->high_offset)
+	    ppc64_spu->high_offset = high;
+	}
     }
-  else if (high > ppc64_spu->high_lma)
-    ppc64_spu->high_lma = high;
-  else if (low < ppc64_spu->low_lma)
-    ppc64_spu->low_lma = low;
 }
 
 static void
@@ -374,6 +381,31 @@ mangle_mem (char *p, unsigned int size)
       *p = '_';
 }
 
+/* Map the ELF symbol address to its real location in the PPU object
+   file.  Symbols in bss will be given an address as if it were in a
+   loadable section. */
+static bfd_vma
+get_symbol_address (bfd * abfd, struct ppc64_spu_tdata *ppc64_spu,
+		    elf_symbol_type * esym)
+{
+  if (abfd->xvec == &bfd_elf64_powerpc_spu_elf_vec)
+    {
+      bfd *nbfd = ppc64_spu->spu_bfd;
+      Elf_Internal_Phdr *phdr;
+      unsigned int i;
+      bfd_vma value = esym->internal_elf_sym.st_value;
+      phdr = elf_tdata (nbfd)->phdr;
+      for (i = 0; i < elf_elfheader (nbfd)->e_phnum; i++, phdr++)
+	if (phdr->p_type == PT_LOAD
+	    && value >= phdr->p_vaddr
+	    && value < phdr->p_vaddr + phdr->p_memsz)
+	  return value - phdr->p_vaddr + phdr->p_offset;
+      return 0;
+    }
+  else
+    return esym->internal_elf_sym.st_value - ppc64_spu->low_lma;
+}
+
 static const bfd_target *
 ppc64_spu_object_p (bfd *abfd)
 {
@@ -390,12 +422,19 @@ ppc64_spu_object_p (bfd *abfd)
 
   /* This target can only be used for reading. */
   if (bfd_write_p (abfd))
-    return 0;
+    {
+      bfd_set_error (bfd_error_wrong_format);
+      return 0;
+    }
 
   /* Open the file as an SPU bfd_object */
   nbfd = bfd_openr (abfd->filename, "elf32-spu");
   if (!nbfd)
-    return 0;
+    {
+      bfd_set_error (bfd_error_wrong_format);
+      return 0;
+    }
+
   nbfd->format = bfd_object;
   right_targ = BFD_SEND_FMT (nbfd, _bfd_check_format, (nbfd));
   if (right_targ != nbfd->xvec)
@@ -415,7 +454,8 @@ ppc64_spu_object_p (bfd *abfd)
       || (symcount = bfd_canonicalize_symtab (nbfd, ppc64_spu->spu_sympp)) < 0)
     goto fail_object_p;
 
-  bfd_map_over_sections (nbfd, alloc_section_bounds, ppc64_spu);
+  /* Determine loadable bounds */
+  alloc_segment_bounds (nbfd, ppc64_spu);
 
   /* Set up the ELF header */
   i_ehdrp = elf_elfheader(abfd);
@@ -433,7 +473,7 @@ ppc64_spu_object_p (bfd *abfd)
   i_ehdrp->e_machine = EM_PPC64;
   i_ehdrp->e_ehsize = 64;
   i_ehdrp->e_shentsize = 64;
-  i_ehdrp->e_shnum = 5;
+  i_ehdrp->e_shnum = 5; /* Increased to 6 when adding relocations */
   i_ehdrp->e_shstrndx = SHSTRTAB_SH_INDEX;
   elf_numsections (abfd) = i_ehdrp->e_shnum;
 
@@ -441,12 +481,15 @@ ppc64_spu_object_p (bfd *abfd)
    * need, even though we might not use them all.  */
   ppc64_spu->hdrs = bfd_zalloc (abfd, sizeof (Elf_Internal_Shdr) * 6);
 
-  /* Create .data section */
+  /* Create .data section. */
   data_sec = &ppc64_spu->hdrs[DATA_SH_INDEX];
   data_sec->sh_type = SHT_PROGBITS;
   data_sec->sh_flags = SHF_WRITE | SHF_ALLOC;
-  data_sec->sh_size = ppc64_spu->high_lma - ppc64_spu->low_lma;
-  data_sec->sh_addralign = 1 << ppc64_spu->align_power;
+  if (abfd->xvec ==  &bfd_elf64_powerpc_spu_elf_vec)
+    data_sec->sh_size = ppc64_spu->high_offset;
+  else
+    data_sec->sh_size = ppc64_spu->high_lma - ppc64_spu->low_lma;
+  data_sec->sh_addralign = ppc64_spu->align;
 
   /* Create .shstrtab section */
   shstrtab_sec = &ppc64_spu->hdrs[SHSTRTAB_SH_INDEX];
@@ -485,9 +528,18 @@ ppc64_spu_object_p (bfd *abfd)
   rela_sec->sh_size = 0;
   rela_sec->contents = 0;
 
-  len = strlen (bfd_get_filename (abfd)) + sizeof (sym_prefix) + 1;
-  name = bfd_alloc (abfd, len);
-  snprintf (name, len, "%s%s_", sym_prefix, bfd_get_filename (abfd));
+  if (&binary_symbol_prefix && binary_symbol_prefix)
+    {
+      len = strlen (binary_symbol_prefix) + 2;
+      name = bfd_alloc (abfd, len);
+      strncpy (name, binary_symbol_prefix, len);
+    }
+  else
+    {
+      len = strlen (bfd_get_filename (abfd)) + sizeof (sym_prefix) + 2;
+      name = bfd_alloc (abfd, len);
+      snprintf (name, len, "%s%s_", sym_prefix, bfd_get_filename (abfd));
+    }
   mangle_mem (name, len);
 
   /* Create internal symbols. The first is a dummy entry of all zeros. */
@@ -496,6 +548,10 @@ ppc64_spu_object_p (bfd *abfd)
   add_symbol (abfd, 0, 0, 0, 0,
 	      STB_LOCAL, STT_SECTION, STV_DEFAULT,
 	      DATA_SH_INDEX, 0);
+
+  /* Local copies of symbols used to load and/or initialize code.  Use a
+     standard prefix so they can be consistently referenced from SPU
+     code using @ppu. */
   add_symbol (abfd, 0, 0, "_binary_start", 0,
 	      STB_LOCAL, STT_NOTYPE, STV_DEFAULT,
 	      DATA_SH_INDEX, 0);
@@ -503,6 +559,12 @@ ppc64_spu_object_p (bfd *abfd)
 	      STB_LOCAL, STT_NOTYPE, STV_DEFAULT,
 	      DATA_SH_INDEX, 0);
   add_symbol (abfd, data_sec->sh_size, 0, "_binary_size", 0,
+	      STB_LOCAL, STT_NOTYPE, STV_DEFAULT,
+	      SHN_ABS, 0);
+  add_symbol (abfd, ppc64_spu->bss_size, 0, "_binary_bss_size", 0,
+	      STB_LOCAL, STT_NOTYPE, STV_DEFAULT,
+	      SHN_ABS, 0);
+  add_symbol (abfd, ppc64_spu->align, 0, "_binary_ls_align", 0,
 	      STB_LOCAL, STT_NOTYPE, STV_DEFAULT,
 	      SHN_ABS, 0);
 
@@ -520,6 +582,35 @@ ppc64_spu_object_p (bfd *abfd)
   add_symbol (abfd, data_sec->sh_size, 0, name, "size",
 	      STB_GLOBAL, STT_NOTYPE, STV_DEFAULT,
 	      SHN_ABS, 0);
+
+  /* _binary_<file>_bss_size */
+  add_symbol (abfd, ppc64_spu->bss_size, 0, name, "bss_size",
+	      STB_GLOBAL, STT_NOTYPE, STV_DEFAULT,
+	      SHN_ABS, 0);
+
+  /* _binary_<file>_ls_align */
+  add_symbol (abfd, ppc64_spu->align, 0, name, "ls_align",
+	      STB_GLOBAL, STT_NOTYPE, STV_DEFAULT,
+	      SHN_ABS, 0);
+
+  /* Add another undescore to prefix to avoid name conflicts. */
+  name[len-2] = '_';
+  name[len-1] = 0;
+
+  /* Export global symbols adding prefix. */ 
+  for (i = 0; i < (unsigned int)symcount; i++)
+    {
+      asymbol *sym = ppc64_spu->spu_sympp[i];
+      elf_symbol_type *esym = elf_symbol_from(nbfd,sym);
+      if (esym
+	  && !bfd_is_und_section (sym->section)
+	  && !bfd_is_com_section (sym->section)
+	  && (sym->flags & (BSF_GLOBAL | BSF_FILE | BSF_SECTION_SYM)) == BSF_GLOBAL)
+	add_symbol (abfd, get_symbol_address (abfd, ppc64_spu, esym),
+		    esym->internal_elf_sym.st_size, name, sym->name,
+		    STB_GLOBAL, STT_NOTYPE, STV_DEFAULT,
+		    DATA_SH_INDEX, 0);
+    }
 
   /* Read in SPU relocations and create PPU relocations */
   bfd_map_over_sections (nbfd, map_relocations, abfd);
@@ -550,7 +641,8 @@ ppc64_spu_object_p (bfd *abfd)
     goto fail_object_p;
 
   /* Set lma for the .data section */
-  data_sec->bfd_section->lma = ppc64_spu->low_lma;
+  if (abfd->xvec != &bfd_elf64_powerpc_spu_elf_vec)
+    data_sec->bfd_section->lma = ppc64_spu->low_lma;
 
   /* Could call _bfd_elf_setup_sections (abfd), but currently it only
    * deals with SHF_GROUP and SHF_LINK_ORDER, so we don't need it */
@@ -565,74 +657,81 @@ fail_object_p:
   return 0;
 }
 
-struct get_section_contents_args {
-  void *location;
-  bfd_size_type offset;
-  bfd_size_type count;
-  bfd_boolean success;
-};
-
-static void
-map_get_section_contents (bfd *abfd, asection *section, void *data)
-{
-  struct get_section_contents_args *args = data;
-  void *l = NULL; /* ??? */
-  bfd_size_type o = 0; /* ??? */
-  bfd_size_type c = 0;
-
-  if ((section->flags & (SEC_ALLOC | SEC_EXCLUDE | SEC_HAS_CONTENTS | SEC_NEVER_LOAD | SEC_LOAD))
-      != (SEC_ALLOC | SEC_HAS_CONTENTS | SEC_LOAD))
-    return;
-
-  if (section->lma >= args->offset && section->lma < args->offset + args->count)
-    {
-      l = args->location + (section->lma - args->offset);
-      o = 0;
-      if (section->lma + section->size <= args->offset + args->count)
-	c = section->size;
-      else
-	c = (args->offset + args->count) - section->lma;
-
-    }
-  else if (section->lma < args->offset && section->lma + section->size > args->offset)
-    {
-      l = args->location;
-      o = args->offset - section->lma;
-      if (section->lma + section->size <= args->offset + args->count)
-	c = (section->lma + section->size) - args->offset;
-      else
-	c = args->count;
-    }
-
-  if (c > 0)
-    if (!bfd_get_section_contents (abfd, section, l, (file_ptr)o, c))
-      args->success = FALSE;
-}
-
-/* Get contents of the only section.  */
-
+/* Get contents of the output .data section.  */
 static bfd_boolean
-ppc64_spu_get_section_contents (bfd *abfd,
-				asection *section,
-				void * location,
-				file_ptr offset,
+ppc64_spu_get_section_contents (bfd * abfd, asection * section,
+				void *location, file_ptr offset,
 				bfd_size_type count)
 {
+  Elf_Internal_Phdr *phdr;
+  unsigned int i;
   struct ppc64_spu_tdata *ppc64_spu = abfd->tdata.any;
-  struct get_section_contents_args args;
+  bfd *nbfd = ppc64_spu->spu_bfd;
+  void *l;
+  bfd_vma offset_vaddr;
+  file_ptr o;
+  bfd_size_type c;
 
-  if (section != elf_elfsections(abfd)[DATA_SH_INDEX]->bfd_section)
+  if (section != elf_elfsections (abfd)[DATA_SH_INDEX]->bfd_section)
     return FALSE;
 
-  // The mapping is based on lma, there could be holes.
+  /* Make sure any holes are set to 0. */
   memset (location, 0, count);
 
-  args.location = location;
-  args.offset = (bfd_size_type)offset + section->lma;
-  args.count = count;
-  args.success = TRUE;
-  bfd_map_over_sections (ppc64_spu->spu_bfd, map_get_section_contents, &args);
-  return args.success;
+  if (abfd->xvec == &bfd_elf64_powerpc_spu_elf_vec)
+    {
+      /* Include ELF header, program headers, and contents referenced by
+         program headers.  Strip the rest. */
+      if (bfd_seek (nbfd, offset, SEEK_SET) != 0
+	  || bfd_bread (location, count, nbfd) != count)
+	return FALSE;
+      /* Reset values in ELF header. */
+      /* Set e_shoff to 0. */
+      for (i = 32; i < 36; i++)
+	if (offset <= (file_ptr)i && (file_ptr)i < offset + (file_ptr)count)
+	  ((char *) location)[i - offset] = 0;
+      /* Set e_shnum to 0, e_shstrndx to SHN_UNDEF (0). */
+      for (i = 48; i < 52; i++)
+	if (offset <= (file_ptr)i && (file_ptr)i < offset + (file_ptr)count)
+	  ((char *) location)[i - offset] = 0;
+      return TRUE;
+    }
+
+  /* Read contents based on program headers. */
+  phdr = elf_tdata (nbfd)->phdr;
+  offset_vaddr = offset + ppc64_spu->low_lma;
+  for (i = 0; i < elf_elfheader (nbfd)->e_phnum; i++, phdr++)
+    if (phdr->p_type == PT_LOAD)
+      {
+	if (phdr->p_vaddr >= offset_vaddr
+	    && phdr->p_vaddr < offset_vaddr + count)
+	  {
+	    l = location + (phdr->p_vaddr - offset_vaddr);
+	    o = 0;
+	    if (phdr->p_vaddr + phdr->p_filesz <= offset_vaddr + count)
+	      c = phdr->p_filesz;
+	    else
+	      c = (offset_vaddr + count) - phdr->p_vaddr;
+	  }
+	else if (phdr->p_vaddr < offset_vaddr
+		 && phdr->p_vaddr + phdr->p_filesz > offset_vaddr)
+	  {
+	    l = location;
+	    o = offset_vaddr - phdr->p_vaddr;
+	    if (phdr->p_vaddr + phdr->p_filesz <= offset_vaddr + count)
+	      c = (phdr->p_vaddr + phdr->p_filesz) - offset_vaddr;
+	    else
+	      c = count;
+	  }
+	else
+	  continue;
+
+	if (bfd_seek (nbfd, phdr->p_offset + o, SEEK_SET) != 0
+	    || bfd_bread (l + o, c, nbfd) != c)
+	  return FALSE;
+      }
+
+  return TRUE;
 }
 
 
@@ -749,5 +848,15 @@ ppc64_spu_canonicalize_reloc (bfd *abfd, sec_ptr section,
 #define elf_backend_can_gc_sections 1
 #define elf_backend_can_refcount 1
 #define elf_backend_rela_normal 1
+
+#include "elf64-target.h"
+
+/* Define the same target that embeds the whole ELF image instead of
+   just the binary image. */
+#define INCLUDED_TARGET_FILE 1
+#undef TARGET_BIG_SYM
+#define TARGET_BIG_SYM		bfd_elf64_powerpc_spu_elf_vec
+#undef TARGET_BIG_NAME
+#define TARGET_BIG_NAME		"elf64-powerpc-spu-elf"
 
 #include "elf64-target.h"

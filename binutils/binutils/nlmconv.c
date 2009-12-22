@@ -812,7 +812,7 @@ main (int argc, char **argv)
       if (sharedbfd == NULL
 	  || ! bfd_check_format (sharedbfd, bfd_object))
 	{
-	  fprintf (stderr, "%s:%s: %s\n", program_name, sharelib_file,
+	  fprintf (stderr, "error: %s:%s: %s\n", program_name, sharelib_file,
 		   bfd_errmsg (bfd_get_error ()));
 	  sharelib_file = NULL;
 	}

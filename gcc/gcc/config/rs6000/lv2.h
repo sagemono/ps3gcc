@@ -211,6 +211,8 @@
 	  builtin_assert ("machine=powerpc");		\
 	  TARGET_OS_SYSV_CPP_BUILTINS ();		\
 	}						\
+      if (rs6000_notoc_mode > 1)			\
+	builtin_define("CELL_GCM_SNC_NOTOCRESTORE_2");	\
     }							\
   while (0)
 
@@ -776,12 +778,12 @@ enum { SIGNAL_FRAMESIZE = 128 };
   "%{Qy:} %{!Qn:-Qy} "					 \
   "%{mlp64:-melf64ppc} "						\
   "%{mno-sn-ld: " \
-  "  %{mno-toc: %e-mno-toc can not be used with -mno-sn-ld}; " \
+  "  %{mno-toc|mno-toc=1|mno-toc=2: %e-mno-toc can not be used with -mno-sn-ld}; " \
   " :%{!mlp64:--alternative-ld=ps3ppuld --gnu-mode " \
   "    %{fno-exceptions: --no-exceptions} " \
-  "    %{mno-toc: --no-toc-restore} " \
+  "    %{mno-toc|mno-toc=1|mno-toc=2: --no-toc-restore} " \
   "    %{!mno-prxfixup: %{!mforce-prx-fixup: %{!r: --prx-fixup}}} " \
-  "    %{mprx|mprx-with-runtime:--no-check-unresolved} " \
+  "    %{mprx|mprx-with-runtime:--no-check-unresolved --prx-child-link} " \
   "    %{mppuguid: %{!r:-ppuguid}} " \
   "    %{r|mno-ppuguid:-no-ppuguid} } } " \
   "%{shared}"

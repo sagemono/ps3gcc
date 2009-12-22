@@ -693,7 +693,7 @@ spu_macro_to_expand (cpp_reader *pfile, const cpp_token *tok)
       while (tok->type == CPP_PADDING);
       ident = spu_categorize_keyword (tok);
 
-      if (ident)
+      if (ident && ident != __vector_cpp_hashnode)
 	{
 	  enum rid rid_code = (enum rid)(ident->rid_code);
 	  if (ident->type == NT_MACRO)

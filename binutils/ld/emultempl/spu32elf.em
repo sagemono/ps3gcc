@@ -58,20 +58,6 @@ spu_after_open (void)
 static void
 spu_before_allocation (void)
 {
-  if (is_spu_target ()
-      && !link_info.relocatable
-      && !link_info.shared)
-    {
-      /* Size the sections.  This is premature, but we need to know the
-	 rough layout so that overlays can be found.  */
-      expld.phase = lang_mark_phase_enum;
-      expld.dataseg.phase = exp_dataseg_none;
-      one_lang_size_sections_pass (NULL, TRUE);
-
-      /* We must not cache anything from the preliminary sizing.  */
-      lang_reset_memory_regions ();
-    }
-
   gld${EMULATION_NAME}_before_allocation ();
 
   spu_elf_size_sections (output_bfd, &link_info);

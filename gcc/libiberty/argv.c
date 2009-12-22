@@ -227,12 +227,16 @@ char **buildargv (const char *input)
 		      *arg++ = *input;
 		    }
 /* Under windows treat backslash as a normal character.  */
-#ifndef _WIN32
 		  else if (*input == '\\')
 		    {
+#ifndef _WIN32
 		      bsquote = 1;
-		    }
+#else
+		      if (input[1] == '"')
+			input++;
+		      *arg++ = *input;
 #endif
+		    }
 		  else if (squote)
 		    {
 		      if (*input == '\'')
@@ -577,30 +581,34 @@ create_response_file (basename, argv)
 
       string = *argv;
       len = strlen (string);
+#ifdef _WIN32
+      if (strpbrk (string, "\ \'"))
+	{
+	  quote = 1;
+	  fprintf (rsp_fp, "\"");
+	}
+#endif
       for (i = 0; i < len; i++)
 	{
 	  /* Escape spaces, \, and the quotes if on unix, just quote under
 	     windows if including space or single quote.  */
-	  if (string[i] == '\''
-	      || ISSPACE (string[i])
+	  if (string[i] == '\"'
 #ifndef _WIN32
-	      || string[i] == '\\' || string[i] == '\"'
+	      || string[i] == '\''
+	      || ISSPACE (string[i])
+	      || string[i] == '\\'
 #endif
 	     )
-#ifndef _WIN32
 	    fprintf (rsp_fp, "\\%c", string[i]);
 	  else
 	    fprintf (rsp_fp, "%c", string[i]);
-#else
-	    quote = 1;
-#endif
 	}
 #ifdef _WIN32
       /* Check if the argv requires quotes.  */
       if (quote)
-	fprintf (rsp_fp, "\"%s\"\n", *argv);
+	fprintf (rsp_fp, "\"\n");
       else
-	fprintf (rsp_fp, "%s\n", *argv);
+	fprintf (rsp_fp, "\n");
 #else
       fprintf (rsp_fp, "\n");
 #endif

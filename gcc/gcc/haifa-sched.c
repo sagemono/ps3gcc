@@ -881,6 +881,24 @@ advance_one_cycle (void)
 		      targetm.sched.dfa_post_cycle_insn ());
 }
 
+static void
+mark_critical_path (rtx insn, int bit)
+{
+  rtx link;
+  if (INSN_BLOCK_CYCLE (insn) & bit)
+    return;
+  INSN_BLOCK_CYCLE (insn) |= bit;
+  for (link = INSN_DEPEND (insn); link; link = XEXP (link, 1))
+    {
+      rtx next;
+      int next_priority;
+      next = XEXP (link, 0);
+      next_priority = insn_cost (insn, link, next) + priority (next);
+      if (next_priority == INSN_PRIORITY (insn))
+	mark_critical_path (next, bit);
+    }
+}
+
 /* Clock at which the previous instruction was issued.  */
 static int last_clock_var;
 
@@ -912,7 +930,8 @@ schedule_insn (rtx insn, struct ready_list *ready, int clock)
       fputc ('\n', sched_dump);
     }
 
-  INSN_BLOCK_CYCLE(insn) = clock;
+  INSN_BLOCK_CYCLE(insn) &= PATH_MASK;
+  INSN_BLOCK_CYCLE(insn) |= clock << PATH_BIT_SIZE;
 
   if (INSN_TICK (insn) > clock)
     {
@@ -2268,8 +2287,12 @@ set_priorities (rtx head, rtx tail)
   int sched_max_insns_priority = 
 	current_sched_info->sched_max_insns_priority;
   rtx prev_head;
+  rtx next_tail;
+  rtx *pri_first;
+  int repeat;
 
   prev_head = PREV_INSN (head);
+  next_tail = NEXT_INSN (tail);
 
   if (head == tail && (! INSN_P (head)))
     return 0;
@@ -2284,6 +2307,8 @@ set_priorities (rtx head, rtx tail)
       n_insn++;
       (void) priority (insn);
 
+      INSN_BLOCK_CYCLE (insn) = 0;
+
       if (INSN_PRIORITY_KNOWN (insn))
 	sched_max_insns_priority =
 	  MAX (sched_max_insns_priority, INSN_PRIORITY (insn)); 
@@ -2291,6 +2316,50 @@ set_priorities (rtx head, rtx tail)
   sched_max_insns_priority += 1;
   current_sched_info->sched_max_insns_priority =
 	sched_max_insns_priority;
+
+  /* Mark paths starting with the critical path and then by decreasing
+     priority.  The path marker is also reset at each call insn. */
+  pri_first = xcalloc (sched_max_insns_priority, sizeof (rtx));
+  do
+    {
+      int i, bit;
+      repeat = 0;
+      /* Sort the insn by priority by creating a chain for each priority
+         in pri_first. */
+      for (insn = head; insn != next_tail; insn = NEXT_INSN (insn))
+	{
+	  if (NOTE_P (insn))
+	    continue;
+	  if (INSN_PRIORITY_KNOWN (insn) && INSN_BLOCK_CYCLE (insn) == 0)
+	    {
+	      INSN_PRI_NEXT (insn) = pri_first[INSN_PRIORITY (insn)];
+	      pri_first[INSN_PRIORITY (insn)] = insn;
+	    }
+	  if (CALL_P (insn))
+	    {
+	      repeat = 1;
+	      head = NEXT_INSN (insn);
+	      break;
+	    }
+	}
+      /* Mark the paths from longest to shortest. */
+      bit = PATH_HIGH_BIT;
+      for (i = sched_max_insns_priority - 1; i > 0; i--)
+	{
+	  int next_bit = bit;
+	  for (insn = pri_first[i]; insn; insn = INSN_PRI_NEXT (insn))
+	    if (INSN_BLOCK_CYCLE (insn) < bit)
+	      {
+		mark_critical_path (insn, bit);
+		next_bit = bit >> 1;
+	      }
+	  pri_first[i] = 0;
+	  bit = next_bit;
+	}
+      pri_first[0] = 0;
+    }
+  while (repeat);
+  free (pri_first);
 
   return n_insn;
 }
@@ -2497,7 +2566,7 @@ sched_emit_insn (rtx pat)
 {
   rtx insn = emit_insn_after (pat, last_scheduled_insn);
   last_scheduled_insn = insn;
-  INSN_BLOCK_CYCLE(insn) = clock_var;
+  INSN_BLOCK_CYCLE(insn) = clock_var << PATH_BIT_SIZE;
   extend_h_i_d ();
   init_h_i_d (insn);
   return insn;

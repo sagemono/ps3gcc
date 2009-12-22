@@ -81,8 +81,8 @@
 (define_insn_reservation "LOAD" 6 (eq_attr "type" "load")
     "pipe1 + ls, nothing*5")
 
-(define_insn_reservation "HBR" 18 (eq_attr "type" "hbr")
-    "pipe1 + hbr, hbr + nothing, nothing*16")
+(define_insn_reservation "HBR" 20 (eq_attr "type" "hbr")
+    "pipe1 + hbr, hbr + nothing, nothing*18")
 
 (define_insn_reservation "MULTI0" 4 (eq_attr "type" "multi0")
     "pipe0+pipe1, nothing*3")

@@ -1212,6 +1212,32 @@ rs6000_init_hard_regno_mode_ok (void)
 #define RS6000_DEFAULT_LONG_DOUBLE_SIZE 64
 #endif
 
+/* BEGIN SCE LOCAL bug 75707 */
+void process_no_toc_opt()
+{
+  if (rs6000_notoc_mode > 2)
+    error ("bad value is passed to -mno-toc= option");
+
+  if (rs6000_notoc_mode > 0) {
+    {
+      if (rs6000_base_toc <= 0)
+	rs6000_base_toc = 3;
+      lv2_no_nop_after_bl = 1;
+
+      /* in case of -mno-toc=1, we should keep toc save/restore codes.
+	 for indirect calls. */
+      if (rs6000_notoc_mode > 1)
+	lv2_no_save_restore_tocbase = 1;
+
+      target_flags &= ~MASK_MINIMAL_TOC;
+      /* Make sure the instructions to load section anchors are hoisted
+	 together. */
+      if (flag_section_anchors)
+	PARAM_VALUE (PARAM_MAX_GCSE_PASSES) = 2;
+    }
+  }
+}
+
 /* Override command line options.  Mostly we process the processor
    type and sometimes adjust other TARGET_ options.  */
 
@@ -1605,21 +1631,12 @@ rs6000_override_options (const char *default_cpu)
       error ("-mminimal-toc and -mbase-toc are incompatible");
     }
 
-  if (TARGET_MINIMAL_TOC && TARGET_TOC_FREE)
+  if (TARGET_MINIMAL_TOC && rs6000_notoc_mode != 0)
     error ("-mminimal-toc and -mno-toc are incompatible");
 
-  if (TARGET_TOC_FREE)
-    {
-      if (rs6000_base_toc <= 0)
-	rs6000_base_toc = 3;
-      lv2_no_nop_after_bl = 1;
-      lv2_no_save_restore_tocbase = 1;
-      target_flags &= ~MASK_MINIMAL_TOC;
-      /* Make sure the instructions to load section anchors are hoisted
-         together. */
-      if (flag_section_anchors)
-	PARAM_VALUE (PARAM_MAX_GCSE_PASSES) = 2;
-    }
+  process_no_toc_opt();
+
+
 
   if (TARGET_TOC)
     ASM_GENERATE_INTERNAL_LABEL (toc_label_name, "LCTOC", 1);
@@ -2804,21 +2821,18 @@ rs6000_expand_vector_extract (rtx target, rtx vec, int elt)
 static rtx
 create_correct_vector_mem (rtx mem, enum machine_mode mode, rtx tmpreg)
 {
-  if (!no_new_pseudos)
-    return mem;
   if (!memory_address_p (mode, XEXP (mem, 0)))
     {
       rtx addr = XEXP (mem, 0);
       rtx new;
-      if (GET_CODE (addr) == PLUS)
+      if (GET_CODE (addr) == PLUS && GET_CODE (XEXP (addr, 1)) == CONST_INT)
         {
-          gcc_assert (GET_CODE (XEXP (addr, 1)) == CONST_INT);
-          emit_move_insn (tmpreg, XEXP (addr, 1));
-          new = gen_rtx_MEM (mode, gen_rtx_PLUS (GET_MODE (addr), XEXP (addr, 0), tmpreg));
+	  emit_move_insn (tmpreg, XEXP (addr, 1));
+	  new = gen_rtx_MEM (mode, gen_rtx_PLUS (GET_MODE (addr), XEXP (addr, 0), tmpreg));
         }
       else
         {
-          gcc_assert (GET_CODE (addr) == LO_SUM);
+	  /* This is either LO_SUM, or a const pool reference. */
           emit_move_insn (tmpreg, addr);
           new = gen_rtx_MEM (mode, tmpreg);
         }
@@ -2930,37 +2944,40 @@ rs6000_split_lve (rtx op0, rtx op1, rtx op2, rtx tmpreg)
   if (reload_completed)
     abort ();
 
-  /* Create a stack location one if we don't have a memory location already. */
+  /* Make sure op1 is a legitimate operand for lve, lvlx or lvsl. */
   if (GET_CODE (op1) != MEM)
     {
+      /* Create a stack location one if we don't have a memory location
+         already. */
       mem = assign_stack_local (mode, GET_MODE_SIZE (inner_mode), 0);
       x = adjust_address_nv (mem, inner_mode, 0);
       /* FIXME: This is just a workaround as we cannot produce a
-         new psedu-register after the first flow pass has happened.
+         new pseudo-register after the first flow pass has happened.
          GCC 4.3.0 removes flow.c, assign_stack_local does not produce
          legite address.   */
       x = create_correct_vector_mem (x, inner_mode, tmpreg);
       emit_move_insn (x, op1);
-      mem = create_correct_vector_mem (mem, mode, tmpreg);
-      op1 = mem;
+      op1 = create_correct_vector_mem (mem, mode, tmpreg);
     }
   else
-    mem = adjust_address_nv (op1, mode, 0);
+    {
+      mem = adjust_address_nv (op1, mode, 0);
+      op1 = create_correct_vector_mem (mem, mode, tmpreg);
+    }
 
 
   /* If we know the alignment of OP1 is equal or greater than 128, we can just emit a lve
      without a perm.  */
   if (MEM_ALIGN (op1) >= 128)
     {
-      x = gen_rtx_UNSPEC (mode, gen_rtvec (1, mem), UNSPEC_LVE);
+      x = gen_rtx_UNSPEC (mode, gen_rtvec (1, op1), UNSPEC_LVE);
       emit_insn (gen_rtx_SET (VOIDmode, op0, x));
     }
   /* On the Cell, we can produce a lvlx instead of lvsl and lve/perm as lvlx
      will promote the element into the first slot.  */
   else if (TARGET_ALTIVEC && rs6000_cpu == PROCESSOR_CELLPPU)
     {
-      mem = adjust_address_nv (op1, mode, 0);
-      emit_insn (gen_altivec_lvlx (gen_lowpart_general (V16QImode, op0), mem));
+      emit_insn (gen_altivec_lvlx (gen_lowpart_general (V16QImode, op0), op1));
     }
   else
     {
@@ -3250,7 +3267,8 @@ rs6000_legitimate_offset_address_p (enum machine_mode mode, rtx x, int strict)
     return false;
   if (!INT_REG_OK_FOR_BASE_P (XEXP (x, 0), strict))
     return false;
-  if (legitimate_constant_pool_address_p (x))
+  if (!VECTOR_MODE_P (mode)
+      && legitimate_constant_pool_address_p (x))
     return true;
   if (GET_CODE (XEXP (x, 1)) != CONST_INT)
     return false;
@@ -4064,7 +4082,8 @@ rs6000_legitimate_address (enum machine_mode mode, rtx x, int reg_ok_strict)
     return 1;
   if (rs6000_legitimate_small_data_p (mode, x))
     return 1;
-  if (legitimate_constant_pool_address_p (x))
+  if (!VECTOR_MODE_P (mode)
+      && legitimate_constant_pool_address_p (x))
     return 1;
   /* If not REG_OK_STRICT (before reload) let pass any stack offset.  */
   if (! reg_ok_strict
@@ -5304,7 +5323,7 @@ rs6000_darwin64_record_arg_advance_recurse (CUMULATIVE_ARGS *cum,
 	else if (USE_FP_FOR_ARG_P (cum, mode, ftype))
 	  {
 	    rs6000_darwin64_record_arg_advance_flush (cum, bitpos, 0);
-
+	    cum->fregno += (GET_MODE_SIZE (mode) + 7) >> 3;
 	    /* Single-precision floats present a special problem for
 	       us, because they are smaller than an 8-byte GPR, and so
 	       the structure-packing rules combined with the standard

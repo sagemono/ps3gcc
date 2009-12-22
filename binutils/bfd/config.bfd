@@ -1095,12 +1095,12 @@ case "${targ}" in
 
   ppu-*-lv2)
     targ_defvec=bfd_elf64_powerpc_celloslv2_vec
-    targ_selvecs="bfd_elf64_powerpc_vec bfd_elf64_powerpc_spu_vec bfd_elf32_spu_vec"
+    targ_selvecs="bfd_elf64_powerpc_vec bfd_elf64_powerpc_spu_vec bfd_elf64_powerpc_spu_elf_vec bfd_elf32_spu_vec"
     want64=true
     ;;
   ppu-*-tb)
     targ_defvec=bfd_elf64_powerpc_vec
-    targ_selvecs="bfd_elf64_powerpc_celloslv2_vec bfd_elf64_powerpc_spu_vec bfd_elf32_spu_vec"
+    targ_selvecs="bfd_elf64_powerpc_celloslv2_vec bfd_elf64_powerpc_spu_vec bfd_elf64_powerpc_spu_elf_vec bfd_elf32_spu_vec"
     want64=true
     ;;
 
@@ -1334,16 +1334,16 @@ case "${targ}" in
 
   spu-*-lv2 | spu-*-linux* )
     targ_defvec=bfd_elf32_spu_vec
-    targ_selvecs="bfd_elf64_powerpc_vec bfd_elf64_powerpc_celloslv2_vec bfd_elf64_powerpc_spu_vec"
+    targ_selvecs="bfd_elf64_powerpc_vec bfd_elf64_powerpc_celloslv2_vec bfd_elf64_powerpc_spu_vec bfd_elf64_powerpc_spu_elf_vec"
     ;;
   spu-*-tb)
     targ_defvec=bfd_elf32_spu_vec
-    targ_selvecs="bfd_elf64_powerpc_vec bfd_elf64_powerpc_spu_vec"
+    targ_selvecs="bfd_elf64_powerpc_vec bfd_elf64_powerpc_spu_vec bfd_elf64_powerpc_spu_elf_vec"
     ;;
 
   spu-*-elf)
     targ_defvec=bfd_elf32_spu_vec
-    targ_selvecs="bfd_elf32_powerpc_vec bfd_elf64_powerpc_vec bfd_elf64_powerpc_spu_vec"
+    targ_selvecs="bfd_elf32_powerpc_vec bfd_elf64_powerpc_vec bfd_elf64_powerpc_spu_vec bfd_elf64_powerpc_spu_elf_vec"
     ;;
 
 #if HAVE_host_aout_vec

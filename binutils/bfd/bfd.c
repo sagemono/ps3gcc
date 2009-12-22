@@ -383,14 +383,17 @@ void
 bfd_perror (const char *message)
 {
   if (bfd_get_error () == bfd_error_system_call)
-    /* Must be a system error then.  */
-    perror ((char *) message);
+    {
+      /* Must be a system error then.  */
+      fprintf (stderr, "error: ");
+      perror ((char *) message);
+    }
   else
     {
       if (message == NULL || *message == '\0')
-	fprintf (stderr, "%s\n", bfd_errmsg (bfd_get_error ()));
+	fprintf (stderr, "error: %s\n", bfd_errmsg (bfd_get_error ()));
       else
-	fprintf (stderr, "%s: %s\n", message, bfd_errmsg (bfd_get_error ()));
+	fprintf (stderr, "error: %s: %s\n", message, bfd_errmsg (bfd_get_error ()));
     }
 }
 

@@ -337,7 +337,7 @@ fatal_perror (const char * cmsgid, ...)
   va_list ap;
 
   va_start (ap, cmsgid);
-  fprintf (stderr, "collect2: ");
+  fprintf (stderr, "collect2: error: ");
   vfprintf (stderr, _(cmsgid), ap);
   fprintf (stderr, ": %s\n", xstrerror (e));
   va_end (ap);

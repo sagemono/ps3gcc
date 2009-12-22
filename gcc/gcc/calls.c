@@ -667,22 +667,21 @@ precompute_register_parameters (int num_actuals, struct arg_data *args,
 	    pop_temp_slots ();
 	  }
 
+	/* begin sce local */
+	/* When POINTER_SIZE != Pmode we need to convert the address
+	   to the correct mode first. */
+	if ((GET_CODE (args[i].value) == SYMBOL_REF
+	     || GET_CODE (args[i].value) == LABEL_REF
+	     || GET_CODE (args[i].value) == CONST)
+	    && GET_MODE (args[i].value) != args[i].mode)
+	  args[i].value = convert_memory_address (args[i].mode, args[i].value);
+	/* end sce local */
+
 	/* If the value is a non-legitimate constant, force it into a
 	   pseudo now.  TLS symbols sometimes need a call to resolve.  */
 	if (CONSTANT_P (args[i].value)
 	    && !LEGITIMATE_CONSTANT_P (args[i].value))
-	  {
-	    /* begin sce local */
-	    /* When POINTER_SIZE != Pmode we need to convert the address
-	       to the correct mode first. */
-	    if ((GET_CODE (args[i].value) == SYMBOL_REF
-	         || GET_CODE (args[i].value) == LABEL_REF
-	         || GET_CODE (args[i].value) == CONST)
-		&& GET_MODE (args[i].value) != args[i].mode)
-	      args[i].value = convert_memory_address (args[i].mode, args[i].value);
-	    /* end sce local */
-	    args[i].value = force_reg (args[i].mode, args[i].value);
-	  }
+	  args[i].value = force_reg (args[i].mode, args[i].value);
 
 	/* If we are to promote the function arg to a wider mode,
 	   do it now.  */

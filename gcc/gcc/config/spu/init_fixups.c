@@ -29,13 +29,13 @@
  * that are stored in data.  The linker has recorded these locations in
  * the .fixup section.
  * The linker scripts makes sure __fixup_start is the first symbol in
- * .fixup.  We define it here as static, so it won't becom a dynamic
+ * .fixup.  We define it here as static, so it won't become a dynamic
  * symbol. */
 
 #include <spu_intrinsics.h>
 #include <stdint.h>
 
-static int __fixup_start[0] __attribute__((section(".fixup_head", "a"), aligned(4), used));
+static unsigned int __fixup_start[0] __attribute__((section(".fixup_head", "a"), aligned(4), used));
 
 /* We use $126 explicitly here and compile with -mfixed-range=79 to make
  * sure it is setup properly when compiling with -fPIC.  When this file

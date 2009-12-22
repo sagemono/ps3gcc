@@ -175,9 +175,20 @@ Access all globals, including constants, using a 32 bit offset from r2
 ; Bz54159 - implement TOC-free
 ; To be compatible with code that is not TOC-free the linker must
 ; generate stubs that restore the TOC base.
+;mno-toc
+;Target Report RejectNegative Mask(TOC_FREE)
+;Same as -mno-toc=2. See -mno-toc= option.
 mno-toc
-Target Report RejectNegative Mask(TOC_FREE)
-Do not use a TOC for data references and do not save/restore the TOC base
+Target Report RejectNegative Var(rs6000_notoc_mode,2)
+
+; Bz75707
+mno-toc=
+Target Report Joined UInteger Var(rs6000_notoc_mode)
+Contol the way to access variables and TOC save/restore codes.
+-mno-toc=2 omits all of TOC access code and TOC save/restore codes.
+-mno-toc=1 is same as -mno-toc=2 except TOC save/restore codes are emitted only for calls via function pointer.
+-mno-toc=0 emits everything regarding to TOC.
+Default is -mnot-toc=0.
 
 mvrsave
 Target Report Var(TARGET_ALTIVEC_VRSAVE)

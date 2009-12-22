@@ -1104,3 +1104,8 @@ extern int darwin_ms_struct;
    check if 2nd arg of __builtin_expect is constant.
    SPU GCC port allows __bulitin_epand to have variable args. So the macro is defiend. */
 #define SKIP_BUILTIN_ARG_CHECK 1
+
+/* Used by emit_store_flag() in expmed.c to decide when to optimize the
+ * A < 0 and A >= 0 cases. */
+#define SETCC_COST(mode) COSTS_N_INSNS (2)
+

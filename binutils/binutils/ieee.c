@@ -4714,7 +4714,7 @@ write_ieee_debugging_info (bfd *abfd, void *dhandle)
 
   if (err != NULL)
     {
-      fprintf (stderr, "%s: %s: %s\n", bfd_get_filename (abfd), err,
+      fprintf (stderr, "error: %s: %s: %s\n", bfd_get_filename (abfd), err,
 	       bfd_errmsg (bfd_get_error ()));
       return FALSE;
     }

@@ -661,6 +661,7 @@ extern const bfd_target bfd_elf64_powerpc_vec;
 extern const bfd_target bfd_elf64_powerpcle_vec;
 extern const bfd_target bfd_elf64_powerpc_celloslv2_vec; /* sce local */
 extern const bfd_target bfd_elf64_powerpc_spu_vec; /* sce local */
+extern const bfd_target bfd_elf64_powerpc_spu_elf_vec; /* sce local */
 extern const bfd_target bfd_elf64_s390_vec;
 extern const bfd_target bfd_elf64_sh64_vec;
 extern const bfd_target bfd_elf64_sh64l_vec;
@@ -980,6 +981,7 @@ static const bfd_target * const _bfd_target_vector[] = {
 	&bfd_elf64_powerpcle_vec,
 	&bfd_elf64_powerpc_celloslv2_vec, /* sce local */
 	&bfd_elf64_powerpc_spu_vec, /* sce local */
+	&bfd_elf64_powerpc_spu_elf_vec, /* sce local */
 	&bfd_elf64_s390_vec,
 	&bfd_elf64_sh64_vec,
 	&bfd_elf64_sh64l_vec,

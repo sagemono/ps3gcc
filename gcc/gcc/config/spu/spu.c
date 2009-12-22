@@ -110,6 +110,9 @@ int spu_double_acc = SPU_FP_ACCURATE;
 /* The ratio represents approximately how many instructions to use for
  * an inline memcpy.  Otherwise some form of memcpy will be called.  */
 int spu_move_ratio = 32;
+
+/* Used to control adding of nops to force dual issue. */
+int spu_dual_crit;
 
 enum spu_immediate {
   SPU_NONE,
@@ -393,6 +396,10 @@ spu_override_options (void)
   /* APPLE LOCAL pragma reverse_bitfields, ms_struct */
   darwin_reverse_bitfields = false;
   darwin_ms_struct = false;
+
+  if (spu_dual_nops > 15)
+    spu_dual_nops = 15;
+  spu_dual_crit = (16 - spu_dual_nops) << 12;
 }
 
 
@@ -2314,7 +2321,7 @@ emit_nop_for_insn (rtx insn)
     }
   else
     new_insn = emit_insn_after (gen_lnop (), insn);
-  INSN_BLOCK_CYCLE(new_insn) = INSN_BLOCK_CYCLE(insn);
+  INSN_BLOCK_CYCLE(new_insn) = INSN_BLOCK_CYCLE(insn) & ~PATH_MASK;
   recog_memoized(new_insn);
 }
 
@@ -3370,22 +3377,6 @@ spu_sched_variable_issue (FILE *file ATTRIBUTE_UNUSED,
   return 1;
 }
 
-static int
-max_queued_priority (int n_cycles)
-{
-  rtx link, insn;
-  int i;
-  int p = 0;
-  for (i = 1; i <= n_cycles; i++)
-    for (link = get_queued_insns (i); link; link = XEXP (link, 1))
-      {
-	insn = XEXP (link, 0);
-	if (INSN_PRIORITY (insn) > p)
-	  p = INSN_PRIORITY (insn);
-      }
-  return p;
-}
-
 /* This function is called for both TARGET_SCHED_REORDER and
  * TARGET_SCHED_REORDER2.  */
 static int
@@ -3393,7 +3384,7 @@ spu_sched_reorder (FILE *file ATTRIBUTE_UNUSED, int verbose ATTRIBUTE_UNUSED,
 		   rtx *ready, int *nreadyp, int clock)
 {
   int i, nready = *nreadyp;
-  int pipe_0, pipe_1, pipe_hbrp, pipe_ls, schedule_i, pipe_early;
+  int pipe_0, pipe_1, pipe_hbrp, pipe_ls, schedule_i, pipe_early, max_crit;
   rtx insn;
 
   if (nready <= 0 || pipe1_clock >= clock)
@@ -3421,6 +3412,7 @@ spu_sched_reorder (FILE *file ATTRIBUTE_UNUSED, int verbose ATTRIBUTE_UNUSED,
     return 1;
 
   pipe_0 = pipe_1 = pipe_hbrp = pipe_ls = pipe_early = schedule_i = -1;
+  max_crit = 0;
   for (i = 0; i < nready; i++)
     if (INSN_CODE (ready[i]) != -1)
       {
@@ -3456,6 +3448,8 @@ spu_sched_reorder (FILE *file ATTRIBUTE_UNUSED, int verbose ATTRIBUTE_UNUSED,
 	    pipe_hbrp = i;
 	    break;
 	  }
+	if ((INSN_BLOCK_CYCLE (ready[i]) & PATH_MASK) > max_crit)
+	  max_crit = INSN_BLOCK_CYCLE (ready[i]) & PATH_MASK;
       }
 
   /* In the first scheduling phase, schedule loads and stores together
@@ -3500,25 +3494,26 @@ spu_sched_reorder (FILE *file ATTRIBUTE_UNUSED, int verbose ATTRIBUTE_UNUSED,
 
   /* In general, we want to emit nops to increase dual issue, but dual
    * issue isn't faster when one of the insns could be scheduled later
-   * without effecting the critical path.  We look at INSN_PRIORITY to
-   * make a good guess, but it isn't perfect so -mdual-nops=n can be
-   * used to effect it. */
-  if (in_spu_reorg && spu_dual_nops < 10)
+   * without effecting the critical path.  Decrease the chance of these
+   * nops when there are no ready instructions on a critical path.  */
+  if (in_spu_reorg)
     {
-      /* When we are at an even address and we are not issueing nops to
-	 improve scheduling then we need to advance the cycle.  */
+      /* A nop will be inserted to force dual issue when:
+       *   - we are at an even address
+       *   - a pipe0 insn has been scheduled
+       *   - a pipe1 insn is ready to be scheduled
+       * Advance the cycle to prevent the nop when there are no critical
+       * insns in the ready queue.  */
       if ((spu_sched_length & 7) == 0 && prev_clock_var == clock
-	  && (spu_dual_nops == 0
-	      || (pipe_1 != -1
-		  && prev_priority > INSN_PRIORITY (ready[pipe_1]) + spu_dual_nops)))
+	  && (spu_dual_nops == 0 || max_crit < spu_dual_crit))
 	return 0;
 
-      /* When at an odd address, schedule the highest priority insn
-       * without considering pipeline. */
+      /* We are at the start of a new cycle and at an odd address.  If
+       * we scheduled a pipe0 insn, there is a good chance a nop will be
+       * emitted to force dual issue.  If there are no critical insns in
+       * the ready queue, just schedule the highest priority insn. */
       if ((spu_sched_length & 7) == 4 && prev_clock_var != clock
-	  && (spu_dual_nops == 0
-	      || (prev_priority > max_queued_priority (spu_dual_nops/2) + spu_dual_nops
-		  && prev_priority > INSN_PRIORITY (ready[nready-1]) + spu_dual_nops)))
+	  && (spu_dual_nops == 0 || max_crit < spu_dual_crit))
 	return 1;
     }
 
@@ -3567,6 +3562,7 @@ spu_sched_reorder (FILE *file ATTRIBUTE_UNUSED, int verbose ATTRIBUTE_UNUSED,
 		  XEXP(pat, 0) = r0;
 		  XEXP(pat, 1) = gen_rtx_ASHIFT(TImode, r1, const0_rtx);
 		  INSN_CODE (insn) = recog (PATTERN (insn), insn, 0);
+		  INSN_COST (insn) = -1;
 		  dfa_insn_code_reset (insn);
 		  schedule_i = i;
 		  break;
@@ -3588,6 +3584,7 @@ spu_sched_reorder (FILE *file ATTRIBUTE_UNUSED, int verbose ATTRIBUTE_UNUSED,
 		  XEXP(pat, 0) = gen_rtx_REG(V16QImode, REGNO(XEXP(pat, 0)));
 		  XEXP(pat, 1) = gen_rtx_UNSPEC(V16QImode, v, UNSPEC_FSMB);
 		  INSN_CODE (insn) = recog (PATTERN (insn), insn, 0);
+		  INSN_COST (insn) = -1;
 		  dfa_insn_code_reset (insn);
 		  schedule_i = i;
 		  break;
@@ -3604,6 +3601,7 @@ spu_sched_reorder (FILE *file ATTRIBUTE_UNUSED, int verbose ATTRIBUTE_UNUSED,
 		      XEXP(pat, 0) = r0;
 		      XEXP(pat, 1) = gen_rtx_LSHIFTRT(TImode, r1, GEN_INT (v));
 		      INSN_CODE (insn) = recog (PATTERN (insn), insn, 0);
+		      INSN_COST (insn) = -1;
 		      dfa_insn_code_reset (insn);
 		      ready[i] = ready[nready-1];
 		      ready[nready-1] = insn;
@@ -3636,8 +3634,27 @@ spu_sched_adjust_cost (rtx insn, rtx link, rtx dep_insn, int cost)
       || INSN_CODE (dep_insn) == CODE_FOR_blockage)
     return 0;
 
-  if (INSN_CODE (insn) == CODE_FOR__spu_convert
-      || INSN_CODE (dep_insn) == CODE_FOR__spu_convert)
+  /* We want the source and destination registers of SPU_CONVERT to be
+   * tied during register allocation, otherwise we get unnecessary
+   * register copy instructions.  The registers will be tied if all
+   * other uses of the source register are scheduled before the
+   * SPU_CONVERT insn.  Increase the cost to improve the chances of that
+   * happening. */
+  if (INSN_CODE (insn) == CODE_FOR__spu_convert)
+    {
+      if (!reload_completed)
+	{
+	  rtx l;
+	  int max_cost = 0;
+	  for (l = INSN_DEPEND (dep_insn); l; l = XEXP (l, 1))
+	    if (REG_NOTE_KIND (l) != REG_DEP_ANTI
+		&& INSN_COST (XEXP (l, 0)) > max_cost)
+	      max_cost = INSN_COST (XEXP (l, 0));
+	  return max_cost + 1;
+	}
+      return 0;
+    }
+  if (INSN_CODE (dep_insn) == CODE_FOR__spu_convert)
     return 0;
 
   /* Make sure hbrps are spread out. */

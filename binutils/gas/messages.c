@@ -127,6 +127,7 @@ as_perror (const char *gripe,		/* Unpunctuated error theme.  */
   int saved_errno = errno;
 
   as_show_where ();
+  fprintf (stderr, "error: ");
   fprintf (stderr, gripe, filename);
   errno = saved_errno;
   errtxt = bfd_errmsg (bfd_get_error ());

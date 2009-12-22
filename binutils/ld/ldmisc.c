@@ -209,7 +209,7 @@ vfinfo (FILE *fp, const char *fmt, va_list arg, bfd_boolean is_warning)
 
 	    case 'E':
 	      /* current bfd error or errno */
-	      fprintf (fp, "%s", bfd_errmsg (bfd_get_error ()));
+	      fprintf (fp, "error: %s", bfd_errmsg (bfd_get_error ()));
 	      break;
 
 	    case 'I':

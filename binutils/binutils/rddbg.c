@@ -130,7 +130,7 @@ read_section_stabs_debugging_info (bfd *abfd, asymbol **syms, long symcount,
 	  stabs = (bfd_byte *) xmalloc (stabsize);
 	  if (! bfd_get_section_contents (abfd, sec, stabs, 0, stabsize))
 	    {
-	      fprintf (stderr, "%s: %s: %s\n",
+	      fprintf (stderr, "error: %s: %s: %s\n",
 		       bfd_get_filename (abfd), names[i].secname,
 		       bfd_errmsg (bfd_get_error ()));
 	      return FALSE;
@@ -140,7 +140,7 @@ read_section_stabs_debugging_info (bfd *abfd, asymbol **syms, long symcount,
 	  strings = (bfd_byte *) xmalloc (strsize);
 	  if (! bfd_get_section_contents (abfd, strsec, strings, 0, strsize))
 	    {
-	      fprintf (stderr, "%s: %s: %s\n",
+	      fprintf (stderr, "error: %s: %s: %s\n",
 		       bfd_get_filename (abfd), names[i].strsecname,
 		       bfd_errmsg (bfd_get_error ()));
 	      return FALSE;

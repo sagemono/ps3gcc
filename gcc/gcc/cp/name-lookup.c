@@ -3824,9 +3824,12 @@ qualified_lookup_using_namespace (tree name, tree scope,
   /* Maintain a list of namespaces visited...  */
   tree seen = NULL_TREE;
   /* ... and a list of namespace yet to see.  */
+  tree todo_strong = NULL_TREE;
   tree todo = NULL_TREE;
   tree todo_maybe = NULL_TREE;
   tree usings;
+  bool first_strong = true;
+  bool strong_binding = false;
   timevar_push (TV_NAME_LOOKUP);
   /* Look through namespace aliases.  */
   scope = ORIGINAL_NAMESPACE (scope);
@@ -3836,7 +3839,10 @@ qualified_lookup_using_namespace (tree name, tree scope,
 	cxx_scope_find_binding_for_name (NAMESPACE_LEVEL (scope), name);
       seen = tree_cons (scope, NULL_TREE, seen);
       if (binding)
-	ambiguous_decl (name, result, binding, flags);
+	{
+	  ambiguous_decl (name, result, binding, flags);
+	  strong_binding = first_strong;
+	}
 
       /* Consider strong using directives always, and non-strong ones
 	 if we haven't found a binding yet.  ??? Shouldn't we consider
@@ -3854,26 +3860,31 @@ qualified_lookup_using_namespace (tree name, tree scope,
 	       todo_maybe, but it's probably not worth the effort.  */
 	    if (is_associated_namespace (scope, TREE_PURPOSE (usings))
 		&& !purpose_member (TREE_PURPOSE (usings), seen)
-		&& !purpose_member (TREE_PURPOSE (usings), todo))
-	      todo = tree_cons (TREE_PURPOSE (usings), NULL_TREE, todo);
-	    else if ((!result->value && !result->type)
+		&& !purpose_member (TREE_PURPOSE (usings), todo_strong))
+	      todo_strong = tree_cons (TREE_PURPOSE (usings), NULL_TREE, todo_strong);
+	    else if (!binding
 		     && !purpose_member (TREE_PURPOSE (usings), seen)
 		     && !purpose_member (TREE_PURPOSE (usings), todo)
 		     && !purpose_member (TREE_PURPOSE (usings), todo_maybe))
 	      todo_maybe = tree_cons (TREE_PURPOSE (usings), NULL_TREE,
 				      todo_maybe);
 	  }
-      if (todo)
+      if (todo_strong)
+	{
+	  scope = TREE_PURPOSE (todo_strong);
+	  todo_strong = TREE_CHAIN (todo_strong);
+	}
+      else if (todo)
 	{
 	  scope = TREE_PURPOSE (todo);
 	  todo = TREE_CHAIN (todo);
 	}
-      else if (todo_maybe
-	       && (!result->value && !result->type))
+      else if (todo_maybe && !strong_binding)
 	{
 	  scope = TREE_PURPOSE (todo_maybe);
 	  todo = TREE_CHAIN (todo_maybe);
 	  todo_maybe = NULL_TREE;
+	  first_strong = false;
 	}
       else
 	scope = NULL_TREE; /* If there never was a todo list.  */

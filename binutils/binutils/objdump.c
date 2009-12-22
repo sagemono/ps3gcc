@@ -2164,7 +2164,7 @@ read_section_stabs (bfd *abfd, const char *sect_name, bfd_size_type *size_ptr)
 
   if (! bfd_get_section_contents (abfd, stabsect, contents, 0, size))
     {
-      non_fatal (_("Reading %s section of %s failed: %s"),
+      non_fatal (_("error: Reading %s section of %s failed: %s"),
 		 sect_name, bfd_get_filename (abfd),
 		 bfd_errmsg (bfd_get_error ()));
       free (contents);

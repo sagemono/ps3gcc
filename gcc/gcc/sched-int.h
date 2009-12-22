@@ -197,6 +197,10 @@ struct haifa_insn_data
      notes, this indicates whether the note may be reused.  */
   rtx line_note;
 
+  /* List of insns in with same priority.  Used when marking critical
+     paths. */
+  rtx pri_next;
+
   /* Logical uid gives the original ordering of the insns.  */
   int luid;
 
@@ -255,6 +259,7 @@ extern int sched_old_max_uid;
 #define INSN_NEEDNOP8(INSN)	(h_i_d[INSN_UID (INSN)].neednop8)
 #define INSN_NEEDNOP10(INSN)    (h_i_d[INSN_UID (INSN)].neednop10)
 #define INSN_SCHED_EARLY(INSN)    (h_i_d[INSN_UID (INSN)].sched_early)
+#define INSN_PRI_NEXT(INSN)    (h_i_d[INSN_UID (INSN)].pri_next)
 
 extern FILE *sched_dump;
 extern int sched_verbose;
@@ -382,5 +387,11 @@ extern void ready_add (struct ready_list *, rtx);
 /* defined in haifa-sched.c, used in config/spu/spu.c */
 extern int clock_var;
 extern rtx sched_emit_insn (rtx);
+
+/* We store critical path information in the least significant bits of
+   INSN_BLOCK_CYCLE, and the cycle in the upper bits. */
+#define PATH_BIT_SIZE 16
+#define PATH_MASK ((1 << PATH_BIT_SIZE) - 1)
+#define PATH_HIGH_BIT (1 << (PATH_BIT_SIZE - 1))
 
 #endif /* GCC_SCHED_INT_H */

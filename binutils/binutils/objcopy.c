@@ -216,6 +216,10 @@ static char *prefix_symbols_string = 0;
 static char *prefix_sections_string = 0;
 static char *prefix_alloc_sections_string = 0;
 
+/* Prefix for symbols generated with -I binary.  Referenced as a
+ * weak_ref in bfd/binary.c. */
+char *binary_symbol_prefix = 0;
+
 /* begin sce local, bugzilla 52093 */
 /* If this is TRUE, we do not mark the output object
    as dead-stripping compatible */
@@ -271,8 +275,9 @@ enum command_line_switch
     OPTION_SET_SECTION_ALIGN,
     OPTION_SET_SECTION_PAD,
     /* begin sce local, bugzilla 52093 */
-    OPTION_NO_EF_PPC64_REL24
+    OPTION_NO_EF_PPC64_REL24,
     /* end sce local */
+    OPTION_BINARY_SYMBOL_PREFIX
   };
 
 /* Options to handle if running as "strip".  */
@@ -317,6 +322,7 @@ static struct option copy_options[] =
   {"adjust-warnings", no_argument, 0, OPTION_CHANGE_WARNINGS},
   {"alt-machine-code", required_argument, 0, OPTION_ALT_MACH_CODE},
   {"binary-architecture", required_argument, 0, 'B'},
+  {"binary-symbol-prefix", required_argument, 0, OPTION_BINARY_SYMBOL_PREFIX},
   {"byte", required_argument, 0, 'b'},
   {"change-addresses", required_argument, 0, OPTION_CHANGE_ADDRESSES},
   {"change-leading-char", no_argument, 0, OPTION_CHANGE_LEADING_CHAR},
@@ -1357,7 +1363,7 @@ copy_object (bfd *ibfd, bfd *obfd)
 	      padd->section = bfd_make_section_with_flags (obfd, padd->name, flags);
 	      if (padd->section == NULL)
 		{
-		  non_fatal (_("can't create section `%s': %s"),
+		  non_fatal (_("error: can't create section `%s': %s"),
 			     padd->name, bfd_errmsg (bfd_get_error ()));
 		  return FALSE;
 		}
@@ -1498,7 +1504,7 @@ copy_object (bfd *ibfd, bfd *obfd)
 		  if (! bfd_set_section_size (obfd, osections[i],
 					      size + (gap_stop - gap_start)))
 		    {
-		      non_fatal (_("Can't fill gap after %s: %s"),
+		      non_fatal (_("error: Can't fill gap after %s: %s"),
 				 bfd_get_section_name (obfd, osections[i]),
 				 bfd_errmsg (bfd_get_error ()));
 		      status = 1;
@@ -1523,7 +1529,7 @@ copy_object (bfd *ibfd, bfd *obfd)
 	      if (! bfd_set_section_size (obfd, osections[c - 1],
 					  pad_to - lma))
 		{
-		  non_fatal (_("Can't add padding to %s: %s"),
+		  non_fatal (_("error: Can't add padding to %s: %s"),
 			     bfd_get_section_name (obfd, osections[c - 1]),
 			     bfd_errmsg (bfd_get_error ()));
 		  status = 1;
@@ -1690,7 +1696,7 @@ copy_object (bfd *ibfd, bfd *obfd)
     ;
   else if (! bfd_copy_private_bfd_data (ibfd, obfd))
     {
-      non_fatal (_("%s: error copying private BFD data: %s"),
+      non_fatal (_("error: %s: error copying private BFD data: %s"),
 		 bfd_get_filename (obfd),
 		 bfd_errmsg (bfd_get_error ()));
       return FALSE;
@@ -2082,7 +2088,7 @@ setup_bfd_headers (bfd *ibfd, bfd *obfd)
   return;
 
 loser:
-  non_fatal (_("%s: error in %s: %s"),
+  non_fatal (_("error: %s: error in %s: %s"),
 	     bfd_get_filename (ibfd),
 	     err, bfd_errmsg (bfd_get_error ()));
   status = 1;
@@ -2234,7 +2240,7 @@ setup_section (bfd *ibfd, sec_ptr isection, void *obfdarg)
   return;
 
 loser:
-  non_fatal (_("%s: section `%s': error in %s: %s"),
+  non_fatal (_("error: %s: section `%s': error in %s: %s"),
 	     bfd_get_filename (ibfd),
 	     bfd_section_name (ibfd, isection),
 	     err, bfd_errmsg (bfd_get_error ()));
@@ -2506,7 +2512,7 @@ write_debugging_info (bfd *obfd, void *dhandle,
 	  || ! bfd_set_section_alignment (obfd, stabsec, 2)
 	  || ! bfd_set_section_alignment (obfd, stabstrsec, 0))
 	{
-	  non_fatal (_("%s: can't create debugging section: %s"),
+	  non_fatal (_("error: %s: can't create debugging section: %s"),
 		     bfd_get_filename (obfd),
 		     bfd_errmsg (bfd_get_error ()));
 	  return FALSE;
@@ -2520,7 +2526,7 @@ write_debugging_info (bfd *obfd, void *dhandle,
 	  || ! bfd_set_section_contents (obfd, stabstrsec, strings, 0,
 					 stringsize))
 	{
-	  non_fatal (_("%s: can't set debugging section contents: %s"),
+	  non_fatal (_("error: %s: can't set debugging section contents: %s"),
 		     bfd_get_filename (obfd),
 		     bfd_errmsg (bfd_get_error ()));
 	  return FALSE;
@@ -3235,6 +3241,11 @@ copy_main (int argc, char *argv[])
 	  no_ef_ppc64_rel24 = TRUE;
 	  break;
     /* end sce local */
+
+	case OPTION_BINARY_SYMBOL_PREFIX:
+	  binary_symbol_prefix = optarg;
+	  break;
+
 
 	case 0:
 	  /* We've been given a long option.  */

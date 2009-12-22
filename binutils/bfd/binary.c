@@ -133,19 +133,34 @@ binary_get_symtab_upper_bound (bfd *abfd ATTRIBUTE_UNUSED)
 static char *
 mangle_name (bfd *abfd, char *suffix)
 {
+  /* binary_symbol_prefix is defined in objcopy.c */
+  extern char *binary_symbol_prefix __attribute__((weak));
   bfd_size_type size;
   char *buf;
   char *p;
 
-  size = (strlen (bfd_get_filename (abfd))
-	  + strlen (suffix)
-	  + sizeof "_binary__");
+  if (&binary_symbol_prefix && binary_symbol_prefix)
+    {
+      size = (strlen (binary_symbol_prefix)
+	      + strlen (suffix)
+	      + 1);
+      buf = bfd_alloc (abfd, size);
+      if (buf == NULL)
+	return "";
+      snprintf (buf, size, "%s%s", binary_symbol_prefix, suffix);
+    }
+  else
+    {
+      size = (strlen (bfd_get_filename (abfd))
+	      + strlen (suffix)
+	      + sizeof "_binary__");
 
-  buf = bfd_alloc (abfd, size);
-  if (buf == NULL)
-    return "";
+      buf = bfd_alloc (abfd, size);
+      if (buf == NULL)
+	return "";
 
-  sprintf (buf, "_binary_%s_%s", bfd_get_filename (abfd), suffix);
+      sprintf (buf, "_binary_%s_%s", bfd_get_filename (abfd), suffix);
+    }
 
   /* Change any non-alphanumeric characters to underscores.  */
   for (p = buf; *p; p++)

@@ -983,6 +983,17 @@ find_regs_nested (rtx deps, rtx x)
   return deps;
 }
 
+static int
+remove_single_usage_refs (rtx *px, void *data)
+{
+  struct loop_regs *regs = data;
+  rtx x = *px;
+
+  if (REG_P (x))
+    regs->array[REGNO (x)].single_usage = NULL_RTX;
+  return 0;
+}
+
 /* Optimize one loop described by LOOP.  */
 
 /* ??? Could also move memory writes out of loops if the destination address
@@ -1332,6 +1343,9 @@ scan_loop (struct loop *loop, int flags)
 		      REG_NOTES (user)
 			= replace_rtx (REG_NOTES (user), SET_DEST (set),
 				       copy_rtx (SET_SRC (set)));
+
+		      /* Remove references of p from regs. */
+		      for_each_rtx (&PATTERN (p), remove_single_usage_refs, regs);
 
 		      delete_insn (p);
 		      for (i = 0; i < LOOP_REGNO_NREGS (regno, SET_DEST (set));

@@ -5288,7 +5288,12 @@ emit_store_flag (rtx target, enum rtx_code code, rtx op0, rtx op1,
       && (normalizep || STORE_FLAG_VALUE == 1
 	  || (GET_MODE_BITSIZE (mode) <= HOST_BITS_PER_WIDE_INT
 	      && ((STORE_FLAG_VALUE & GET_MODE_MASK (mode))
-		  == (unsigned HOST_WIDE_INT) 1 << (GET_MODE_BITSIZE (mode) - 1)))))
+		  == (unsigned HOST_WIDE_INT) 1 << (GET_MODE_BITSIZE (mode) - 1))))
+#ifdef SETCC_COST
+      && SETCC_COST (mode) > shift_cost[mode][GET_MODE_BITSIZE (mode) - 1]
+			     + neg_cost[mode]
+#endif
+      )
     {
       subtarget = target;
 

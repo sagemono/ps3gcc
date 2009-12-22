@@ -42,10 +42,10 @@ INITIAL_READONLY_SECTIONS="
 # sce local bugzilla 39745
 # SPURS team requested us to provide the pair of symbols
 # to indentify where is the readonly segment.
-SYMBOL_READONLY_SEGMENT_START="  PROVIDE (__ro_segment_start = .); "
-SYMBOL_READONLY_SEGMENT_END="  PROVIDE (__ro_segment_end = .); "
+SYMBOL_READONLY_SEGMENT_START="  __ro_segment_start = .; "
+SYMBOL_READONLY_SEGMENT_END="  __ro_segment_end = .; "
 
-SYMBOL_DATA_SEGMENT_START="PROVIDE (__data_start = .);"
+SYMBOL_DATA_SEGMENT_START="__data_start = .;"
 
 # Symbols used to initialze bss using the following assembly code:
 #	ila	$6,__bss_start

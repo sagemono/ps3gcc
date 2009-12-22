@@ -112,6 +112,26 @@ extern qword __stack;
 
 extern char _end[];
 
+
+#if defined (_RAW_SPU) || defined (_SPU_THREAD) || defined(_SPURS_TASK)
+
+vector unsigned int _cell_spu_ls_param __attribute__((weak)) = {0};
+qword _spu_ls_initial_sp __attribute__((section(".data")));
+
+__attribute__((always_inline)) static
+qword fix_sp_size_limit(qword stack_size)
+{
+  unsigned int cell_spu_stack_size = spu_extract(_cell_spu_ls_param, 1);
+  qword q_cell_spu_stack_size = si_ai((qword)spu_splats(cell_spu_stack_size), -48);
+  qword is_stack_size_limit_enabled = si_clgti(q_cell_spu_stack_size, 0);
+  qword is_valid_stack_size         = si_clgt(stack_size, q_cell_spu_stack_size);
+  qword fixed_stack_size = si_selb(stack_size, q_cell_spu_stack_size, 
+				   si_and( is_stack_size_limit_enabled, is_valid_stack_size));
+  return fixed_stack_size;
+}
+#endif 
+
+
 #ifdef _STD_MAIN
 char argv_buf[256] = "0000000000000000000000000000000000000000"
                      "0000000000000000000000000000000000000000"
@@ -196,8 +216,13 @@ _start(int spu_id NOT_USED_IN_STD_MAIN,
     qword tmp = si_rotqbyi(si_r2, 12);
     stack_size = si_selb(tmp, stack_size, si_ceqi(tmp, 0));
   }
-#endif
   si_sp = si_selb(chain, stack_size, si_fsmbi(0x0f00));
+#else
+  si_sp = si_selb(chain, stack_size, si_fsmbi(0x0f00));
+  _spu_ls_initial_sp = si_ai(si_sp, 48);
+  stack_size = fix_sp_size_limit(stack_size);
+  si_sp = si_selb(chain, stack_size, si_fsmbi(0x0f00));
+#endif
 
   _init();
 

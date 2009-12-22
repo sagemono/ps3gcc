@@ -66,14 +66,14 @@
 
 #undef  STARTFILE_SPEC
 #define STARTFILE_SPEC	\
-			"%{mspurs-job:job_start_gcc%O%s; " \
-			"  mspurs-job-initialize:job_start_w_crt%O%s job_crt%O%s crti%O%s %{fpic|fPIC: %{!mno-fixups:init_fixups%O%s}} %{mzerobss:init_zerobss%O%s} init_crtend%O%s;" \
+			"%{mspurs-job:job_start%O%s; " \
 			"  mcellsim|mspusim:cs-crt0%O%s; " \
 			"  :--strip-crt " \
 			"     %{cstdmain:crt2%O%s; " \
 			"       mraw|mapusim:crt3%O%s; " \
 			"       mis:crt4%O%s; " \
 			"       mspurs-task:spurs_task%O%s; " \
+                        "       mspurs-job-initialize:job_start_w_crt%O%s job_crt%O%s; " \
 			"       shared:dll_crt%O%s; " \
 			"       :crt1%O%s " \
 			"     } " \

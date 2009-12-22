@@ -101,7 +101,7 @@ Target Report RejectNegative
 volatile must be specified on any memory that is effected by DMA
 
 mdual-nops
-Target Report Var(spu_dual_nops,10) Init(10)
+Target Report Var(spu_dual_nops,15) Init(15)
 Insert nops when it might improve performance by allowing dual issue (default)
 
 mdual-nops=

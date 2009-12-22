@@ -54,9 +54,9 @@ bfd_nonfatal (const char *string)
   const char *errmsg = bfd_errmsg (bfd_get_error ());
 
   if (string)
-    fprintf (stderr, "%s: %s: %s\n", program_name, string, errmsg);
+    fprintf (stderr, "error: %s: %s: %s\n", program_name, string, errmsg);
   else
-    fprintf (stderr, "%s: %s\n", program_name, errmsg);
+    fprintf (stderr, "error: %s: %s\n", program_name, errmsg);
 }
 
 void
@@ -107,7 +107,7 @@ set_default_bfd_target (void)
   const char *target = TARGET;
 
   if (! bfd_set_default_target (target))
-    fatal (_("can't set BFD default target to `%s': %s"),
+    fatal (_("error : can't set BFD default target to `%s': %s"),
 	   target, bfd_errmsg (bfd_get_error ()));
 }
 

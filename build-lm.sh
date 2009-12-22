@@ -3,7 +3,7 @@
 # Copyright(C) 2009 Sony Computer Entertainment Inc.
 # All Rights Reserved.
 
-# This script builds and installs linux->mingw toolchain for SDK3.0.0-GCC411.
+# This script builds and installs linux->mingw toolchain for SDK3.1.0-GCC411.
 # If environment variable TOOLCHAIN_BUILDDIR is set, it is used as a working
 # directory to build the toolchain.  The default is the current working
 # directory.

@@ -401,7 +401,7 @@ parse_coff_struct_type (bfd *abfd, struct coff_symbols *symbols,
 
       if (! bfd_coff_get_syment (abfd, sym, &syment))
 	{
-	  non_fatal (_("bfd_coff_get_syment failed: %s"),
+	  non_fatal (_("error: bfd_coff_get_syment failed: %s"),
 		     bfd_errmsg (bfd_get_error ()));
 	  return DEBUG_TYPE_NULL;
 	}
@@ -417,7 +417,7 @@ parse_coff_struct_type (bfd *abfd, struct coff_symbols *symbols,
 	{
 	  if (! bfd_coff_get_auxent (abfd, sym, 0, &auxent))
 	    {
-	      non_fatal (_("bfd_coff_get_auxent failed: %s"),
+	      non_fatal (_("error: bfd_coff_get_auxent failed: %s"),
 			 bfd_errmsg (bfd_get_error ()));
 	      return DEBUG_TYPE_NULL;
 	    }
@@ -506,7 +506,7 @@ parse_coff_enum_type (bfd *abfd, struct coff_symbols *symbols,
 
       if (! bfd_coff_get_syment (abfd, sym, &syment))
 	{
-	  non_fatal (_("bfd_coff_get_syment failed: %s"),
+	  non_fatal (_("error: bfd_coff_get_syment failed: %s"),
 		     bfd_errmsg (bfd_get_error ()));
 	  return DEBUG_TYPE_NULL;
 	}
@@ -694,7 +694,7 @@ parse_coff (bfd *abfd, asymbol **syms, long symcount, void *dhandle)
 
       if (! bfd_coff_get_syment (abfd, sym, &syment))
 	{
-	  non_fatal (_("bfd_coff_get_syment failed: %s"),
+	  non_fatal (_("error: bfd_coff_get_syment failed: %s"),
 		     bfd_errmsg (bfd_get_error ()));
 	  return FALSE;
 	}
@@ -714,7 +714,7 @@ parse_coff (bfd *abfd, asymbol **syms, long symcount, void *dhandle)
 	{
 	  if (! bfd_coff_get_auxent (abfd, sym, 0, &auxent))
 	    {
-	      non_fatal (_("bfd_coff_get_auxent failed: %s"),
+	      non_fatal (_("error: bfd_coff_get_auxent failed: %s"),
 			 bfd_errmsg (bfd_get_error ()));
 	      return FALSE;
 	    }

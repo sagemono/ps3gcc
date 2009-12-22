@@ -2953,7 +2953,16 @@ output_asm_name (void)
 	       get_attr_length (debug_insn));
 #endif
       fprintf (asm_out_file, "\t[cycle = %d]",
-	       INSN_BLOCK_CYCLE (debug_insn));
+	       INSN_BLOCK_CYCLE (debug_insn) >> 16);
+      if (INSN_BLOCK_CYCLE (debug_insn) & 0xffff)
+	{
+	  int i, m = INSN_BLOCK_CYCLE (debug_insn) & 0xffff;
+	  char c = 'a';
+	  fprintf (asm_out_file, "\t[path = ");
+	  for (i = 0x8000; i; i >>= 1, c++)
+	    fprintf (asm_out_file, "%c", (m & i) ? c : '_');
+	  fprintf (asm_out_file, "]");
+	}
       /* Clear this so only the first assembler insn
 	 of any rtl insn will get the special comment for -dp.  */
       debug_insn = 0;

@@ -751,7 +751,7 @@ dfa_visualize_scheduled_block (rtx head, rtx tail)
 			   INSN_PRIORITY (insn),
 			   insn_cost (insn, 0, 0),
 		  	   get_attr_length (insn),
-			   INSN_BLOCK_CYCLE (insn));
+			   INSN_BLOCK_CYCLE (insn) >> PATH_BIT_SIZE);
 
 		  if (recog_memoized (insn) < 0)
 		    fprintf (sched_dump, "nothing");
