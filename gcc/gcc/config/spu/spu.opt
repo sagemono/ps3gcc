@@ -84,6 +84,10 @@ mspurs-task
 Target Report
 Build executable for SPURS task model
 
+mcustom-module
+Target Report
+Build executable for mcustom module
+
 mwarn-reloc
 Target Report Mask(WARN_RELOC) Init(0)
 Emit warnings when run-time relocations are generated

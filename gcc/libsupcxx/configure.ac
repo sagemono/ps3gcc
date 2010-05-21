@@ -62,6 +62,17 @@ AC_SUBST(am_cxxflags)
 AM_CONDITIONAL(RTTI, test "$with_multisubdir" != "fno-exceptions/fno-rtti")
 AM_CONDITIONAL(PPU_LV2, test "$target_alias" = "ppu-lv2")
 
+AC_ARG_ENABLE(maintainer-mode,
+[  --enable-maintainer-mode enable rules only needed by maintainers],,
+enable_maintainer_mode=no)
+                                                                                
+if test "x$enable_maintainer_mode" = xno; then
+  MAINT='#'
+else
+  MAINT=
+fi
+AC_SUBST(MAINT)
+
 AC_CONFIG_FILES([Makefile])
 AC_OUTPUT
 

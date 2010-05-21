@@ -14851,6 +14851,10 @@ rs6000_function_ok_for_sibcall (tree decl, tree exp ATTRIBUTE_UNUSED)
 	    }
 	}
       if (DEFAULT_ABI == ABI_DARWIN
+	  /* If we are not outputting a NOP after a bl, then
+	     we can also sibcall as we don't need to restore the
+	     TOC register.  */
+	  || (cellos_lv2_kernel && lv2_no_nop_after_bl)
 	  || ((*targetm.binds_local_p) (decl)
 	      && (DEFAULT_ABI != ABI_AIX || !DECL_EXTERNAL (decl))))
 	{

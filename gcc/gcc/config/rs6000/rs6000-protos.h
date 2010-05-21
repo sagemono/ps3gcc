@@ -179,6 +179,7 @@ extern void rs6000_cpu_cpp_builtins (struct cpp_reader *);
 /* APPLE LOCAL begin AltiVec */
 extern struct cpp_hashnode *rs6000_macro_to_expand (struct cpp_reader *,
 						    const struct cpp_token *);
+extern void rs6000_restore_cpp_builtins (struct cpp_reader *);
 /* APPLE LOCAL end AltiVec */
 
 #if TARGET_MACHO

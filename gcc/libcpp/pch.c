@@ -64,7 +64,7 @@ write_macdef (cpp_reader *pfile, cpp_hashnode *hn, void *file_p)
 	const unsigned char *defn;
 
 	s.name_length = NODE_LEN (hn);
-	s.flags = hn->flags & NODE_POISONED;
+	s.flags = hn->flags & (NODE_POISONED | NODE_CONDITIONAL);
 
 	if (hn->type == NT_MACRO)
 	  {

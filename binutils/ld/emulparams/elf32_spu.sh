@@ -44,6 +44,7 @@ INITIAL_READONLY_SECTIONS="
 # to indentify where is the readonly segment.
 SYMBOL_READONLY_SEGMENT_START="  __ro_segment_start = .; "
 SYMBOL_READONLY_SEGMENT_END="  __ro_segment_end = .; "
+READONLY_SEGMENT_END_ALIGN="${RELOCATING+. = ALIGN(${ALIGNMENT});}"
 
 SYMBOL_DATA_SEGMENT_START="__data_start = .;"
 

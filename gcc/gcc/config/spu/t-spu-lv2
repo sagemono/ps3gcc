@@ -66,7 +66,7 @@ CRTSTUFF_T_CFLAGS =
 MULTILIB_OPTIONS=fPIC
 MULTILIB_DIRNAMES=pic
 MULTILIB_EXCEPTIONS=
-MULTILIB_MATCHES=fPIC=fpic fPIC=shared fPIC=mfixups
+MULTILIB_MATCHES=fPIC=fpic fPIC=shared fPIC=mcustom-module fPIC=mfixups
 
 # Neither gcc or newlib seem to have a standard way to generate multiple
 # crt*.o files.  So we don't use the standard crt0.o name anymore.

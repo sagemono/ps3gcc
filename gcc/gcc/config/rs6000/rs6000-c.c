@@ -39,7 +39,7 @@
 #include "../libcpp/internal.h"
 
 static cpp_hashnode *altivec_categorize_keyword (const cpp_token *);
-static void init_vector_keywords (cpp_reader *pfile);
+static void init_vector_keywords (cpp_reader *pfile, bool restore);
 /* APPLE LOCAL end AltiVec */
 
 
@@ -135,9 +135,6 @@ rs6000_macro_to_expand (cpp_reader *pfile, const cpp_token *tok)
   cpp_hashnode *expand_this = tok->val.node;
   cpp_hashnode *ident;
 
-  if (CPP_OPTION (pfile, valid_pch))
-    init_vector_keywords (pfile);
-
   ident = altivec_categorize_keyword (tok);
 
   if (ident != expand_this)
@@ -201,32 +198,31 @@ rs6000_macro_to_expand (cpp_reader *pfile, const cpp_token *tok)
 }
 
 static void
-init_vector_keywords (cpp_reader *pfile)
+init_vector_keywords (cpp_reader *pfile, bool restore)
 {
-      /* Keywords without two leading underscores are context-sensitive, and hence
-	 implemented as conditional macros, controlled by the rs6000_macro_to_expand()
-	 function above.  */
-      __vector_keyword = cpp_lookup (pfile, DSC ("__vector"));
+  /* Keywords without two leading underscores are context-sensitive, and hence
+     implemented as conditional macros, controlled by the rs6000_macro_to_expand()
+     function above.  */
+  __vector_keyword = cpp_lookup (pfile, DSC ("__vector"));
+  __pixel_keyword = cpp_lookup (pfile, DSC ("__pixel"));
+  __bool_keyword = cpp_lookup (pfile, DSC ("__bool"));
+  vector_keyword = cpp_lookup (pfile, DSC ("vector"));
+  pixel_keyword = cpp_lookup (pfile, DSC ("pixel"));
+  _Bool_keyword = cpp_lookup (pfile, DSC ("_Bool"));
+  bool_keyword = cpp_lookup (pfile, DSC ("bool"));
+
+  if (!restore)
+    {
       __vector_keyword->flags |= NODE_CONDITIONAL;
-
-      __pixel_keyword = cpp_lookup (pfile, DSC ("__pixel"));
       __pixel_keyword->flags |= NODE_CONDITIONAL;
-
-      __bool_keyword = cpp_lookup (pfile, DSC ("__bool"));
       __bool_keyword->flags |= NODE_CONDITIONAL;
-
-      vector_keyword = cpp_lookup (pfile, DSC ("vector"));
       vector_keyword->flags |= NODE_CONDITIONAL;
-
-      pixel_keyword = cpp_lookup (pfile, DSC ("pixel"));
       pixel_keyword->flags |= NODE_CONDITIONAL;
-
-      _Bool_keyword = cpp_lookup (pfile, DSC ("_Bool"));
       _Bool_keyword->flags |= NODE_CONDITIONAL;
-
-      bool_keyword = cpp_lookup (pfile, DSC ("bool"));
       bool_keyword->flags |= NODE_CONDITIONAL;
-      return;
+    }
+
+  return;
 }
 
 /* APPLE LOCAL end AltiVec */
@@ -270,7 +266,7 @@ rs6000_cpu_cpp_builtins (cpp_reader *pfile)
       builtin_define ("pixel=pixel");
       builtin_define ("_Bool=_Bool"); 
       builtin_define ("bool=bool");
-      init_vector_keywords (pfile);
+      init_vector_keywords (pfile, false);
 
       /* Enable context-sensitive macros.  */
       cpp_get_callbacks (pfile)->macro_to_expand = rs6000_macro_to_expand;
@@ -309,6 +305,13 @@ rs6000_cpu_cpp_builtins (cpp_reader *pfile)
   /* Let the compiled code know if 'f' class registers will not be available.  */
   if (TARGET_SOFT_FLOAT || !TARGET_FPRS)
     builtin_define ("__NO_FPRS__");
+}
+
+void
+rs6000_restore_cpp_builtins (cpp_reader *pfile)
+{
+  if (TARGET_ALTIVEC)
+    init_vector_keywords (pfile, true);
 }
 
 

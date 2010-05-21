@@ -374,6 +374,7 @@ cat <<EOF
   .eh_frame     ${RELOCATING-0} : ONLY_IF_RO { KEEP (*(.eh_frame)) }
   .gcc_except_table ${RELOCATING-0} : ONLY_IF_RO { *(.gcc_except_table .gcc_except_table.*) }
 
+  ${READONLY_SEGMENT_END_ALIGN}
   ${SYMBOL_READONLY_SEGMENT_END}
 
   /* Adjust the address for the data segment.  We want to adjust up to
@@ -513,6 +514,10 @@ cat <<EOF
   .debug_funcnames 0 : { *(.debug_funcnames) }
   .debug_typenames 0 : { *(.debug_typenames) }
   .debug_varnames  0 : { *(.debug_varnames) }
+
+  /* DWARF 3 */
+  .debug_pubtypes 0 : { *(.debug_pubtypes) }
+  .debug_ranges 0 : { *(.debug_ranges) }
 
   /* TRANSMETA PGO Begin */
   /* This section is used by simulator-based pgo data gathering.  */

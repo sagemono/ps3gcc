@@ -35,6 +35,10 @@ Boston, MA 02110-1301, USA.  */
 #include "hosthooks.h"
 #include "target.h"
 
+#ifndef TARGET_RESTORE_CPP_BUILTINS
+# define TARGET_RESTORE_CPP_BUILTINS()
+#endif
+
 /* This is a list of flag variables that must match exactly, and their
    names for the error message.  The possible values for *flag_var must
    fit in a 'signed char'.  */
@@ -422,6 +426,8 @@ c_common_read_pch (cpp_reader *pfile, const char *name,
     }
 
   fclose (f);
+
+  TARGET_RESTORE_CPP_BUILTINS ();
   
   /* Give the front end a chance to take action after a PCH file has
      been loaded.  */

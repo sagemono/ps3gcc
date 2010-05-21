@@ -410,6 +410,9 @@ extern const char *rs6000_hint_str;
 	}					\
     }						\
   while (0)
+
+#define TARGET_RESTORE_CPP_BUILTINS() \
+  rs6000_restore_cpp_builtins (pfile)
 
 /* Target machine storage layout.  */
 

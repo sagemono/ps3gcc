@@ -796,6 +796,7 @@ spu_elf_create_sections (bfd *output_bfd ATTRIBUTE_UNUSED,
       if (s == NULL || !bfd_set_section_alignment (ibfd, s, 2))
 	return FALSE;
       htab->sfixup = s;
+      htab->elf.dynobj = ibfd;
     }
 
   return TRUE;

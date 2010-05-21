@@ -44,7 +44,7 @@
 #include "spu_types.h"
 
 static cpp_hashnode *spu_categorize_keyword (const cpp_token *);
-static void spu_init_vector_keywords (cpp_reader *pfile);
+static void spu_init_vector_keywords (cpp_reader *pfile, bool restore);
 /* APPLE LOCAL end AltiVec */
 
 struct spu_builtin_description;
@@ -666,16 +666,9 @@ spu_categorize_keyword (const cpp_token *tok)
 cpp_hashnode *
 spu_macro_to_expand (cpp_reader *pfile, const cpp_token *tok)
 {
-  static bool vector_keywords_init = false;
   cpp_hashnode *expand_this = tok->val.node;
   cpp_hashnode *ident;
   cpp_hashnode *__vector_cpp_hashnode;
-
-  if (!vector_keywords_init)
-    {
-      spu_init_vector_keywords (pfile);
-      vector_keywords_init = true;
-    }
 
   ident = spu_categorize_keyword (tok);
 
@@ -724,7 +717,7 @@ spu_macro_to_expand (cpp_reader *pfile, const cpp_token *tok)
 }
 
 static void
-spu_init_vector_keywords (cpp_reader *pfile)
+spu_init_vector_keywords (cpp_reader *pfile, bool restore)
 {
   cpp_hashnode *node;
 
@@ -733,17 +726,25 @@ spu_init_vector_keywords (cpp_reader *pfile)
      spu_macro_to_expand() function above.  */
 
   node = cpp_lookup (pfile, DSC ("__vector"));
-  node->flags |= NODE_CONDITIONAL;
+  if (!restore)
+    node->flags |= NODE_CONDITIONAL;
   __vector_keyword = HT_IDENT_TO_GCC_IDENT (& node->ident);
 
   node = cpp_lookup (pfile, DSC ("vector"));
-  node->flags |= NODE_CONDITIONAL;
+  if (!restore)
+    node->flags |= NODE_CONDITIONAL;
   vector_keyword = HT_IDENT_TO_GCC_IDENT (& node->ident);
 
   return;
 }
 
 /* APPLE LOCAL end AltiVec */
+
+void
+spu_restore_cpp_builtins (cpp_reader *pfile)
+{
+  spu_init_vector_keywords (pfile, true);
+}
 
 /* Defined in c-cppbuiltin.c and not declared in any header. */
 extern void builtin_define_std (const char *);
@@ -764,7 +765,7 @@ spu_cpu_cpp_builtins (cpp_reader *pfile)
 
   /* APPLE LOCAL begin AltiVec */
   builtin_define ("vector=vector");
-  spu_init_vector_keywords (pfile);
+  spu_init_vector_keywords (pfile, false);
 
   /* Enable context-sensitive macros. */
   cpp_get_callbacks (pfile)->macro_to_expand = spu_macro_to_expand;

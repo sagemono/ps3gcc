@@ -96,7 +96,7 @@ Does not save/restore TOC base. This option should be used only for a single TOC
 ;      -falign-labels=1
 ;      -falign-loops=1
 mcellos-kernel
-Target Report RejectNegative Undocumented
+Target Report RejectNegative Undocumented Var(cellos_lv2_kernel) Init (0)
 For Cell OS kernel
 
 ; Bz50853

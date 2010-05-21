@@ -38,6 +38,8 @@
 
 #define TARGET_CPU_CPP_BUILTINS()	spu_cpu_cpp_builtins(pfile)
 
+#define TARGET_RESTORE_CPP_BUILTINS()	spu_restore_cpp_builtins(pfile)
+
 #define OVERRIDE_OPTIONS spu_override_options()
 
 #define C_COMMON_OVERRIDE_OPTIONS spu_c_common_override_options()

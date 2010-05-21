@@ -47,7 +47,7 @@
 	"%{!fno-aggressive-cmov:-faggressive-cmov} " \
 	"%{!fno-strict-aligned:-fstrict-aligned} " \
 	"%{Os:%{!mhint-max-nops*:-mhint-max-nops=0} %{!mdual-nops:-mno-dual-nops}} " \
-	"%{shared|mfixups: -fPIC} "
+	"%{shared|mfixups|mcustom-module: -fPIC} "
 
 #undef CC1PLUS_SPEC
 #define CC1PLUS_SPEC \
@@ -75,10 +75,11 @@
 			"       mspurs-task:spurs_task%O%s; " \
                         "       mspurs-job-initialize:job_start_w_crt%O%s job_crt%O%s; " \
 			"       shared:dll_crt%O%s; " \
+			"       mcustom-module:; " \
 			"       :crt1%O%s " \
 			"     } " \
 			"  crti%O%s "\
-			"  %{fpic|fPIC|shared: %{!mno-fixups:init_fixups%O%s}} " \
+			"  %{fpic|fPIC|shared|mcustom-module: %{!mno-fixups:init_fixups%O%s}} " \
 			"  %{mzerobss:init_zerobss%O%s} " \
 			"  init_crtend%O%s "\
 			" } "
@@ -94,11 +95,11 @@
 
 #undef LINK_SPEC
 #define LINK_SPEC "%{mlarge-mem: --defsym __stack=0xfffffff0} " \
-                  "%{!Ttext*: %{mspurs-job*:%{fPIC|fpic:-Ttext=0x0; :-Ttext=0x4c00}; mspurs-task:-Ttext=0x3000}} " \
-                  "%{fPIC|fpic|shared: %{!mno-warn-reloc: %{mno-fixups: --warn-pic-all}}} " \
+                  "%{!Ttext*: %{mspurs-job*:%{fPIC|fpic:-Ttext=0x0; :-Ttext=0x4c00}; mspurs-task:-Ttext=0x3000; mcustom-module:-Ttext=0x0}} " \
+                  "%{fPIC|fpic|shared|mcustom-module: %{!mno-warn-reloc: %{mno-fixups: --warn-pic-all}}} " \
                   "%{shared} %{static} " \
-                  "%{fpic|fPIC|shared:%{mno-fixups:;:--emit-fixups}} " \
-                  "%{fpic|fPIC: -q} " \
+                  "%{fpic|fPIC|shared|mcustom-module:%{mno-fixups:;:--emit-fixups}} " \
+                  "%{fpic|fPIC|shared|mcustom-module: -q} " \
                   "%{rdynamic: %{static|shared: ; : -export-dynamic}} " \
                   "%{mspurs-job: --set-eflags=spurs-job} " \
                   "%{mspurs-job-initialize: --set-eflags=spurs-job-initialize} " \

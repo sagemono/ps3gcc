@@ -85,6 +85,7 @@ extern enum machine_mode spu_eh_return_filter_mode	(void);
 extern void spu_cpu_cpp_builtins		(struct cpp_reader *);
 extern struct cpp_hashnode *spu_macro_to_expand	(struct cpp_reader *,
 						 const struct cpp_token *);
+extern void spu_restore_cpp_bultins		(struct cpp_reader *);
 extern int spu_mode_offset			(enum machine_mode old_mode, enum machine_mode new_mode); 
 extern void spu_allocate_stack			(rtx op0, rtx op1); 
 extern void spu_restore_stack_nonlocal		(rtx op0, rtx op1); 
