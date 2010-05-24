@@ -15,7 +15,7 @@
 メントを参照してください。
 例:
     mkdir work/src
-    unzip toolchain-src-3.3.0-GCC411.zip -d work/src
+    unzip toolchain-src-3.4.0-GCC411.zip -d work/src
     mkdir work/build
     cd work/build
     ../src/build.sh

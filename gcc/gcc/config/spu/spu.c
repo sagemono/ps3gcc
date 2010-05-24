@@ -3829,7 +3829,7 @@ cpat_info(unsigned char *arr, int size, int *prun, int *pstart)
 	      cpat = 0;
 	    if ((i & (run-1)) != 0)
 	      cpat = 0;
-	    i += run;
+	    i += run-1; /* subtract 1 to compensate i++ */
 	  }
 	else
 	  cpat = 0;

@@ -102,4 +102,8 @@ extern struct pragma_loop_info *pragma_loop_find (struct loop *);
 #define PRAGMA_LOOP_SMS		4
 extern int pragma_loop_seen;
 
+extern void pragma_comment_output (void);
+extern void save_pragma_comment (FILE *);
+extern void restore_pragma_comment (FILE *);
+
 #endif /* GCC_C_PRAGMA_H */

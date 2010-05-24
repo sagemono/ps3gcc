@@ -214,6 +214,8 @@ c_common_write_pch (void)
   if (fseek (asm_out_file, 0, SEEK_END) != 0)
     fatal_error ("can%'t seek in %s: %m", asm_file_name);
 
+  save_pragma_comment (pch_outfile);
+
   gt_pch_save (pch_outfile);
   cpp_write_pch_state (parse_in, pch_outfile);
 
@@ -414,6 +416,8 @@ c_common_read_pch (cpp_reader *pfile, const char *name,
       if (fseek (f, h.asm_size, SEEK_CUR) != 0)
 	cpp_errno (pfile, CPP_DL_ERROR, "seeking");
     }
+
+  restore_pragma_comment (f);
 
   cpp_prepare_state (pfile, &smd);
 

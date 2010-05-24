@@ -983,6 +983,69 @@ pragma_comment_output (void)
     }
 }
 
+void
+save_pragma_comment (FILE *f)
+{
+  size_t size = 0;
+  if (comment_list != NULL) {
+    long pos = ftell (f);
+    struct comment_t *p = comment_list;
+    if (fwrite (&size, sizeof (size), 1, f) != 1)
+      fatal_error ("can%'t write: %m");
+    do {
+      size += strlen (p->commentstr) + 1;
+      if (fwrite (p->commentstr, strlen (p->commentstr) + 1, 1, f) != 1)
+	fatal_error ("can%'t write: %m");
+      p = p->next;
+    } while (p);
+    long end = ftell (f);
+    if (fseek (f, pos, SEEK_SET) != 0)
+      fatal_error ("can%'t seek: %m");
+    if (fwrite (&size, sizeof (size), 1, f) != 1)
+      fatal_error ("can%'t write: %m");
+    if (fseek (f, end, SEEK_SET) != 0)
+      fatal_error ("can%'t seek: %m");
+  } else {
+    if (fwrite (&size, sizeof (size), 1, f) != 1)
+      fatal_error ("can%'t write: %m");
+  }
+}
+
+void
+restore_pragma_comment (FILE *f)
+{
+  size_t size;
+
+  if (fread (&size, sizeof (size), 1, f) != 1)
+    fatal_error ("can%'t read: %m");
+
+  if (size) {
+    size_t s;
+    char *buf;
+
+    buf = xmalloc (size);
+
+    if (fread (buf, size, 1, f) != 1)
+      fatal_error ("can%'t read: %m");
+
+    for (s = 0; s < size;) {
+      struct comment_t *p = XCNEW(struct comment_t);
+      size_t len = strlen (&buf[s]) + 1;
+      p = XCNEW(struct comment_t);
+      p->commentstr = XNEWVEC(char, len);
+      memcpy (p->commentstr, &buf[s], len);                                                                          
+      if (comment_list)
+        comment_tail->next = p;
+      else
+        comment_list = p;
+                                                                                
+      comment_tail = p;
+      s += strlen (p->commentstr) + 1;
+    }
+    free (buf);
+  }
+}
+
 /* #pragma comment (lib, "libname") */
 static void
 handle_pragma_comment (cpp_reader * ARG_UNUSED (dummy))
