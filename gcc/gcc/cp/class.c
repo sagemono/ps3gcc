@@ -170,6 +170,7 @@ static int make_new_vtable (tree, tree);
 static int maybe_indent_hierarchy (FILE *, int, int);
 static tree dump_class_hierarchy_r (FILE *, int, tree, tree, int);
 static void dump_class_hierarchy (tree);
+static void dump_class_layout (tree);
 static void dump_class_hierarchy_1 (FILE *, int, tree);
 static void dump_array (FILE *, tree);
 static void dump_vtable (tree, tree, tree);
@@ -5104,6 +5105,8 @@ finish_struct_1 (tree t)
 
   dump_class_hierarchy (t);
 
+  dump_class_layout (t);
+
   /* Finish debugging output for this type.  */
   rest_of_type_compilation (t, ! LOCAL_CLASS_P (t));
 
@@ -6534,6 +6537,205 @@ dump_class_hierarchy_1 (FILE *stream, int flags, tree t)
   fprintf (stream, "\n");
 }
 
+/*
+ * Devnet 65761
+ */
+/* Dump type as stripg */
+static void
+print_member_type (FILE* stream, int flags, tree type_node)
+{
+  int flag_typename = TRUE;
+
+  if (TREE_CODE(type_node) == POINTER_TYPE)
+    {
+      fputc('*', stream);
+      print_member_type (stream, flags, TREE_TYPE(type_node));
+    }
+  else if (TREE_CODE(type_node) == REFERENCE_TYPE)
+    {
+      fputc('&', stream);
+      print_member_type (stream, flags, TREE_TYPE(type_node));
+    }
+  else if (TREE_CODE(type_node) == ARRAY_TYPE)
+    {
+      tree array_size_tree = TYPE_SIZE (type_node);
+      tree elem_type = TREE_TYPE(type_node);
+      tree elem_size_tree = TYPE_SIZE (elem_type);
+
+      if (array_size_tree && elem_size_tree)
+        {
+          unsigned HOST_WIDE_INT num_elem = TREE_INT_CST_LOW(array_size_tree) / TREE_INT_CST_LOW(elem_size_tree);
+          fprintf(stream, "[%lld]", num_elem);
+        }
+      else
+        fprintf(stream, "[<unknown_num_elem>]");
+      print_member_type (stream, flags, elem_type);
+    }
+  else if (TREE_CODE(type_node) == FUNCTION_TYPE)
+    {
+      fputs ("<function>", stream);
+    }
+  else if (TREE_CODE(type_node) == UNION_TYPE || TREE_CODE(type_node) == RECORD_TYPE)
+    {
+      tree type_name = TYPE_NAME(type_node);
+      const char *type_name_string = IDENTIFIER_POINTER (DECL_NAME(type_name));
+      if (type_name_string[0] == '.')
+        {
+          if (TREE_CODE(type_node) == RECORD_TYPE)
+            fputs ("<untagged_struct>", stream);
+          else
+            fputs ("<untagged_union>", stream);
+        }
+      else
+        fputs (type_name_string, stream);
+    }
+  else if (TREE_CODE(type_node) == ENUMERAL_TYPE)
+    {
+      tree type_name = TYPE_NAME(type_node);
+      const char *type_name_string = IDENTIFIER_POINTER (DECL_NAME(type_name));
+      if (type_name_string[0] == '.')
+        fputs ("enum", stream);
+      else
+        fprintf (stream, "enum %s", type_name_string);
+    }
+  else if (TREE_CODE_CLASS(TREE_CODE(type_node)) == tcc_type)
+    {
+      tree type_name = TYPE_NAME(type_node);
+      const char *type_name_string = IDENTIFIER_POINTER (DECL_NAME(type_name));
+  
+     if (type_name_string)
+       fputs (type_name_string, stream);
+     else
+       fputs ("<unknown_type>", stream);
+    }
+  else
+    fprintf(stream, "<unknown_type>");
+}
+
+/* If MEMBER is one of subobjects of ROOT, return the BINFO related with MEMBER.
+   Otherwise returns NULL_TREE. */
+static tree
+get_member_binfo (tree root, tree member)
+{
+  if (TREE_CODE(root) != RECORD_TYPE)
+    return NULL_TREE;
+
+  int i;
+  tree subclass;
+  for (i = 0; BINFO_BASE_ITERATE(TYPE_BINFO(root), i, subclass); ++i)
+    {
+      if (BINFO_TYPE(subclass) == TREE_TYPE(member))
+        return subclass;
+      tree r;
+      if ((r = get_member_binfo (BINFO_TYPE(subclass), member)) != NULL_TREE)
+        return r;
+    }
+  return NULL_TREE;
+}
+
+/* Dump class member for CLASS_DECL. */
+static void
+dump_class_members (FILE *stream,
+                    int flags,
+                    tree class_decl, 
+                    unsigned HOST_WIDE_INT class_bit_offset,
+                      int indent_level)
+{
+  tree member_node;
+  enum { num_indent_char = 3 };
+  unsigned HOST_WIDE_INT possible_member_bit_offset = class_bit_offset;
+
+  for (member_node = TYPE_FIELDS(class_decl); member_node; member_node = TREE_CHAIN(member_node))
+    {
+      if  (TREE_CODE(member_node) != FIELD_DECL)
+        continue;
+
+      tree member_type = TREE_TYPE(member_node);
+      unsigned HOST_WIDE_INT member_size = TREE_INT_CST_LOW (DECL_SIZE (member_node));
+      unsigned HOST_WIDE_INT member_align = DECL_ALIGN (member_node);
+      unsigned HOST_WIDE_INT raw_member_offset = TREE_INT_CST_LOW(DECL_FIELD_OFFSET(member_node));
+      unsigned HOST_WIDE_INT raw_member_bitoffset = TREE_INT_CST_LOW(DECL_FIELD_BIT_OFFSET (member_node));
+      unsigned HOST_WIDE_INT bit_offset = class_bit_offset + raw_member_offset * BITS_PER_UNIT + raw_member_bitoffset;
+      tree member_binfo = NULL_TREE;
+
+      unsigned HOST_WIDE_INT padding_bits = bit_offset - possible_member_bit_offset;
+      if (TREE_CODE(member_type) != UNION_TYPE && padding_bits > 0)
+        {
+          fprintf (stream, "%*s%sPADDING byte_offset=%lld bit_offset=%lld bit_size=%lld\n",
+                   indent_level, "",
+                   (padding_bits >= 8 ? "BYTE": "BIT"),
+                   possible_member_bit_offset / BITS_PER_UNIT,
+                   possible_member_bit_offset % BITS_PER_UNIT,
+                   bit_offset - possible_member_bit_offset);
+        }
+      if (TREE_CODE (class_decl) != UNION_TYPE)
+        possible_member_bit_offset = bit_offset + member_size;
+
+      fprintf (stream, "%*s", indent_level, "");
+
+      if (TREE_CODE(member_type) == RECORD_TYPE
+          && (member_binfo = get_member_binfo (class_decl, member_node)))
+        {
+          if (BINFO_VIRTUAL_P(member_binfo))
+            {
+              //fprintf(stream, "%p ", (void *)member_binfo);
+              if (BINFO_FLAG_6(member_binfo))
+                /* If the virtual base class have already been displayed, skip it. */
+                continue;
+              BINFO_FLAG_6(member_binfo) = 0;
+              fputs ("VIRTUAL ", stream);
+            }
+          fputs ("BASE ", stream);
+        }
+      else if (member_type == vtbl_ptr_type_node)
+        fputs ("VPTR ", stream);
+      else
+        fputs ("MEMBER ", stream);
+
+      if (DECL_NAME(member_node))
+        fprintf(stream, "%s ", IDENTIFIER_POINTER (DECL_NAME(member_node)));
+      else if (member_binfo == NULL_TREE)
+        fputs ("<anonymous_member> ", stream);
+
+      fputs ("type=\"", stream);
+      print_member_type (stream, flags, member_type);
+      fputc ('"', stream);
+
+      fprintf(stream, " size=%lld align=%lld byte_offset=%lld bit_offset=%d\n",
+              member_size, member_align,
+              bit_offset / BITS_PER_UNIT,
+              (unsigned int)bit_offset % BITS_PER_UNIT);
+      
+      if (TREE_CODE(member_type) == RECORD_TYPE || TREE_CODE(member_type) == UNION_TYPE)
+        dump_class_members(stream, flags, member_type, 
+                           class_bit_offset + bit_offset,
+                           indent_level + num_indent_char);
+    } /* for (t = member_list; t; t = TREE_CHAIN(t)) */
+}
+
+static void
+dump_class_layout_1 (FILE *stream, int flags, tree t)
+{
+  fputs ((TREE_CODE(t) == UNION_TYPE? "UNION": "CLASS"), stream);
+  fprintf (stream, " \"%s\" size=%lu align=%lu base_size=%lu base_align=%lu",
+           type_as_string (t, TFF_PLAIN_IDENTIFIER),
+	   (unsigned long)(tree_low_cst (TYPE_SIZE (t), 0) / BITS_PER_UNIT),
+	   (unsigned long)(TYPE_ALIGN (t) / BITS_PER_UNIT),
+	   (unsigned long)(tree_low_cst (TYPE_SIZE (CLASSTYPE_AS_BASE (t)), 0)
+			   / BITS_PER_UNIT),
+	   (unsigned long)(TYPE_ALIGN (CLASSTYPE_AS_BASE (t))
+			   / BITS_PER_UNIT));
+  tree nnn = TREE_CHAIN(t);
+
+  expanded_location xloc = expand_location (DECL_SOURCE_LOCATION (nnn));
+  fprintf (stream, " file=\"%s\" line=%d", xloc.file, xloc.line);
+  fputc ('\n', stream);
+
+  dump_class_members(stream, flags, t, 0, 3);
+
+  fputc ('\n', stream);
+}
+
 /* Debug interface to hierarchy dumping.  */
 
 extern void
@@ -6551,6 +6753,19 @@ dump_class_hierarchy (tree t)
   if (stream)
     {
       dump_class_hierarchy_1 (stream, flags, t);
+      dump_end (TDI_class, stream);
+    }
+}
+
+static void
+dump_class_layout (tree t)
+{
+  int flags;
+  FILE *stream = dump_begin (TDI_classlayout, &flags);
+
+  if (stream)
+    {
+      dump_class_layout_1 (stream, flags, t);
       dump_end (TDI_class, stream);
     }
 }

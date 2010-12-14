@@ -3199,7 +3199,10 @@ finalize_nrv_r (tree* tp, int* walk_subtrees, void* data)
     }
   /* And replace all uses of the NRV with the RESULT_DECL.  */
   else if (*tp == dp->var)
-    *tp = dp->result;
+    {
+      DECL_IGNORED_P (*tp) = 1;
+      *tp = dp->result;
+    }
 
   /* Avoid walking into the same tree more than once.  Unfortunately, we
      can't just use walk_tree_without duplicates because it would only call
@@ -3226,6 +3229,8 @@ finalize_nrv (tree *tp, tree var, tree result)
 
   /* Copy debugging information from VAR to RESULT.  */
   DECL_NAME (result) = DECL_NAME (var);
+  DECL_ARTIFICIAL (result) = DECL_ARTIFICIAL (var);
+  DECL_IGNORED_P (result) = DECL_IGNORED_P (var);
   DECL_SOURCE_LOCATION (result) = DECL_SOURCE_LOCATION (var);
   DECL_ABSTRACT_ORIGIN (result) = DECL_ABSTRACT_ORIGIN (var);
   /* Don't forget that we take its address.  */

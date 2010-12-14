@@ -13247,14 +13247,6 @@ gen_decl_die (tree decl, dw_die_ref context_die)
       if (debug_info_level <= DINFO_LEVEL_TERSE)
 	break;
 
-      if (TREE_CODE (decl) == VAR_DECL
-	  && current_function_decl
-	  && DECL_RESULT (current_function_decl)
-	  && DECL_NAME (DECL_RESULT (current_function_decl))
-	  && DECL_NAME (DECL_RESULT (current_function_decl)) == DECL_NAME(decl)
-	  && DECL_RTL_SET_P (DECL_RESULT (current_function_decl)))
-	COPY_DECL_RTL (DECL_RESULT (current_function_decl), decl);
-
       /* Output any DIEs that are needed to specify the type of this data
 	 object.  */
       gen_type_die (TREE_TYPE (decl), context_die);

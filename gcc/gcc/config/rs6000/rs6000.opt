@@ -271,6 +271,10 @@ mscalar-vector-casts
 Target Var(rs6000_scalar_vector_casts) Init(0)
 Allows casts between scalars and vectors of the same size
 
+mbranchless
+Target Var(rs6000_branchless_integer_comparison) Init(0)
+Generating branchless integer comparison
+
 ;  /* CELL LOCAL End */
 
 mfloat-gprs=
@@ -309,3 +313,13 @@ muse-save-restore-funcs=
 Target RejectNegative Joined UInteger Var(rs6000_save_restore_funcs)
 Call functions to save and restore registers when it decreases the size of a function by N or more instructions
 
+mpad-func-with-nop
+Target Var(rs6000_num_pad_nops,3) Init(0)
+Add padding nops so that each function consists of 3 or more instructions.
+When debugging the program under ProDG OML, specify this option.
+This is option is same as -mpad-func-with-nop=3.
+
+mpad-func-with-nop=
+Target RejectNegative Joined UInteger Var(rs6000_num_pad_nops)
+Add padding nops so that each function has at least N instrucitons.
+By defautl no function is padded.

@@ -32,6 +32,7 @@ enum tree_dump_index
   TDI_none,			/* No dump */
   TDI_tu,			/* dump the whole translation unit.  */
   TDI_class,			/* dump class hierarchy.  */
+  TDI_classlayout,              /* dump class layuot. */
   TDI_original,			/* dump each function before optimizing it */
   TDI_generic,			/* dump each function after genericizing it */
   TDI_nested,			/* dump each function after unnesting it */

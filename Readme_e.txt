@@ -13,7 +13,7 @@ install directory and the rebuild working directory by setting
 environment variables.  See comments in script files for details.
 Example:
     mkdir work/src
-    unzip toolchain-src-3.4.0-GCC411.zip -d work/src
+    unzip toolchain-src-3.5.0-GCC411.zip -d work/src
     mkdir work/build
     cd work/build
     ../src/build.sh
@@ -21,9 +21,8 @@ Script build-mingw.sh will rebuild the toolchain for Windows.  The script
 runs on Linux environment.  MinGW runtime is required for rebuilding.
 Download the following two files, and put them in "mingw" directory.
   mingw-runtime-3.3.tar.gz
-    http://sourceforge.net/forum/forum.php?forum_id=372259
   w32api-2.5.tar.gz
-    http://sourceforge.net/forum/forum.php?forum_id=352558
+    http://ftp.jaist.ac.jp/pub/sourceforge/m/project/mi/mingw/OldFiles/
 The script build-mingw.sh uses build-lm.sh, build-mp-lv2.sh and
 build-ms-lv2.sh.  You can change the toolchain install directory and the
 rebuild working directory by setting environment variables.  See comments

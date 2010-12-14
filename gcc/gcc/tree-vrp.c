@@ -6,7 +6,7 @@ This file is part of GCC.
 
 GCC is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
-the Free Software Foundation; either version 2, or (at your option)
+the Free Software Foundation; either version 3, or (at your option)
 any later version.
 
 GCC is distributed in the hope that it will be useful,
@@ -15,9 +15,8 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with GCC; see the file COPYING.  If not, write to
-the Free Software Foundation, 51 Franklin Street, Fifth Floor,
-Boston, MA 02110-1301, USA.  */
+along with GCC; see the file COPYING3.  If not see
+<http://www.gnu.org/licenses/>.  */
 
 #include "config.h"
 #include "system.h"
@@ -94,6 +93,106 @@ static sbitmap blocks_visited;
    of values that SSA name N_I may take.  */
 static value_range_t **vr_value;
 
+
+/*
+ * begin sce local bz87299
+ * copied from http://gcc.gnu.org/viewcvs/trunk/gcc/tree-vrp.c?revision=136237&content-type=text%2Fplain&view=co
+ */
+#define TYPE_OVERFLOW_WRAPS(TYPE) (TYPE_UNSIGNED (TYPE) || flag_wrapv)
+
+static inline tree
+vrp_val_max (tree type)
+{
+  if (!INTEGRAL_TYPE_P (type))
+    return NULL_TREE;
+
+  /* For integer sub-types the values for the base type are relevant.  */
+  if (TREE_TYPE (type))
+    type = TREE_TYPE (type);
+
+  return TYPE_MAX_VALUE (type);
+}
+
+/* Return the minimum value for TYPEs base type.  */
+
+static inline tree
+vrp_val_min (tree type)
+{
+  if (!INTEGRAL_TYPE_P (type))
+    return NULL_TREE;
+
+  /* For integer sub-types the values for the base type are relevant.  */
+  if (TREE_TYPE (type))
+    type = TREE_TYPE (type);
+
+  return TYPE_MIN_VALUE (type);
+}
+
+/* Return whether VAL is equal to the maximum value of its type.  This
+   will be true for a positive overflow infinity.  We can't do a
+   simple equality comparison with TYPE_MAX_VALUE because C typedefs
+   and Ada subtypes can produce types whose TYPE_MAX_VALUE is not ==
+   to the integer constant with the same value in the type.  */
+
+static inline bool
+vrp_val_is_max (tree val)
+{
+  tree type_max = vrp_val_max (TREE_TYPE (val));
+  return (val == type_max
+	  || (type_max != NULL_TREE
+	      && operand_equal_p (val, type_max, 0)));
+}
+
+/* Return whether VAL is equal to the minimum value of its type.  This
+   will be true for a negative overflow infinity.  */
+
+static inline bool
+vrp_val_is_min (tree val)
+{
+  tree type_min = vrp_val_min (TREE_TYPE (val));
+  return (val == type_min
+	  || (type_min != NULL_TREE
+	      && operand_equal_p (val, type_min, 0)));
+}
+
+/* Return whether TYPE should use an overflow infinity distinct from
+   TYPE_{MIN,MAX}_VALUE.  We use an overflow infinity value to
+   represent a signed overflow during VRP computations.  An infinity
+   is distinct from a half-range, which will go from some number to
+   TYPE_{MIN,MAX}_VALUE.  */
+
+static inline bool
+needs_overflow_infinity (tree type)
+{
+  return (INTEGRAL_TYPE_P (type)
+	  && !TYPE_OVERFLOW_WRAPS (type)
+	  /* Integer sub-types never overflow as they are never
+	     operands of arithmetic operators.  */
+	  && !(TREE_TYPE (type) && TREE_TYPE (type) != type));
+}
+
+/* Return whether VAL is a negative overflow infinity.  */
+
+static inline bool
+is_negative_overflow_infinity (tree val)
+{
+  return (needs_overflow_infinity (TREE_TYPE (val))
+	  && CONSTANT_CLASS_P (val)
+	  && TREE_OVERFLOW (val)
+	  && vrp_val_is_min (val));
+}
+
+/* Return whether VAL is a positive overflow infinity.  */
+
+static inline bool
+is_positive_overflow_infinity (tree val)
+{
+  return (needs_overflow_infinity (TREE_TYPE (val))
+	  && CONSTANT_CLASS_P (val)
+	  && TREE_OVERFLOW (val)
+	  && vrp_val_is_max (val));
+}
+/* end sce local bz87299 */
 
 /* Return true if ARG is marked with the nonnull attribute in the
    current function signature.  */
@@ -1743,12 +1842,20 @@ adjust_range_with_scev (value_range_t *vr, struct loop *loop, tree stmt,
 			tree var)
 {
   tree init, step, chrec;
+  tree type, min, max, tmin, tmax;
   enum ev_direction dir;
 
   /* TODO.  Don't adjust anti-ranges.  An anti-range may provide
      better opportunities than a regular range, but I'm not sure.  */
   if (vr->type == VR_ANTI_RANGE)
     return;
+
+  /* SCE LOCAL bug 89496.
+     If the rhs of STMT is pointer type and its range is unknown,
+     giving up to narrow the value range of rhs. */
+  if (POINTER_TYPE_P(TREE_TYPE(var))
+      && (vr->type == VR_VARYING || vr->type == VR_UNDEFINED))
+      return;
 
   chrec = instantiate_parameters (loop, analyze_scalar_evolution (loop, var));
   if (TREE_CODE (chrec) != POLYNOMIAL_CHREC)
@@ -1768,27 +1875,54 @@ adjust_range_with_scev (value_range_t *vr, struct loop *loop, tree stmt,
 	 or decreases,  ... */
       dir == EV_DIR_UNKNOWN
       /* ... or if it may wrap.  */
-      || scev_probably_wraps_p (init, step, stmt,
-				cfg_loops->parray[CHREC_VARIABLE (chrec)],
-				true))
+      || scev_probably_wraps_p (init, step, stmt, cfg_loops->parray[CHREC_VARIABLE (chrec)],
+                                true))
     return;
 
-  if (!POINTER_TYPE_P (TREE_TYPE (init))
-      && (vr->type == VR_VARYING || vr->type == VR_UNDEFINED))
+  /*
+   * begin sce local bz87229
+   * Copied from http://gcc.gnu.org/viewcvs/trunk/gcc/tree-vrp.c?revision=136237&view=markup
+   */
+  /* We use TYPE_MIN_VALUE and TYPE_MAX_VALUE here instead of
+     negative_overflow_infinity and positive_overflow_infinity,
+     because we have concluded that the loop probably does not
+     wrap.  */
+  type = TREE_TYPE (var);
+  if (POINTER_TYPE_P (type) || !TYPE_MIN_VALUE (type))
+    tmin = lower_bound_in_type (type, type);
+  else
+    tmin = TYPE_MIN_VALUE (type);
+  if (POINTER_TYPE_P (type) || !TYPE_MAX_VALUE (type))
+    tmax = upper_bound_in_type (type, type);
+  else
+    tmax = TYPE_MAX_VALUE (type);
+
+  if (vr->type == VR_VARYING || vr->type == VR_UNDEFINED)
     {
+      min = tmin;
+      max = tmax;
+
       /* For VARYING or UNDEFINED ranges, just about anything we get
 	 from scalar evolutions should be better.  */
+
       if (dir == EV_DIR_DECREASES)
-	set_value_range (vr, VR_RANGE, TYPE_MIN_VALUE (TREE_TYPE (init)),
-	                 init, vr->equiv);
+	max = init;
       else
-	set_value_range (vr, VR_RANGE, init, TYPE_MAX_VALUE (TREE_TYPE (init)),
-	                 vr->equiv);
+	min = init;
+
+      /* If we would create an invalid range, then just assume we
+	 know absolutely nothing.  This may be over-conservative,
+	 but it's clearly safe, and should happen only in unreachable
+         parts of code, or for invalid programs.  */
+      if (compare_values (min, max) == 1)
+	return;
+
+      set_value_range (vr, VR_RANGE, min, max, vr->equiv);
     }
-  else if (vr->type == VR_RANGE)
+ else if (vr->type == VR_RANGE)
     {
-      tree min = vr->min;
-      tree max = vr->max;
+      min = vr->min;
+      max = vr->max;
 
       if (dir == EV_DIR_DECREASES)
 	{
@@ -1799,11 +1933,19 @@ adjust_range_with_scev (value_range_t *vr, struct loop *loop, tree stmt,
 	      max = init;
 
 	      /* If we just created an invalid range with the minimum
-		 greater than the maximum, take the minimum all the
-		 way to -INF.  */
+		 greater than the maximum, we fail conservatively.
+		 This should happen only in unreachable
+		 parts of code, or for invalid programs.  */
 	      if (compare_values (min, max) == 1)
-		min = TYPE_MIN_VALUE (TREE_TYPE (min));
+		return;
 	    }
+
+	  /* According to the loop information, the variable does not
+	     overflow.  If we think it does, probably because of an
+	     overflow due to arithmetic on a different INF value,
+	     reset now.  */
+	  if (is_negative_overflow_infinity (min))
+	    min = tmin;
 	}
       else
 	{
@@ -1812,16 +1954,18 @@ adjust_range_with_scev (value_range_t *vr, struct loop *loop, tree stmt,
 	    {
 	      min = init;
 
-	      /* If we just created an invalid range with the minimum
-		 greater than the maximum, take the maximum all the
-		 way to +INF.  */
+	      /* Again, avoid creating invalid range by failing.  */
 	      if (compare_values (min, max) == 1)
-		max = TYPE_MAX_VALUE (TREE_TYPE (max));
+		return;
 	    }
+
+	  if (is_positive_overflow_infinity (max))
+	    max = tmax;
 	}
 
       set_value_range (vr, VR_RANGE, min, max, vr->equiv);
     }
+  /* end sce local bz872900 */
 }
 
 

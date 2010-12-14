@@ -1,6 +1,6 @@
 /* PowerPC64-specific support for 64-bit ELF.
-   Copyright 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006
-   Free Software Foundation, Inc.
+   Copyright 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2006, 
+   2007, 2008, 2010  Free Software Foundation, Inc.
    Written by Linus Nordberg, Swox AB <info@swox.com>,
    based on elf32-ppc.c by Ian Lance Taylor.
    Largely rewritten by Alan Modra <amodra@bigpond.net.au>
@@ -2509,7 +2509,7 @@ struct ppc64_elf_obj_tdata
   asection *got;
   asection *relgot;
 
-  union {
+  struct {
     /* Used during garbage collection.  We attach global symbols defined
        on removed .opd entries to this section so that the sym is removed.  */
     asection *deleted_section;
@@ -4275,7 +4275,10 @@ ppc64_elf_add_symbol_hook (bfd *ibfd,
       && ELF_ST_BIND (isym->st_info) == STB_GLOBAL
       && ELF_ST_TYPE (isym->st_info) < STT_SECTION
       && is_ppc64_elf_target (ibfd->xvec))
-    ppc64_elf_tdata (ibfd)->u.has_dotsym = 1;
+    {
+      struct ppc64_elf_obj_tdata *td = ppc64_elf_tdata (ibfd);
+      td->u.has_dotsym = 1;
+    }
 
   return TRUE;
 }
@@ -6423,7 +6426,9 @@ adjust_opd_syms (struct elf_link_hash_entry *h, void *inf ATTRIBUTE_UNUSED)
       if (adjust == -1)
 	{
 	  /* This entry has been deleted.  */
-	  asection *dsec = ppc64_elf_tdata (sym_sec->owner)->u.deleted_section;
+	  struct ppc64_elf_obj_tdata *td = ppc64_elf_tdata (sym_sec->owner);
+	  asection *dsec = td->u.deleted_section;
+
 	  if (dsec == NULL)
 	    {
 	      for (dsec = sym_sec->owner->sections; dsec; dsec = dsec->next)

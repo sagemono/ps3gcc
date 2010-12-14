@@ -711,10 +711,16 @@ write_mangled_name (const tree decl, bool top_level)
       if (DECL_LANG_SPECIFIC (decl)
 	  && (DECL_MAYBE_IN_CHARGE_DESTRUCTOR_P (decl)
 	      || DECL_MAYBE_IN_CHARGE_CONSTRUCTOR_P (decl)))
-	/* We need a distinct mangled name for these entities, but
-	   we should never actually output it.  So, we append some
-	   characters the assembler won't like.  */
-	write_string (" *INTERNAL* ");
+	{
+	  /* We need a distinct mangled name for these entities, but
+	     we should never actually output it.  So, we append some
+	     characters the assembler won't like.  */
+	  write_string (" *INTERNAL* ");
+	  /** bz87570
+	   * To avoid assembler error, unmark this tree.
+	   **/
+	  TREE_USED (decl) = 0;
+	}
     }
 }
 

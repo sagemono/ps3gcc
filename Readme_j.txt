@@ -15,7 +15,7 @@
 メントを参照してください。
 例:
     mkdir work/src
-    unzip toolchain-src-3.4.0-GCC411.zip -d work/src
+    unzip toolchain-src-3.5.0-GCC411.zip -d work/src
     mkdir work/build
     cd work/build
     ../src/build.sh
@@ -23,9 +23,8 @@
 構築するためものです。再構築には、MinGWランタイムが必要となります。以下
 の二つのファイルをダウンロードして、mingwディレクトリに置いてください。
   mingw-runtime-3.3.tar.gz
-    http://sourceforge.net/forum/forum.php?forum_id=372259
   w32api-2.5.tar.gz
-    http://sourceforge.net/forum/forum.php?forum_id=352558
+    http://ftp.jaist.ac.jp/pub/sourceforge/m/project/mi/mingw/OldFiles/
 build-mingw.shは、build-lm.sh、build-mp-lv2.sh、build-ms-lv2.shを使用し
 ています。ツールチェーンをインストールするディレクトリと、再構築に使う作
 業用ディレクトリは、環境変数により変更することができます。詳細は各スクリ

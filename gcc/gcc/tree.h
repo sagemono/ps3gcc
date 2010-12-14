@@ -1884,6 +1884,8 @@ struct tree_type GTY(())
 #define BINFO_FLAG_3(NODE) TREE_LANG_FLAG_3(TREE_BINFO_CHECK(NODE))
 #define BINFO_FLAG_4(NODE) TREE_LANG_FLAG_4(TREE_BINFO_CHECK(NODE))
 #define BINFO_FLAG_5(NODE) TREE_LANG_FLAG_5(TREE_BINFO_CHECK(NODE))
+/* Be careful that  bug 65748 oppupis BINFO_FLAG_6 to control class layout dump.
+   I confirmed that BINFO_FLAG_6 is unused in any sources before. */
 #define BINFO_FLAG_6(NODE) TREE_LANG_FLAG_6(TREE_BINFO_CHECK(NODE))
 
 /* The actual data type node being inherited in this basetype.  */

@@ -12638,6 +12638,82 @@ rs6000_emit_sCOND (enum rtx_code code, rtx result)
   enum machine_mode op_mode;
   enum rtx_code cond_code;
 
+  if (rs6000_cpu == PROCESSOR_CELLPPU
+      && rs6000_branchless_integer_comparison)
+    {
+      enum machine_mode op0_mode = GET_MODE (rs6000_compare_op0);
+      enum machine_mode op1_mode = GET_MODE (rs6000_compare_op1);
+      if (!rs6000_compare_fp_p && GET_MODE_CLASS (op0_mode) == MODE_INT
+	  && GET_MODE_CLASS (op1_mode) == MODE_INT
+	  && op0_mode == SImode && op1_mode == SImode
+	  && !MEM_P (rs6000_compare_op0) && !MEM_P (rs6000_compare_op1))
+	{
+	  rtx tmp = gen_reg_rtx (DImode);
+	  rtx op0 = gen_reg_rtx (DImode);
+	  rtx op1 = gen_reg_rtx (DImode);
+	  if (code == LTU || code == GTU || code == LEU || code == GEU)
+	    {
+	      convert_move (op0, rs6000_compare_op0, 1);
+	      convert_move (op1, rs6000_compare_op1, 1);
+	    }
+	  else
+	    {
+	      convert_move (op0, rs6000_compare_op0, 0);
+	      convert_move (op1, rs6000_compare_op1, 0);
+	    }
+	  switch (code)
+	    {
+	    case LT:
+	    case LTU:
+	      emit_insn (gen_rtx_SET (VOIDmode, tmp,
+				      gen_rtx_MINUS (DImode,
+						     op0,
+						     op1)));
+	      emit_insn (gen_rtx_SET (VOIDmode, tmp,
+				      gen_rtx_ASHIFTRT (DImode, tmp,
+							GEN_INT (63))));
+	      emit_insn (gen_anddi3 (tmp, tmp, GEN_INT (1)));
+	      convert_move (result, tmp, 0);
+	      break;
+	    case GT:
+	    case GTU:
+	      emit_insn (gen_rtx_SET (VOIDmode, tmp,
+				      gen_rtx_MINUS (DImode, op1, op0)));
+	      emit_insn (gen_rtx_SET (VOIDmode, tmp,
+				      gen_rtx_ASHIFTRT (DImode,	tmp,
+							GEN_INT (63))));
+	      emit_insn (gen_anddi3 (tmp, tmp, GEN_INT (1)));
+	      convert_move (result, tmp, 0);
+	      break;
+	    case LE:
+	    case LEU:
+	      emit_insn (gen_rtx_SET (VOIDmode, tmp,
+				      gen_rtx_MINUS (DImode, op1, op0)));
+	      emit_insn (gen_rtx_SET (VOIDmode, tmp,
+				      gen_rtx_ASHIFTRT (DImode, tmp,
+							GEN_INT (63))));
+	      emit_insn (gen_adddi3 (tmp, tmp, GEN_INT (1)));
+	      convert_move (result, tmp, 0);
+	      break;
+	    case GE:
+	    case GEU:
+	      emit_insn (gen_rtx_SET (VOIDmode, tmp,
+				      gen_rtx_MINUS (DImode, op0, op1)));
+	      emit_insn (gen_rtx_SET (VOIDmode, tmp,
+				      gen_rtx_ASHIFTRT (DImode, tmp,
+							GEN_INT (63))));
+	      emit_insn (gen_adddi3 (tmp, tmp, GEN_INT (1)));
+	      convert_move (result, tmp, 0);
+	      break;
+	    default:
+	      break;
+	    }
+	}
+      return;
+    }
+  else
+    return;
+
   condition_rtx = rs6000_generate_compare (code);
   cond_code = GET_CODE (condition_rtx);
 
@@ -16984,6 +17060,31 @@ rs6000_output_function_epilogue (FILE *file,
       fputs ("\t# callprof pad\n", file);
     }
   /* end sce local bz57983 */
+
+  /* begin sce local bz87446 */
+  if (rs6000_num_pad_nops > 0)
+    {
+      int cur_fun_sz = 0;
+      int required_sz = rs6000_num_pad_nops * 4;
+
+      if (lv2_callprof > 0 && lv2_cond_return_emitted)
+        {
+          /* already emitted 1 'blr' insn.*/
+          cur_fun_sz += 4;
+        }
+      
+      rtx insn;
+      /* sum up the bytes of insns in the function. */
+      for (insn = get_insns ();
+           required_sz > cur_fun_sz && insn != 0;
+           insn = NEXT_INSN (insn))
+          if (INSN_P(insn) && INSN_CODE(insn) >= 0)
+            cur_fun_sz += insn_min_length (insn);
+      
+      for ( ;required_sz > cur_fun_sz; cur_fun_sz += 4)
+        fputs ("\tnop\n", file);
+    }
+  /* end sce local bz87446 */
 
   if (! HAVE_epilogue)
     {
