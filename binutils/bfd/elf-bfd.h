@@ -1865,6 +1865,9 @@ extern bfd_boolean bfd_elf_gc_common_finalize_got_offsets
 extern bfd_boolean bfd_elf_gc_common_final_link
   (bfd *, struct bfd_link_info *);
 
+extern bfd_boolean _bfd_elf_gc_debug
+  (bfd *, struct bfd_link_info *);
+
 extern bfd_boolean bfd_elf_reloc_symbol_deleted_p
   (bfd_vma, void *);
 

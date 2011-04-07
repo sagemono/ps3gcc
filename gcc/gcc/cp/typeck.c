@@ -1,6 +1,6 @@
 /* Build expressions with type checking for C++ compiler.
    Copyright (C) 1987, 1988, 1989, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
-   1999, 2000, 2001, 2002, 2003, 2004, 2005 Free Software Foundation, Inc.
+   1999, 2000, 2001, 2002, 2003, 2004, 2005, 2010 Free Software Foundation, Inc.
    Hacked by Michael Tiemann (tiemann@cygnus.com)
 
 This file is part of GCC.
@@ -5771,10 +5771,6 @@ build_modify_expr (tree lhs, enum tree_code modifycode, tree rhs)
 
   if (newrhs == error_mark_node)
     return error_mark_node;
-
-  if (TREE_CODE (lhs) == COMPONENT_REF)
-    newrhs = adjust_bitfield_initializer (TREE_OPERAND (lhs, 1),
-					  newrhs);
 
   if (c_dialect_objc () && flag_objc_gc)
     {

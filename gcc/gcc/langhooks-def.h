@@ -70,6 +70,7 @@ extern tree lhd_expr_size (tree);
 extern size_t lhd_tree_size (enum tree_code);
 extern HOST_WIDE_INT lhd_to_target_charset (HOST_WIDE_INT);
 extern tree lhd_expr_to_decl (tree, bool *, bool *, bool *);
+extern bool lhd_artificial_function_name (const char *);
 
 /* Declarations of default tree inlining hooks.  */
 extern tree lhd_tree_inlining_walk_subtrees (tree *, int *, walk_tree_fn,
@@ -127,6 +128,7 @@ extern int lhd_gimplify_expr (tree *, tree *, tree *);
 #define LANG_HOOKS_EXPR_TO_DECL		lhd_expr_to_decl
 #define LANG_HOOKS_TO_TARGET_CHARSET	lhd_to_target_charset
 #define LANG_HOOKS_INIT_TS		lhd_do_nothing
+#define LANG_HOOKS_ARTIFICIAL_FUNCTION_NAME lhd_artificial_function_name
 
 #define LANG_HOOKS_FUNCTION_INIT	lhd_do_nothing_f
 #define LANG_HOOKS_FUNCTION_FINAL	lhd_do_nothing_f
@@ -210,6 +212,7 @@ extern tree lhd_make_node (enum tree_code);
    so we create a compile-time error instead.  */
 #define LANG_HOOKS_MAKE_TYPE lhd_make_node
 #define LANG_HOOKS_INCOMPLETE_TYPE_ERROR lhd_incomplete_type_error
+#define LANG_HOOKS_GENERIC_TYPE_P	hook_bool_tree_false
 #define LANG_HOOKS_TYPE_PROMOTES_TO lhd_type_promotes_to
 #define LANG_HOOKS_REGISTER_BUILTIN_TYPE lhd_register_builtin_type
 #define LANG_HOOKS_TYPE_MAX_SIZE	lhd_return_null_tree
@@ -222,6 +225,7 @@ extern tree lhd_make_node (enum tree_code);
   LANG_HOOKS_UNSIGNED_TYPE, \
   LANG_HOOKS_SIGNED_TYPE, \
   LANG_HOOKS_SIGNED_OR_UNSIGNED_TYPE, \
+  LANG_HOOKS_GENERIC_TYPE_P, \
   LANG_HOOKS_TYPE_PROMOTES_TO, \
   LANG_HOOKS_REGISTER_BUILTIN_TYPE, \
   LANG_HOOKS_INCOMPLETE_TYPE_ERROR, \
@@ -306,6 +310,7 @@ extern tree lhd_make_node (enum tree_code);
   LANG_HOOKS_BUILTIN_FUNCTION, \
   LANG_HOOKS_INIT_TS,          \
   LANG_HOOKS_EXPR_TO_DECL, \
+  LANG_HOOKS_ARTIFICIAL_FUNCTION_NAME, \
 }
 
 #endif /* GCC_LANG_HOOKS_DEF_H */

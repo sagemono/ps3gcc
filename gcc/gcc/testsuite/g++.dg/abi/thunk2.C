@@ -1,5 +1,10 @@
+#if 0
 // { dg-do compile { target i?86-*-* x86_64-*-* } }
 // { dg-require-effective-target ilp32 }
+#else
+// { dg-do compile { target ppu-*-* spu-*-* } }
+#endif
+
 // { dg-options -w }
 
 struct A {

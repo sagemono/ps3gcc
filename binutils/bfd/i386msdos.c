@@ -156,6 +156,7 @@ msdos_set_section_contents (abfd, section, location, offset, count)
 #define msdos_bfd_discard_group bfd_generic_discard_group
 #define msdos_section_already_linked \
   _bfd_generic_section_already_linked
+#define msdos_bfd_gc_debug bfd_generic_gc_debug
 #define msdos_bfd_link_hash_table_create _bfd_generic_link_hash_table_create
 #define msdos_bfd_link_hash_table_free _bfd_generic_link_hash_table_free
 #define msdos_bfd_link_add_symbols _bfd_generic_link_add_symbols

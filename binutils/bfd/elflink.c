@@ -10009,3 +10009,197 @@ _bfd_elf_common_section (asection *sec ATTRIBUTE_UNUSED)
 {
   return bfd_com_section_ptr;
 }
+
+static bfd_boolean
+_bfd_dwarf_gc_debug_line (bfd *abfd ATTRIBUTE_UNUSED,
+			  struct bfd_link_info *info)
+{
+  bfd *sub;
+  bfd_byte end_sequence_pattern[3] = {0x0, 0x1, 0x1};
+
+  for (sub = info->input_bfds; sub != NULL; sub = sub->link_next)
+    {
+      bfd_boolean set_file = FALSE;
+      asection *dls;
+      Elf_Internal_Rela *internal_relocs, *irela, *irelaend;
+      Elf_Internal_Rela *new_relocs, *newrela, *final_newrela = NULL;
+      Elf_Internal_Shdr *input_rel_hdr;
+      bfd_byte *newcontents, *contents;
+      bfd_size_type start = 0, end = 0, size = 0, offset = 0, reloc_count = 0;
+      Elf_Internal_Shdr *symtab_hdr;
+      struct elf_link_hash_entry **sym_hashes;
+      size_t nlocsyms;
+      size_t extsymoff;
+      const struct elf_backend_data *bed = get_elf_backend_data (sub);
+      Elf_Internal_Sym *isym = NULL;
+
+      dls = bfd_get_section_by_name (sub, ".debug_line");
+      if (dls == NULL)
+	continue;
+
+      symtab_hdr = &elf_tdata (sub)->symtab_hdr;
+      sym_hashes = elf_sym_hashes (sub);
+
+      if (elf_bad_symtab (sub))
+	{
+	  nlocsyms = symtab_hdr->sh_size / bed->s->sizeof_sym;
+	  extsymoff = 0;
+	}
+      else
+	extsymoff = nlocsyms = symtab_hdr->sh_info;
+
+      isym = (Elf_Internal_Sym *) symtab_hdr->contents;
+      if (isym == NULL && nlocsyms != 0)
+	{
+	  isym = bfd_elf_get_elf_syms (sub, symtab_hdr, nlocsyms, 0, NULL, NULL, NULL);
+	  if (isym == NULL)
+	    return FALSE;
+	}
+
+      input_rel_hdr = &elf_section_data (dls)->rel_hdr;
+
+      contents = bfd_malloc (dls->size);
+      if (contents == NULL)
+	return FALSE;
+
+      if (!bfd_get_section_contents (sub, dls, contents, 0, dls->size))
+	return FALSE;
+
+      newcontents = bfd_zmalloc (dls->size);
+      if (newcontents == NULL)
+	{
+	  free (contents);
+	  return FALSE;
+	}
+
+      internal_relocs = _bfd_elf_link_read_relocs (sub, dls, NULL, NULL,
+						   info->keep_memory);
+      irela = internal_relocs;
+      irelaend = irela + dls->reloc_count;
+
+      new_relocs = bfd_zmalloc (dls->reloc_count * sizeof (Elf_Internal_Rela));
+      if (new_relocs == NULL)
+	{
+	  free (contents);
+	  free (newcontents);
+	  return FALSE;
+	}
+
+      newrela = new_relocs;
+
+      for (; irela < irelaend; irela++)
+	{
+	  asection *o;
+	  bfd_vma r_symndx;
+
+	  r_symndx = ELF32_R_SYM (irela->r_info);
+	  if (bed->s->arch_size == 64)
+	    r_symndx >>= 24;
+
+	  o = bfd_section_from_elf_index (sub, isym[r_symndx].st_shndx);
+
+	  if (!o || o->gc_mark)
+	    {
+	      memcpy (newrela, irela, sizeof (Elf_Internal_Rela));
+	      newrela->r_offset -= (bfd_vma)offset;
+	      if (final_newrela == NULL)
+		final_newrela = newrela;
+	      newrela++;
+	      set_file = FALSE;
+	      continue;
+	    }
+
+	  final_newrela = NULL;
+	  end = (bfd_size_type)(irela->r_offset - 3);
+
+	  if (internal_relocs == irela)
+	    {
+	      memcpy(&newcontents[size], &contents[start], end - start);
+	      size += end - start;
+	    }
+	  else
+	    {
+	      if (memcmp (&contents[end - 3], end_sequence_pattern, 3))
+		{
+		  /* DW_LNS_set_file. */
+		  if (set_file)
+		    {
+		      bfd_size_type i;
+		      for (i = 2; i < size; i++)
+			if (newcontents[size - i] == 4)
+			  break;
+		      size -= i;
+		      offset += i;
+		    }
+		  set_file = TRUE;
+		}
+	      memcpy (&newcontents[size], &contents[start], end - start);
+	      size += end - start;
+	    }
+	  start = end;
+	  /* Serach DW_LNE_end_sequence. */
+	  for (end = (bfd_size_type)irela->r_offset; end < dls->size - 3; end++)
+	    if (!memcmp (&contents[end], end_sequence_pattern, 3))
+	      break;
+	  end += 3;
+	  offset += end - start;
+	  start = end;
+	  reloc_count++;
+	}
+
+      if (start != 0)
+	{
+	  if (start < dls->size)
+	    {
+	      if (memcmp (&newcontents[size - 3], end_sequence_pattern, 3)
+		  && contents[start] == 4)
+		{
+		  bfd_size_type i;
+                  for (i = 2; i < size; i++)
+                    if (newcontents[size - i] == 4)
+                      break;
+                  size -= i;
+		  for (; final_newrela <= newrela; final_newrela++)
+		    final_newrela->r_offset -= i;
+		}
+	      memcpy (&newcontents[size], &contents[start], dls->size - start);
+	      size += dls->size - start;
+	    }
+	  else
+	    {
+	      /* If the last data is DW_LNS_set_file,
+		 DW_LNS_set_file is deleted. */
+	      if (memcmp (&newcontents[size - 3], end_sequence_pattern, 3))
+		{
+		  bfd_size_type i;
+                  for (i = 2; i < size; i++)
+                    if (newcontents[size - i] == 4)
+                      break;
+                  size -= i;
+		}
+	    }
+	  /* Set length. */
+	  bfd_put_32 (sub, size - 4, newcontents);
+	  dls->contents = newcontents;
+	  dls->size = size;
+	  dls->flags |= SEC_IN_MEMORY;
+	  memcpy (internal_relocs, new_relocs,
+		  dls->reloc_count * sizeof (Elf_Internal_Rela));
+	  dls->reloc_count -= reloc_count;
+	  input_rel_hdr->sh_size -= (reloc_count * input_rel_hdr->sh_entsize);
+	}
+      else
+	free (newcontents);
+
+      free (new_relocs);
+      free (contents);
+    }
+  return TRUE;
+}
+
+bfd_boolean
+_bfd_elf_gc_debug (bfd *abfd, struct bfd_link_info *info)
+{
+  return _bfd_dwarf_gc_debug_line (abfd, info);
+}
+

@@ -1266,6 +1266,9 @@ DESCRIPTION
 .#define bfd_canonicalize_dynamic_reloc(abfd, arels, asyms) \
 .	BFD_SEND (abfd, _bfd_canonicalize_dynamic_reloc, (abfd, arels, asyms))
 .
+.#define bfd_gc_debug(abfd, link_info) \
+.       BFD_SEND (abfd, _bfd_gc_debug, (abfd, link_info))
+.
 .extern bfd_byte *bfd_get_relocated_section_contents
 .  (bfd *, struct bfd_link_info *, struct bfd_link_order *, bfd_byte *,
 .   bfd_boolean, asymbol **);

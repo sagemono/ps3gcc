@@ -3884,8 +3884,9 @@ extern bool cp_missing_noreturn_ok_p		(tree);
 extern void initialize_artificial_var		(tree, tree);
 extern tree check_var_type			(tree, tree);
 extern tree reshape_init (tree, tree);
-
+extern const char *get_tcf_identifier		(void);
 extern bool have_extern_spec;
+
 
 /* in decl2.c */
 extern bool check_java_method			(tree);
@@ -3924,6 +3925,7 @@ extern tree cxx_callgraph_analyze_expr		(tree *, int *, tree);
 extern void mark_needed				(tree);
 extern bool decl_needed_p			(tree);
 extern void note_vague_linkage_fn		(tree);
+extern const char *get_ssdf_identifier		(void);
 
 /* in error.c */
 extern void init_error				(void);
@@ -4262,6 +4264,7 @@ extern tree add_stmt_to_compound		(tree, tree);
 extern tree cxx_maybe_build_cleanup		(tree);
 extern void init_tree				(void);
 extern int pod_type_p				(tree);
+extern bool class_tmpl_impl_spec_p		(tree);
 extern int zero_init_p				(tree);
 extern tree canonical_type_variant		(tree);
 extern tree copy_binfo				(tree, tree, tree,

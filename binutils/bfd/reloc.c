@@ -5047,3 +5047,23 @@ error_return:
     free (reloc_vector);
   return NULL;
 }
+
+/*
+INTERNAL_FUNCTION
+        bfd_generic_gc_debug
+                                                                                
+SYNOPSIS
+        bfd_boolean bfd_generic_gc_debug
+          (bfd *, struct bfd_link_info *);
+                                                                                
+DESCRIPTION
+        Provides default handling for relaxing for back ends which
+        don't do debug gc -- i.e., does nothing.
+*/
+                                                                                
+bfd_boolean
+bfd_generic_gc_debug (bfd *abfd ATTRIBUTE_UNUSED,
+                         struct bfd_link_info *info ATTRIBUTE_UNUSED)
+{
+  return TRUE;
+}

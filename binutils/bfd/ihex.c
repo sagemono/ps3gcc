@@ -934,6 +934,7 @@ ihex_sizeof_headers (bfd *abfd ATTRIBUTE_UNUSED, bfd_boolean exec ATTRIBUTE_UNUS
 #define ihex_bfd_is_group_section                 bfd_generic_is_group_section
 #define ihex_bfd_discard_group                    bfd_generic_discard_group
 #define ihex_section_already_linked               _bfd_generic_section_already_linked
+#define ihex_bfd_gc_debug                         bfd_generic_gc_debug
 #define ihex_bfd_link_hash_table_create           _bfd_generic_link_hash_table_create
 #define ihex_bfd_link_hash_table_free             _bfd_generic_link_hash_table_free
 #define ihex_bfd_link_add_symbols                 _bfd_generic_link_add_symbols

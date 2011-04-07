@@ -1,6 +1,6 @@
 /* Expands front end tree to back end RTL for GCC.
    Copyright (C) 1987, 1988, 1989, 1991, 1992, 1993, 1994, 1995, 1996, 1997,
-   1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005
+   1998, 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2010
    Free Software Foundation, Inc.
 
 This file is part of GCC.
@@ -2558,8 +2558,10 @@ assign_parm_setup_block (struct assign_parm_data_all *all,
       DECL_ALIGN (parm) = MAX (DECL_ALIGN (parm), BITS_PER_WORD);
       stack_parm = assign_stack_local (BLKmode, size_stored,
 				       DECL_ALIGN (parm));
-      if (GET_MODE_SIZE (GET_MODE (entry_parm)) == size)
-	PUT_MODE (stack_parm, GET_MODE (entry_parm));
+      if (GET_MODE_SIZE (GET_MODE (entry_parm)) == size
+          && ! (AGGREGATE_TYPE_P (TREE_TYPE (parm))
+                && TYPE_MODE (TREE_TYPE (parm)) == BLKmode))
+        PUT_MODE (stack_parm, GET_MODE (entry_parm));
       set_mem_attributes (stack_parm, parm, 1);
     }
 

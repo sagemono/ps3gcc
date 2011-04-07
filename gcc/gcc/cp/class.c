@@ -1,6 +1,6 @@
 /* Functions related to building classes and their related objects.
    Copyright (C) 1987, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
-   1999, 2000, 2001, 2002, 2003, 2004, 2005  Free Software Foundation, Inc.
+   1999, 2000, 2001, 2002, 2003, 2004, 2005, 2010  Free Software Foundation, Inc.
    Contributed by Michael Tiemann (tiemann@cygnus.com)
 
 This file is part of GCC.
@@ -6575,19 +6575,30 @@ print_member_type (FILE* stream, int flags, tree type_node)
     {
       fputs ("<function>", stream);
     }
+  else if (TREE_CODE(type_node) == METHOD_TYPE)
+    {
+      fputs ("<method>", stream);
+    }
   else if (TREE_CODE(type_node) == UNION_TYPE || TREE_CODE(type_node) == RECORD_TYPE)
     {
       tree type_name = TYPE_NAME(type_node);
-      const char *type_name_string = IDENTIFIER_POINTER (DECL_NAME(type_name));
-      if (type_name_string[0] == '.')
+      if (type_name == NULL_TREE)
         {
-          if (TREE_CODE(type_node) == RECORD_TYPE)
-            fputs ("<untagged_struct>", stream);
-          else
-            fputs ("<untagged_union>", stream);
+          fputs ("<no name>", stream);
         }
       else
-        fputs (type_name_string, stream);
+        {
+          const char *type_name_string = IDENTIFIER_POINTER (DECL_NAME(type_name));
+          if (type_name_string[0] == '.')
+            {
+              if (TREE_CODE(type_node) == RECORD_TYPE)
+                fputs ("<untagged_struct>", stream);
+              else
+                fputs ("<untagged_union>", stream);
+            }
+          else
+            fputs (type_name_string, stream);
+        }
     }
   else if (TREE_CODE(type_node) == ENUMERAL_TYPE)
     {
@@ -6597,6 +6608,11 @@ print_member_type (FILE* stream, int flags, tree type_node)
         fputs ("enum", stream);
       else
         fprintf (stream, "enum %s", type_name_string);
+    }
+  else if (TREE_CODE(type_node) == VECTOR_TYPE)
+    {
+      fputs("vector ", stream);
+      print_member_type (stream, flags, TREE_TYPE(type_node));
     }
   else if (TREE_CODE_CLASS(TREE_CODE(type_node)) == tcc_type)
     {

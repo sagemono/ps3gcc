@@ -3366,4 +3366,10 @@ mark_used (tree decl)
   processing_template_decl = saved_processing_template_decl;
 }
 
+const char *
+get_ssdf_identifier (void)
+{
+  return SSDF_IDENTIFIER;
+}
+
 #include "gt-cp-decl2.h"

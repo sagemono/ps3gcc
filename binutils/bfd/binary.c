@@ -332,6 +332,7 @@ binary_sizeof_headers (bfd *abfd ATTRIBUTE_UNUSED,
 #define binary_bfd_is_group_section                bfd_generic_is_group_section
 #define binary_bfd_discard_group                   bfd_generic_discard_group
 #define binary_section_already_linked             _bfd_generic_section_already_linked
+#define binary_bfd_gc_debug                        bfd_generic_gc_debug
 #define binary_bfd_link_hash_table_create         _bfd_generic_link_hash_table_create
 #define binary_bfd_link_hash_table_free           _bfd_generic_link_hash_table_free
 #define binary_bfd_link_just_syms                 _bfd_generic_link_just_syms

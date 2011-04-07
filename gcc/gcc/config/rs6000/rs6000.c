@@ -1,6 +1,6 @@
 /* Subroutines used for code generation on IBM RS/6000.
    Copyright (C) 1991, 1993, 1994, 1995, 1996, 1997, 1998, 1999,
-   2000, 2001, 2002, 2003, 2004, 2005, 2006
+   2000, 2001, 2002, 2003, 2004, 2005, 2006, 2010
    Free Software Foundation, Inc.
    Contributed by Richard Kenner (kenner@vlsi1.ultra.nyu.edu)
 
@@ -790,7 +790,7 @@ static void rs6000_darwin64_record_arg_advance_flush (CUMULATIVE_ARGS *,
 						      HOST_WIDE_INT, int);
 static void rs6000_darwin64_record_arg_advance_recurse (CUMULATIVE_ARGS *,
 							tree, HOST_WIDE_INT);
-static void rs6000_darwin64_record_arg_flush (CUMULATIVE_ARGS *,
+static int rs6000_darwin64_record_arg_flush (CUMULATIVE_ARGS *,
 					      HOST_WIDE_INT,
 					      rtx[], int *);
 static void rs6000_darwin64_record_arg_recurse (CUMULATIVE_ARGS *,
@@ -5634,9 +5634,12 @@ rs6000_spe_function_arg (CUMULATIVE_ARGS *cum, enum machine_mode mode,
 }
 
 /* A subroutine of rs6000_darwin64_record_arg.  Assign the bits of the
-   structure between cum->intoffset and bitpos to integer registers.  */
-
-static void
+   structure between cum->intoffset and bitpos to integer registers. 
+   
+   Return true if full or some part of args are assigned onto GPR,
+   return false if nothing is on GPR.
+ */
+int
 rs6000_darwin64_record_arg_flush (CUMULATIVE_ARGS *cum,
 				  HOST_WIDE_INT bitpos, rtx rvec[], int *k)
 {
@@ -5684,7 +5687,7 @@ rs6000_darwin64_record_arg_flush (CUMULATIVE_ARGS *cum,
 
   intregs = MIN (intregs, GP_ARG_NUM_REG - this_regno);
   if (intregs <= 0)
-    return;
+    return false;
 
   intoffset /= BITS_PER_UNIT;
   do
@@ -5700,6 +5703,7 @@ rs6000_darwin64_record_arg_flush (CUMULATIVE_ARGS *cum,
       intregs -= 1;
     }
   while (intregs > 0);
+  return true;
 }
 
 /* Recursive workhorse for the following.  */
@@ -5781,6 +5785,7 @@ rs6000_darwin64_record_arg (CUMULATIVE_ARGS *orig_cum, tree type,
   /* This is a copy; modifications are not visible to our caller.  */
   CUMULATIVE_ARGS copy_cum = *orig_cum;
   CUMULATIVE_ARGS *cum = &copy_cum;
+  int allocated_gpr_p;
 
   /* Pad to 16 byte boundary if needed.  */
   if (!retval && TYPE_ALIGN (type) >= 2 * BITS_PER_WORD
@@ -5797,7 +5802,7 @@ rs6000_darwin64_record_arg (CUMULATIVE_ARGS *orig_cum, tree type,
      element 1; 0 is reserved for an indication of using memory, and
      may or may not be filled in below. */
   rs6000_darwin64_record_arg_recurse (cum, type, 0, rvec, &k);
-  rs6000_darwin64_record_arg_flush (cum, typesize * BITS_PER_UNIT, rvec, &k);
+  allocated_gpr_p = rs6000_darwin64_record_arg_flush (cum, typesize * BITS_PER_UNIT, rvec, &k);
 
   /* If any part of the struct went on the stack put all of it there.
      This hack is because the generic code for
@@ -5805,8 +5810,10 @@ rs6000_darwin64_record_arg (CUMULATIVE_ARGS *orig_cum, tree type,
      parts of the struct are not at the beginning.  */
   if (cum->use_stack)
     {
-      if (retval)
-	return NULL_RTX;    /* doesn't go in registers at all */
+      /* if the arg is treated as return value or no part of the args are
+         allocated onto any GPRs, return NULL_RTX */
+      if (retval || !allocated_gpr_p)
+	return NULL_RTX;
       kbase = 0;
       rvec[0] = gen_rtx_EXPR_LIST (VOIDmode, NULL_RTX, const0_rtx);
     }
@@ -7934,7 +7941,7 @@ altivec_expand_lv_builtin (enum insn_code icode, tree arglist, rtx target, bool 
     }
   else
     {
-      op0 = altivec_copy_to_mode_reg (mode0, op0, 1);	/* CELL LOCAL */
+      op0 = altivec_copy_to_mode_reg (mode0, op0, 0);
       addr = gen_rtx_MEM (blk ? BLKmode : tmode, gen_rtx_PLUS (Pmode, op0, op1));
     }
 
@@ -8011,7 +8018,7 @@ altivec_expand_stv_builtin (enum insn_code icode, tree arglist)
     }
   else
     {
-      op1 = altivec_copy_to_mode_reg (mode1, op1, 1);	/* CELL LOCAL */
+      op1 = altivec_copy_to_mode_reg (mode1, op1, 0);
       addr = gen_rtx_MEM (tmode, gen_rtx_PLUS (Pmode, op1, op2));
     }
 

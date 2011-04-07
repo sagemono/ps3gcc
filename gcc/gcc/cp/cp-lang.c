@@ -36,6 +36,7 @@ Boston, MA 02110-1301, USA.  */
 
 enum c_language_kind c_language = clk_cxx;
 static void cp_init_ts (void);
+static bool cxx_artificial_function_name (const char *name);
 
 /* Lang hooks common to C++ and ObjC++ are declared in cp/cp-objcp-common.h;
    consequently, there should be very few hooks below.  */
@@ -44,12 +45,16 @@ static void cp_init_ts (void);
 #define LANG_HOOKS_NAME "GNU C++"
 #undef LANG_HOOKS_INIT
 #define LANG_HOOKS_INIT cxx_init
+#undef LANG_HOOKS_GENERIC_TYPE_P
+#define LANG_HOOKS_GENERIC_TYPE_P class_tmpl_impl_spec_p
 #undef LANG_HOOKS_DECL_PRINTABLE_NAME
 #define LANG_HOOKS_DECL_PRINTABLE_NAME	cxx_printable_name
 #undef LANG_HOOKS_FOLD_OBJ_TYPE_REF
 #define LANG_HOOKS_FOLD_OBJ_TYPE_REF cp_fold_obj_type_ref
 #undef LANG_HOOKS_INIT_TS
 #define LANG_HOOKS_INIT_TS cp_init_ts
+#undef LANG_HOOKS_ARTIFICIAL_FUNCTION_NAME
+#define LANG_HOOKS_ARTIFICIAL_FUNCTION_NAME cxx_artificial_function_name
 
 /* Each front end provides its own lang hook initializer.  */
 const struct lang_hooks lang_hooks = LANG_HOOKS_INITIALIZER;
@@ -142,6 +147,14 @@ void
 finish_file (void)
 {
   cp_finish_file ();
+}
+
+static bool
+cxx_artificial_function_name (const char *name)
+{
+  return !strncmp (name, get_tcf_identifier(), strlen(get_tcf_identifier()))
+	  || !strncmp (name, get_ssdf_identifier(),
+		       strlen(get_ssdf_identifier()));
 }
 
 #include "gtype-cp.h"

@@ -156,6 +156,11 @@
   _bfd_elf_section_already_linked
 #endif
 
+#ifndef bfd_elfNN_bfd_gc_debug
+#define bfd_elfNN_bfd_gc_debug \
+  _bfd_elf_gc_debug
+#endif
+
 #ifndef bfd_elfNN_bfd_make_debug_symbol
 #define bfd_elfNN_bfd_make_debug_symbol \
   ((asymbol * (*) (bfd *, void *, unsigned long)) bfd_nullvoidptr)

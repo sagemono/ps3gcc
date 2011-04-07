@@ -3215,6 +3215,7 @@ mmo_canonicalize_reloc (bfd *abfd ATTRIBUTE_UNUSED,
 #define mmo_bfd_get_relocated_section_contents \
   bfd_generic_get_relocated_section_contents
 #define mmo_bfd_gc_sections bfd_generic_gc_sections
+#define mmo_bfd_gc_sections bfd_generic_gc_debug
 #define mmo_bfd_link_hash_table_create _bfd_generic_link_hash_table_create
 #define mmo_bfd_link_hash_table_free _bfd_generic_link_hash_table_free
 #define mmo_bfd_link_add_symbols _bfd_generic_link_add_symbols

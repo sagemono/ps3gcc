@@ -5661,7 +5661,10 @@ lang_gc_sections (void)
     }
 
   if (link_info.gc_sections)
-    bfd_gc_sections (output_bfd, &link_info);
+    {
+      bfd_gc_sections (output_bfd, &link_info);
+      bfd_gc_debug (output_bfd, &link_info);
+    }
 }
 
 /* Relax all sections until bfd_relax_section gives up.  */

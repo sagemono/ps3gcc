@@ -550,3 +550,9 @@ lhd_expr_to_decl (tree expr, bool *tc ATTRIBUTE_UNUSED,
 {
   return expr;
 }
+
+bool
+lhd_artificial_function_name (const char *name __attribute__((unused)))
+{
+  return false;
+}

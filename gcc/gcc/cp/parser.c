@@ -2042,7 +2042,8 @@ static bool
 cp_parser_non_integral_constant_expression (cp_parser  *parser,
 					    const char *thing, bool cast_p)
 {
-  if (!parser->integral_or_enumeration_cast_p
+  if (!cast_p
+      || !parser->integral_or_enumeration_cast_p
       || pedantic)
     parser->non_integral_constant_expression_p = true;
 

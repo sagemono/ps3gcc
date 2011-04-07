@@ -2746,6 +2746,7 @@ const bfd_target rs6000coff64_vec =
     bfd_generic_is_group_section,
     bfd_generic_discard_group,
     _bfd_generic_section_already_linked,
+    bfd_generic_gc_debug,
 
     /* Dynamic */
     _bfd_xcoff_get_dynamic_symtab_upper_bound,

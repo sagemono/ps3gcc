@@ -436,7 +436,8 @@ BFD_JUMP_TABLE macros.
 .  NAME##_bfd_merge_sections, \
 .  NAME##_bfd_is_group_section, \
 .  NAME##_bfd_discard_group, \
-.  NAME##_section_already_linked \
+.  NAME##_section_already_linked, \
+.  NAME##_bfd_gc_debug \
 .
 .  int         (*_bfd_sizeof_headers) (bfd *, bfd_boolean);
 .  bfd_byte *  (*_bfd_get_relocated_section_contents)
@@ -482,6 +483,9 @@ BFD_JUMP_TABLE macros.
 .  {* Check if SEC has been already linked during a reloceatable or
 .     final link.  *}
 .  void (*_section_already_linked) (bfd *, struct bfd_section *);
+.
+.  {* Remove debug.  *}
+.  bfd_boolean (*_bfd_gc_debug) (bfd *, struct bfd_link_info *);
 .
 .  {* Routines to handle dynamic symbols and relocs.  *}
 .#define BFD_JUMP_TABLE_DYNAMIC(NAME) \

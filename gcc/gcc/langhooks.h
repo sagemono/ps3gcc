@@ -117,6 +117,10 @@ struct lang_hooks_for_types
      according to UNSIGNEDP.  */
   tree (*signed_or_unsigned_type) (int, tree);
 
+  /* True if the type is an instantiation of a generic type,
+     e.g. C++ template implicit specializations.  */
+  bool (*generic_p) (tree);
+
   /* Given a type, apply default promotions to unnamed function
      arguments and return the new type.  Return the same type if no
      change.  Required by any language that supports variadic
@@ -430,6 +434,8 @@ struct lang_hooks
 
   /* Whenever you add entries here, make sure you adjust langhooks-def.h
      and langhooks.c accordingly.  */
+
+  bool (*artificial_function_name) (const char *name);
 };
 
 /* Each front end provides its own.  */

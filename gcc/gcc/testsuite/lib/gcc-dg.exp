@@ -357,7 +357,7 @@ proc cleanup-rtl-dump { suffix } {
 #
 # SUFFIX is the tree dump file suffix pattern.
 proc cleanup-tree-dump { suffix } {
-  cleanup-dump "t\[0-9\]\[0-9\].$suffix"
+  cleanup-dump "t{,\[0-9\]}\[0-9\]\[0-9\].$suffix"
 }
 
 # Remove a specific ipa dump file for the current test.

@@ -930,7 +930,7 @@ spu_handle_align (fragS *fragp)
 }
 
 void
-md_apply_fix (fixS *fixP, valueT * valP, segT seg ATTRIBUTE_UNUSED)
+md_apply_fix (fixS *fixP, valueT * valP, segT seg)
 {
   unsigned int res;
   valueT val = *valP;
@@ -1062,4 +1062,7 @@ md_apply_fix (fixS *fixP, valueT * valP, segT seg ATTRIBUTE_UNUSED)
           place[3] |= (res) & 0xff;
         }
     }
+  else if (fixP->fx_r_type == BFD_RELOC_32
+	   && !strncmp (seg->name, ".debug_", strlen (".debug_")))
+    md_number_to_chars (place, val, 4);
 }

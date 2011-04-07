@@ -399,6 +399,9 @@ extern bfd_boolean _bfd_generic_set_section_contents
 #define _bfd_nolink_bfd_discard_group \
   ((bfd_boolean (*) (bfd *, struct bfd_section *)) \
    bfd_false)
+#define _bfd_nolink_bfd_gc_debug \
+  ((bfd_boolean (*) (bfd *, struct bfd_link_info *)) \
+   bfd_false)
 #define _bfd_nolink_bfd_link_hash_table_create \
   ((struct bfd_link_hash_table *(*) (bfd *)) bfd_nullvoidptr)
 #define _bfd_nolink_bfd_link_hash_table_free \
@@ -1944,6 +1947,9 @@ bfd_byte *bfd_generic_get_relocated_section_contents
     bfd_byte *data,
     bfd_boolean relocatable,
     asymbol **symbols);
+
+bfd_boolean bfd_generic_gc_debug
+   (bfd *, struct bfd_link_info *);
 
 /* Extracted from archures.c.  */
 extern const bfd_arch_info_type bfd_default_arch_struct;
