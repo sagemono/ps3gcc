@@ -163,6 +163,8 @@ static void remap_save_expr (tree *, void *, int *);
 static bool replace_ref_tree (inline_data *, tree *);
 static inline bool inlining_p (inline_data *);
 static void add_lexical_block (tree current_block, tree new_block);
+static tree copy_decl_for_dup_finish (tree, tree, tree, tree);
+static tree copy_result_decl_to_var (tree, inline_data *);
 
 /* Insert a tree->tree mapping for ID.  Despite the name suggests
    that the trees should be variables, it is used for more than that.  */
@@ -1335,7 +1337,10 @@ declare_return_variable (inline_data *id, tree return_slot_addr,
 
   gcc_assert (TREE_CODE (TYPE_SIZE_UNIT (callee_type)) == INTEGER_CST);
 
-  var = copy_decl_for_dup (result, callee, caller, /*versioning=*/false);
+  if (flag_cvt_targetexpr)
+    var = copy_result_decl_to_var (result, id);
+  else
+    var = copy_decl_for_dup (result, callee, caller, /*versioning=*/false);
 
   DECL_SEEN_IN_BIND_EXPR_P (var) = 1;
   DECL_STRUCT_FUNCTION (caller)->unexpanded_var_list
@@ -1346,11 +1351,22 @@ declare_return_variable (inline_data *id, tree return_slot_addr,
      not be visible to the user.  */
   TREE_NO_WARNING (var) = 1;
 
+  if (flag_cvt_targetexpr)
+    declare_inline_vars (id->block, var);
+
   /* Build the use expr.  If the return type of the function was
      promoted, convert it back to the expected type.  */
   use = var;
   if (!lang_hooks.types_compatible_p (TREE_TYPE (var), caller_type))
     use = fold_convert (caller_type, var);
+    
+  if (flag_cvt_targetexpr)
+    {
+      STRIP_USELESS_TYPE_CONVERSION (use);
+
+      if (DECL_BY_REFERENCE (result))
+        var = build_fold_addr_expr (var);
+    }
 
  done:
   /* Register the VAR_DECL as the equivalent for the RESULT_DECL; that
@@ -2009,7 +2025,6 @@ expand_call_inline (basic_block bb, tree stmt, tree *tp, void *data)
   tree t_step;
   tree var;
   struct cgraph_node *old_node;
-  tree decl;
 
   /* See what we've got.  */
   id = (inline_data *) data;
@@ -2195,11 +2210,18 @@ expand_call_inline (basic_block bb, tree stmt, tree *tp, void *data)
     modify_dest = NULL;
 
   /* Declare the return variable for the function.  */
+  if (flag_cvt_targetexpr)
+    declare_return_variable (id, return_slot_addr,
+			     modify_dest, &use_retvar);
+  else
+    {
+  tree decl;
   decl = declare_return_variable (id, return_slot_addr,
 			          modify_dest, &use_retvar);
   /* Do this only if declare_return_variable created a new one.  */
   if (decl && !return_slot_addr && decl != modify_dest)
     declare_inline_vars (id->block, decl);
+    }
 
   /* After we've initialized the parameters, we insert the body of the
      function itself.  */
@@ -2781,6 +2803,12 @@ copy_decl_for_dup (tree decl, tree from_fn, tree to_fn, bool versioning)
 	}
     }
 
+  return copy_decl_for_dup_finish (from_fn, to_fn, decl, copy);
+}
+
+static tree
+copy_decl_for_dup_finish (tree from_fn, tree to_fn, tree decl, tree copy)
+{
   /* Don't generate debug information for the copy if we wouldn't have
      generated it for the copy either.  */
   DECL_ARTIFICIAL (copy) = DECL_ARTIFICIAL (decl);
@@ -2816,6 +2844,34 @@ copy_decl_for_dup (tree decl, tree from_fn, tree to_fn, bool versioning)
     DECL_CONTEXT (copy) = to_fn;
 
   return copy;
+}
+
+/* Like copy_decl_to_var, but create a return slot object instead of a
+   pointer variable for return by invisible reference.  */
+
+static tree
+copy_result_decl_to_var (tree decl, inline_data *id)
+{
+  tree copy, type;
+
+  gcc_assert (TREE_CODE (decl) == PARM_DECL
+	      || TREE_CODE (decl) == RESULT_DECL);
+
+  type = TREE_TYPE (decl);
+  if (DECL_BY_REFERENCE (decl))
+    type = TREE_TYPE (type);
+
+  copy = build_decl (VAR_DECL, DECL_NAME (decl), type);
+  TREE_READONLY (copy) = TREE_READONLY (decl);
+  TREE_THIS_VOLATILE (copy) = TREE_THIS_VOLATILE (decl);
+  if (!DECL_BY_REFERENCE (decl))
+    {
+      TREE_ADDRESSABLE (copy) = TREE_ADDRESSABLE (decl);
+      DECL_GIMPLE_REG_P (copy) = DECL_GIMPLE_REG_P (decl);
+      DECL_POINTER_ALIAS_SET (copy) = DECL_POINTER_ALIAS_SET (decl);
+    }
+
+  return copy_decl_for_dup_finish (id->callee, id->caller, decl, copy);
 }
 
 /* Return a copy of the function's argument tree.  */

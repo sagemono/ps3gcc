@@ -5663,7 +5663,10 @@ lang_gc_sections (void)
   if (link_info.gc_sections)
     {
       bfd_gc_sections (output_bfd, &link_info);
-      bfd_gc_debug (output_bfd, &link_info);
+      /* begin sce local bugzilla #90825 and #93859 */
+      if (link_info.gc_debug)
+        bfd_gc_debug (output_bfd, &link_info);
+      /* end sce local bugzilla #90825 and #93859 */
     }
 }
 

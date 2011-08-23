@@ -553,6 +553,12 @@ c_common_handle_option (size_t scode, const char *arg, int value)
       warn_unused_macros = value;
       break;
 
+    /* begin SCE local, Bz64436 */
+    case OPT_Wunused_struct_result:
+      flag_cvt_targetexpr = value;
+      break;
+    /* end SCE local */
+
     case OPT_Wvariadic_macros:
       warn_variadic_macros = value;
       break;

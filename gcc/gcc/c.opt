@@ -1,22 +1,22 @@
 ; Options for the C, ObjC, C++ and ObjC++ front ends.
-; Copyright (C) 2003, 2004, 2005, 2006 Free Software Foundation, Inc.
+; Copyright (C) 2003, 2004, 2005, 2006, 2007, 2008, 2009
+; Free Software Foundation, Inc.
 ;
 ; This file is part of GCC.
 ;
 ; GCC is free software; you can redistribute it and/or modify it under
 ; the terms of the GNU General Public License as published by the Free
-; Software Foundation; either version 2, or (at your option) any later
+; Software Foundation; either version 3, or (at your option) any later
 ; version.
-; 
+;
 ; GCC is distributed in the hope that it will be useful, but WITHOUT ANY
 ; WARRANTY; without even the implied warranty of MERCHANTABILITY or
 ; FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
 ; for more details.
-; 
+;
 ; You should have received a copy of the GNU General Public License
-; along with GCC; see the file COPYING.  If not, write to the Free
-; Software Foundation, 51 Franklin Street, Fifth Floor, Boston, MA
-; 02110-1301, USA.
+; along with GCC; see the file COPYING3.  If not see
+; <http://www.gnu.org/licenses/>.
 
 ; See the GCC internals manual for a description of this file's format.
 
@@ -423,6 +423,17 @@ Wunused-macros
 C ObjC C++ ObjC++
 Warn about macros defined in the main file that are not used
 
+Wunused-result
+C ObjC C++ ObjC++ Var(warn_unused_result) Init(1) Warning
+Warn if a caller of a function, marked with attribute warn_unused_result, does not use its return value
+
+; SCE local, Bz64436
+;  - "-Wno-unused-struct-result" can disable the fix
+;    for attribute warn_unused_result with struct return.
+Wunused-struct-result
+C ObjC C++ ObjC++ Var(warn_unused_struct_result) Init(1) Warning Undocumented
+Warn if a caller of a function, marked with attribute warn_unused_result, does not use its struct return
+
 Wvariadic-macros
 C ObjC C++ ObjC++
 Do not warn about using variadic macros when -pedantic
@@ -438,6 +449,11 @@ Warn when a pointer differs in signedness in an assignment
 Wconstant-expression
 C++ Var(warn_constant_expression) Init(1)
 Warn an integral constant expression not correct.
+
+Wconstant-array-bound
+C++ Var(warn_constant_array_bound) Init(0)
+Warn non integral constant expression in array bound.
+This warning is disabled by default.
 
 ansi
 C ObjC C++ ObjC++
@@ -492,6 +508,13 @@ Make string literals \"const char[]\" not \"char[]\"
 fconstant-string-class=
 ObjC ObjC++ Joined
 -fconst-string-class=<name>	Use class <name> for constant strings
+
+; SCE local, Bz64436
+;  NOTICE: -fno-cvt-targtexpr will be a chicken switch.
+;          This affects "tree-inline.c", so flag_cvt_targetexpr is used.
+fcvt-targetexpr
+C++ Var(flag_cvt_targetexpr) Init(1) Undocumented
+Enable converting C++ TARGET_EXPR to CALL_EXPR in convert_to_void. (Default:ON)
 
 fdefault-inline
 C++ ObjC++

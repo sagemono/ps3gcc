@@ -1,9 +1,9 @@
 #! /bin/csh
 # SCE CONFIDENTIAL
-# Copyright(C) 2010 Sony Computer Entertainment Inc.
+# Copyright(C) 2011 Sony Computer Entertainment Inc.
 # All Rights Reserved.
 
-# This script builds and installs mingw->ppu-lv2 toolchain for SDK3.6.0-GCC411.  The
+# This script builds and installs mingw->ppu-lv2 toolchain for SDK3.7.0-GCC411.  The
 # existing toolchain directory is backed up as "host-win32/ppu.~N~" where
 # N is a generated number.
 # If environment variable CELLSDK is set, it should be the directory where
@@ -49,8 +49,10 @@ endif
 
 mkdir -p mp-lv2/binutils || exit 1
 cd mp-lv2/binutils || exit 1
+setenv LDFLAGS "-Wl,--large-address-aware"
 $SRC/binutils/configure --target=ppu-lv2 --prefix=$TOOLCHAIN_PREFIX \
 	--host=$XHOST --build=$BUILD --with-sysroot=$TOOLCHAIN_SYSROOT || exit 1
+unsetenv LDFLAGS
 make || exit 1
 make install || exit 1
 cd ../..
@@ -78,4 +80,4 @@ foreach h (float.h spe.h stdbool.h varargs.h iso646.h \
 end
 cd ../..
 
-cp -af $SRC/gcc/COPYING{,.LIB} $TOOLCHAIN_PREFIX/ || exit 1
+cp -af $SRC/gcc/COPYING{,3,.LIB} $TOOLCHAIN_PREFIX/ || exit 1

@@ -35,6 +35,7 @@ Software Foundation, 51 Franklin Street, Fifth Floor, Boston, MA
    2: unused
    3: STATEMENT_LIST_HAS_LABEL (in STATEMENT_LIST)
    4: unused
+   6: CALL_EXPR_CP_WARN_UNUSED_RESULT_P (in CALL_EXPR) SCE local, Bz64436
 */
 
 /* Reserved identifiers.  This is the union of all the keywords for C,
@@ -227,6 +228,15 @@ struct sorted_fields_type GTY(())
 /* Mark which labels are explicitly declared.
    These may be shadowed, and may be referenced from nested functions.  */
 #define C_DECLARED_LABEL_FLAG(label) TREE_LANG_FLAG_1 (label)
+
+/* begin SCE local, Bz64436 */
+/* For "C++" attribute warn_unused_result of struct returns.
+   True if the struct return of the function that is expressed by
+   CALL_EXPR is not used. The target CALL_EXPR is rhs of MODIFY_EXPR,
+   so c_warn_unused_result checks MODIFY_EXPR.  */
+#define CALL_EXPR_CP_WARN_UNUSED_RESULT_P(NODE) \
+  TREE_LANG_FLAG_6 (CALL_EXPR_CHECK (NODE))
+/* end SCE local */
 
 typedef enum c_language_kind
 {

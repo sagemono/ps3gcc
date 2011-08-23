@@ -2938,6 +2938,12 @@ simplify_aggr_init_expr (tree *tp)
 		      TREE_TYPE (TREE_TYPE (TREE_TYPE (fn))),
 		      fn, args, NULL_TREE);
 
+  /* begin SCE local, Bz64436 */
+  if (warn_unused_struct_result
+      && AGGR_INIT_EXPR_CP_WARN_UNUSED_RESULT_P (aggr_init_expr))
+    CALL_EXPR_CP_WARN_UNUSED_RESULT_P (call_expr) = 1;
+  /* end SCE local */
+
   if (style == arg)
     {
       /* Just mark it addressable here, and leave the rest to

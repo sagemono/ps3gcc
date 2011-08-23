@@ -11576,8 +11576,29 @@ cp_parser_direct_declarator (cp_parser* parser,
 		 in function scopes.  */
 	      else if (!at_function_scope_p ())
 		{
-		  error ("array bound is not an integer constant");
-		  bounds = error_mark_node;
+                  /* In addition, we also allow some kind of non integral constant
+                     exprssion in array bound to emulate MS-VC and SNC parser,
+                     allowing array bounds to be expression containing casts from
+                     constant addresses. 
+                     This emulation is disabled under ISO conformant mode. */
+                  if (flag_iso || flag_pedantic_errors)
+		    {
+                      error ("array bound is not an integer constant");
+                      bounds = error_mark_node;
+		    }
+		  else if (pedantic)
+		    {
+		      pedwarn ("array bound is not an integer constant");
+		    }
+		  else if (CONSTANT_CLASS_P (bounds)
+			   && INTEGRAL_TYPE_P(TREE_TYPE (bounds)))
+                    {
+                      /* DO NOTHING. 
+                         Accepting the simple integer expression. */
+		    }
+                  else
+		    warning (OPT_Wconstant_array_bound,
+			     "array bound is not an integer constant");
 		}
 	    }
 	  else

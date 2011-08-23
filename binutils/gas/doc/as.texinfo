@@ -1,6 +1,6 @@
 \input texinfo @c                               -*-Texinfo-*-
 @c  Copyright 1991, 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000,
-@c  2001, 2002, 2003, 2004, 2005
+@c  2001, 2002, 2003, 2004, 2005, 2010
 @c  Free Software Foundation, Inc.
 @c UPDATE!!  On future updates--
 @c   (1)   check for new machine-dep cmdline options in
@@ -1180,6 +1180,16 @@ Treat all undocumented instructions as errors.
 @item  -forbid-unportable-instructions 
 @itemx -Fup
 Treat undocumented Z80 intructions that do notwork on R800 as errors.
+@end table
+@end ifset
+
+@ifset SPU
+@table @gcctabopt
+@item -mmfc-cmd
+Add comments to the disassembly for immediate values that match common mfc commands
+(put and get with optional list and/or fence or barrier modifiers, as well as atomic unit commands)
+@item -mmfc-cmd-all
+adds comments for immediates that match any mfc command.
 @end table
 @end ifset
 

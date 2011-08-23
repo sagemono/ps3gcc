@@ -31,6 +31,7 @@
 
 #include "config.h"
 #include <string.h>
+#include <sys/stat.h>
 
 #include "bfd.h"
 #include "getopt.h"
@@ -51,6 +52,7 @@ static asymbol **syms;		/* Symbol table.  */
 
 static struct option long_options[] =
 {
+  {"absolute-path", optional_argument, NULL, 'a'},
   {"basenames", no_argument, NULL, 's'},
   {"demangle", optional_argument, NULL, 'C'},
   {"exe", required_argument, NULL, 'e'},
@@ -63,12 +65,24 @@ static struct option long_options[] =
   {0, no_argument, 0, 0}
 };
 
+typedef struct search_path_element {
+  struct search_path_element *next;
+  char *path;
+} search_path_element;
+search_path_element *search_path_head = NULL;
+search_path_element *search_path_tail = NULL;
+static char cwd[1024]; /* size is synchronized with libiberty def. */
+
 static void usage (FILE *, int);
 static void slurp_symtab (bfd *);
 static void find_address_in_section (bfd *, asection *, void *);
 static void find_offset_in_section (bfd *, asection *);
 static void translate_addresses (bfd *, asection *);
 static void process_file (const char *, const char *, const char *);
+static search_path_element* append_search_path (char *path);
+static void process_search_path_option (char *path_list);
+char *guess_source_path (char* path_buf, size_t buf_size, const char *relative_path);
+
 
 /* Print a usage message to STREAM and exit with STATUS.  */
 
@@ -235,20 +249,27 @@ translate_addresses (bfd *abfd, asection *section)
 		  free (alloc);
 	      }
 
-	    if (base_names && filename != NULL)
-	      {
-		char *h;
-
-		h = strrchr (filename, '/');
-		if (h != NULL)
-		  filename = h + 1;
-	      }
-
-	    printf ("%s:%u\n", filename ? filename : "??", line);
-	    if (!unwind_inlines)
-	      found = FALSE;
-	    else
-	      found = bfd_find_inliner_info (abfd, &filename, &functionname, &line);
+            {
+              char *canon_path = NULL;
+              if (base_names && filename != NULL)
+                filename = basename (filename);
+              else if (search_path_head && filename != NULL)
+                {
+#define MAXPATHLEN 1024                  
+                  static char buf[MAXPATHLEN];
+                  char* canon_path = guess_source_path (buf, sizeof(buf), filename);
+                  if (canon_path != NULL)
+                    filename = canon_path;
+                }
+              printf ("%s:%u\n", filename ? filename : "??", line);
+              if (!unwind_inlines)
+                found = FALSE;
+              else
+                found = bfd_find_inliner_info (abfd, &filename, &functionname, &line);
+              
+              if (canon_path)
+                free (canon_path);
+            }
 	  } while (found);
 
 	}
@@ -313,6 +334,120 @@ process_file (const char *file_name, const char *section_name,
 
   bfd_close (abfd);
 }
+
+
+static search_path_element*
+append_search_path (char *path)
+{
+  search_path_element* new_elem;
+  
+  if (*path == '\0')
+    return NULL;
+
+  new_elem = (search_path_element *)malloc (sizeof(search_path_element));
+  if (new_elem == NULL)
+    fatal (_("cannot allocate memory."));
+
+  new_elem->next = NULL;
+  new_elem->path = path;
+
+  if (search_path_head == NULL)
+    {
+      search_path_head = new_elem;
+      search_path_tail = new_elem;
+    }
+  else
+    {
+      search_path_tail->next = new_elem;
+      search_path_tail = new_elem;
+    }
+  return new_elem;
+}
+
+static void
+process_search_path_option (char *path_list)
+{
+  if (path_list == NULL)
+    return;
+
+  while (*path_list != '\0')
+    {
+      char *delim = strchr (path_list, ',');
+      char *next_top;
+
+      if (delim != NULL)
+        {
+          *delim = '\0';
+          next_top = delim + 1;
+        }
+      else
+        next_top = path_list + strlen (path_list);
+
+      append_search_path (path_list);
+
+      path_list = next_top;
+    }
+}
+
+/*
+ * guess a source file name by concatinating an element in the source
+ * file search path and RELATIVE_PATH. 
+ * If the file is found, 
+ */
+#if defined (_WIN32) || defined (__MSDOS__) || defined (__DJGPP__) || defined (__OS2__)
+#  define DIR_SEPARATOR '\\'
+#else
+#  define DIR_SEPARATOR '/'
+#endif
+
+char *
+guess_source_path (char* path_buf, size_t buf_size, const char *relative_path)
+{
+  search_path_element *pe;
+  size_t prefix_len;
+  char *nextp;
+  struct stat stat_result;
+
+  for (pe = search_path_head; pe != NULL; pe = pe->next)
+    {
+      memset(path_buf, '\0', buf_size);
+
+      strncpy (path_buf, pe->path, buf_size);
+      prefix_len = strlen (pe->path);
+
+      if (prefix_len >= buf_size - 1)
+        continue;
+
+      nextp = &path_buf[prefix_len];
+
+      if (path_buf[-1] != DIR_SEPARATOR)
+        {
+          *nextp++ = DIR_SEPARATOR;
+          /* its guranteed that the next char of DIR_SEPARATOR is '\0'
+             because all of bytes of path_buf[] are initialized with '\0'. */
+        }
+      
+      if (nextp >=  &path_buf[buf_size - 1])
+        continue;
+
+      strncpy (nextp, relative_path, buf_size - prefix_len - 2);
+      
+      if (stat (path_buf, &stat_result) == 0
+          && S_ISREG(stat_result.st_mode))
+        break;
+    }
+
+  if (pe == NULL)
+    {
+      memset(path_buf, '\0', buf_size); /* not to leave garbage chars in the rest of buffer */
+      strncpy (path_buf, relative_path, buf_size);
+      return NULL;
+    }
+
+  /* Be careful that lrealpath () put the real path into the buffer allocated by malloc. */
+  return  lrealpath (path_buf);
+}
+
 
 int
 main (int argc, char **argv)
@@ -350,13 +485,23 @@ main (int argc, char **argv)
   file_name = NULL;
   section_name = NULL;
   target = NULL;
-  while ((c = getopt_long (argc, argv, "b:Ce:sfHhij:Vv", long_options, (int *) 0))
+  while ((c = getopt_long (argc, argv, "a:b:Ce:sfHhij:Vv", long_options, (int *) 0))
 	 != EOF)
     {
       switch (c)
 	{
 	case 0:
 	  break;		/* We've been given a long option.  */
+        case 'a':
+          if (optarg == NULL)
+            {
+
+              getcwd (cwd, sizeof(cwd) - 1);
+              process_search_path_option (cwd);
+            }
+          else
+            process_search_path_option (optarg);
+          break;
 	case 'b':
 	  target = optarg;
 	  break;

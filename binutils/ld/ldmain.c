@@ -333,9 +333,12 @@ main (int argc, char **argv)
   link_info.gc_sections = FALSE;
 
   link_info.just_syms = FALSE;	/* sce loca bugzilla 13719 */
+  link_info.ignore_reloc_overflow = FALSE; /* sce local bugzilla 94415 */
 #if defined(BPA)
   link_info.spuguid = TRUE;	/* sce local bugzilla #2878 */
 #endif
+
+  link_info.gc_debug = TRUE; /* sce local bugzilla #93859 */
 
   ldfile_add_arch ("");
 

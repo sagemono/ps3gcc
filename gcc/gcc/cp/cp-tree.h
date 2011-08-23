@@ -53,6 +53,7 @@ struct diagnostic_context;
       REFERENCE_REF_P (in INDIRECT_EXPR)
       QUALIFIED_NAME_IS_TEMPLATE (in SCOPE_REF)
       BASELINK_QUALIFIED_P (in BASELINK)
+      TARGET_EXPR_IMPLICIT_P (in TARGET_EXPR)
    1: IDENTIFIER_VIRTUAL_P (in IDENTIFIER_NODE)
       TI_PENDING_TEMPLATE_FLAG.
       TEMPLATE_PARMS_FOR_INLINE.
@@ -81,6 +82,8 @@ struct diagnostic_context;
    6: IDENTIFIER_REPO_CHOSEN (in IDENTIFIER_NODE)
       DECL_CONSTRUCTION_VTABLE_P (in VAR_DECL)
       TYPE_MARKED_P (in _TYPE)
+      CALL_EXPR_CP_WARN_UNUSED_RESULT_P (in CALL_EXPR) SCE local, Bz64436
+      AGGR_INIT_EXPR_CP_WARN_UNUSED_RESULT_P (in AGGR_INIT_EXPR) SCE local, Bz64436
 
    Usage of TYPE_LANG_FLAG_?:
    0: TYPE_DEPENDENT_P
@@ -3020,6 +3023,20 @@ extern void decl_shadowed_for_var_insert (tree, tree);
 /* EXPR_STMT accessor. This gives the expression associated with an
    expression statement.  */
 #define EXPR_STMT_EXPR(NODE)	TREE_OPERAND (EXPR_STMT_CHECK (NODE), 0)
+
+/* True if this TARGET_EXPR was created by build_cplus_new, and so we can
+   discard it if it isn't useful.  */
+#define TARGET_EXPR_IMPLICIT_P(NODE) \
+  TREE_LANG_FLAG_0 (TARGET_EXPR_CHECK (NODE))
+
+/* begin SCE local, Bz64436 */
+/* True if convert_to_void found that the struct return of the function
+   that is expressed by this AGGR_INIT_EXPR is not used.
+   And this will be taken over as CALL_EXPR_CP_WARN_UNUSED_RESULT_P by
+   simplify_aggr_init_expr. We can discard it if it isn't useful.  */
+#define AGGR_INIT_EXPR_CP_WARN_UNUSED_RESULT_P(NODE) \
+  TREE_LANG_FLAG_6 (AGGR_INIT_EXPR_CHECK (NODE))
+/* end SCE local */
 
 /* An enumeration of the kind of tags that C++ accepts.  */
 enum tag_types {

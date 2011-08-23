@@ -1751,6 +1751,7 @@ case "${host}" in
     host_makefile_frag="config/mh-cygwin"
     ;;
   *-mingw32*)
+    host_makefile_frag="config/mh-mingw"
     ;;
   *-interix*)
     host_makefile_frag="config/mh-interix"

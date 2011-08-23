@@ -899,6 +899,39 @@ convert_to_void (tree expr, const char *implicit)
 	break;
       }
 
+    case TARGET_EXPR:
+      /* begin SCE local, Bz64436 */
+      if (!warn_unused_struct_result)
+	break;
+      if (TARGET_EXPR_IMPLICIT_P (expr))
+	{
+	  tree init = TARGET_EXPR_INITIAL (expr);
+	  if (TREE_CODE (init) == AGGR_INIT_EXPR)
+	    AGGR_INIT_EXPR_CP_WARN_UNUSED_RESULT_P (init) = 1;
+	  else if (TREE_CODE (init) == CALL_EXPR)
+	    CALL_EXPR_CP_WARN_UNUSED_RESULT_P (init) = 1;
+	}
+      /* end SCE local */
+      /* Don't bother with the temporary object returned from a function if
+	 we don't use it and don't need to destroy it.  We'll still
+	 allocate space for it in expand_call or declare_return_variable,
+	 but we don't need to track it through all the tree phases.  */
+      if (flag_cvt_targetexpr
+	  && TARGET_EXPR_IMPLICIT_P (expr)
+	  && TYPE_HAS_TRIVIAL_DESTRUCTOR (TREE_TYPE (expr)))
+	{
+	  tree init = TARGET_EXPR_INITIAL (expr);
+
+	  if (TREE_CODE (init) == AGGR_INIT_EXPR
+	      && !AGGR_INIT_VIA_CTOR_P (init))
+	    {
+	      tree fn = TREE_OPERAND (init, 0);
+	      expr = build3 (CALL_EXPR, TREE_TYPE (TREE_TYPE (TREE_TYPE (fn))),
+			     fn, TREE_OPERAND (init, 1), NULL_TREE);
+	    }
+	}
+      break;
+
     default:;
     }
   {

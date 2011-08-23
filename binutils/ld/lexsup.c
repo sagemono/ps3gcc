@@ -161,6 +161,13 @@ enum option_values
   , OPTION_NO_SPUGUID
 #endif
 /* CELL LOCAL End */
+  /* begin sce local bugzilla #93859 */
+  , OPTION_GC_DEBUG
+  , OPTION_NO_GC_DEBUG
+  /* end sce local bugzilla #93859 */
+  /* begin sce local bugzilla 94415 */
+  , OPTION_IGNORE_RELOC_OVERFLOW
+  /* end sce local bugzilla 94415 */
 };
 
 /* The long options.  This structure is used for both the option
@@ -539,6 +546,18 @@ static const struct ld_option ld_options[] =
       '\0', NULL, N_("Don't embedded .SpuGUID section"), ONE_DASH },
   /* end sce local */
 #endif
+  /* begin sce local bugzilla #93859 */
+  { {"gc-debug", no_argument, NULL, OPTION_GC_DEBUG},
+    '\0', NULL, N_("Remove unused debug sections"), TWO_DASHES },
+  { {"no-gc-debug", no_argument, NULL, OPTION_NO_GC_DEBUG},
+    '\0', NULL, N_("Don't remove unused debug sections"), TWO_DASHES },
+  /* end sce local bugzilla #93859 */
+  /* begin sce local bugzilla 94415 */
+  { {"ignore-reloc-overflow", no_argument, NULL, OPTION_IGNORE_RELOC_OVERFLOW},
+    '\0', NULL, N_("Ignore relocation overflow error. Specifying -Map option with this\n"
+		   "\t\t\t\twill help you to identify which file makes the executable fat.\n"
+		   "\t\t\t\tWARNING! this option generates corrupted object."), TWO_DASHES },
+  /* end sce local bugzilla 94415 */
 };
 
 #define OPTION_COUNT ARRAY_SIZE (ld_options)
@@ -1372,6 +1391,22 @@ parse_args (unsigned argc, char **argv)
           break;
 	  /* end sce local */
 #endif
+
+	/* begin sce local bugzilla #93859 */
+	case OPTION_GC_DEBUG:
+	  link_info.gc_debug = TRUE;
+	  break;
+
+	case OPTION_NO_GC_DEBUG:
+	  link_info.gc_debug = FALSE;
+	  break;
+	/* end sce local bugzilla #93859 */
+
+
+        /* begin sce local bugzilla 94415 */
+        case OPTION_IGNORE_RELOC_OVERFLOW:
+          link_info.ignore_reloc_overflow = TRUE;
+        /* end sce local bugzilla 94415 */
 
 	case OPTION_REDUCE_MEMORY_OVERHEADS:
 	  command_line.reduce_memory_overheads = TRUE;

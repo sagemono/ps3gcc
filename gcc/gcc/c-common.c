@@ -1,12 +1,13 @@
 /* Subroutines shared by all languages that are variants of C.
    Copyright (C) 1992, 1993, 1994, 1995, 1996, 1997, 1998, 1999, 2000,
-   2001, 2002, 2003, 2004, 2005 Free Software Foundation, Inc.
+   2001, 2002, 2003, 2004, 2005, 2006, 2007, 2008, 2009
+   Free Software Foundation, Inc.
 
 This file is part of GCC.
 
 GCC is free software; you can redistribute it and/or modify it under
 the terms of the GNU General Public License as published by the Free
-Software Foundation; either version 2, or (at your option) any later
+Software Foundation; either version 3, or (at your option) any later
 version.
 
 GCC is distributed in the hope that it will be useful, but WITHOUT ANY
@@ -15,9 +16,8 @@ FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
 for more details.
 
 You should have received a copy of the GNU General Public License
-along with GCC; see the file COPYING.  If not, write to the Free
-Software Foundation, 51 Franklin Street, Fifth Floor, Boston, MA
-02110-1301, USA.  */
+along with GCC; see the file COPYING3.  If not see
+<http://www.gnu.org/licenses/>.  */
 
 #include "config.h"
 #include "system.h"
@@ -6174,6 +6174,7 @@ c_warn_unused_result (tree *top_p)
 {
   tree t = *top_p;
   tree_stmt_iterator i;
+  tree rhs;
   tree fdecl, ftype;
 
   switch (TREE_CODE (t))
@@ -6202,6 +6203,16 @@ c_warn_unused_result (tree *top_p)
       c_warn_unused_result (&EH_FILTER_FAILURE (t));
       break;
 
+    /* begin SCE local, Bz64436 */
+    case MODIFY_EXPR:
+      rhs = TREE_OPERAND (t, 1);
+      if (warn_unused_struct_result
+          && TREE_CODE (rhs) == CALL_EXPR
+          && CALL_EXPR_CP_WARN_UNUSED_RESULT_P (rhs))
+        c_warn_unused_result (&rhs);
+      break;
+    /* end SCE local */
+
     case CALL_EXPR:
       if (TREE_USED (t))
 	break;
@@ -6222,11 +6233,13 @@ c_warn_unused_result (tree *top_p)
       if (lookup_attribute ("warn_unused_result", TYPE_ATTRIBUTES (ftype)))
 	{
 	  if (fdecl)
-	    warning (0, "%Hignoring return value of %qD, "
+	    warning (OPT_Wunused_result,
+		     "%Hignoring return value of %qD, "
 		     "declared with attribute warn_unused_result",
 		     EXPR_LOCUS (t), fdecl);
 	  else
-	    warning (0, "%Hignoring return value of function "
+	    warning (OPT_Wunused_result,
+		     "%Hignoring return value of function "
 		     "declared with attribute warn_unused_result",
 		     EXPR_LOCUS (t));
 	}

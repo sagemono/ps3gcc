@@ -2751,10 +2751,13 @@ spu_elf_relocate_section (bfd *output_bfd,
 	    switch (r)
 	      {
 	      case bfd_reloc_overflow:
-		if (!((*info->callbacks->reloc_overflow)
-		      (info, (h ? &h->root : NULL), sym_name, howto->name,
-		       (bfd_vma) 0, input_bfd, input_section, rel->r_offset)))
+		if (info->ignore_reloc_overflow == FALSE
+		    && !((*info->callbacks->reloc_overflow)
+			 (info, (h ? &h->root : NULL), sym_name, howto->name,
+			  (bfd_vma) 0, input_bfd, input_section, rel->r_offset)))
 		  return FALSE;
+		else
+		  r = bfd_reloc_ok;
 		break;
 
 	      case bfd_reloc_undefined:

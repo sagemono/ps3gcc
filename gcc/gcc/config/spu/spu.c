@@ -6298,6 +6298,12 @@ spu_simplify_unspec (rtx x, rtx c0, rtx c1, rtx c2)
 	     || GET_CODE (op0) == CONST_VECTOR)
 	    &&  mode_op0 != VOIDmode)
 	  {
+
+	    /* Bz92413 */
+	    if (mode == SImode && mode_op0 == V4SImode
+	        && GET_CODE (CONST_VECTOR_ELT (op0, 0)) == SYMBOL_REF)
+	      return CONST_VECTOR_ELT (op0, 0);
+
 	    constant_to_array(mode_op0, op0, arr0);
 	    return array_to_constant(mode, arr0);
 	  }

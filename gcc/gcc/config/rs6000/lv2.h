@@ -783,7 +783,7 @@ enum { SIGNAL_FRAMESIZE = 128 };
   "    %{fno-exceptions: --no-exceptions} " \
   "    %{mno-toc|mno-toc=1|mno-toc=2: --no-toc-restore} " \
   "    %{!mno-prxfixup: %{!mforce-prx-fixup: %{!r: --prx-fixup}}} " \
-  "    %{mprx|mprx-with-runtime:--no-check-unresolved --prx-child-link} " \
+  "    %{mprx|mprx-with-runtime:--prx-child-link} " \
   "    %{mppuguid: %{!r:-ppuguid}} " \
   "    %{r|mno-ppuguid:-no-ppuguid} } } " \
   "%{shared}"

@@ -21,7 +21,11 @@
 
 unsigned foo(int x[64], int y[64])
 {
+#if defined(__HOST_MINGW__) && defined(__OPTIMIZE__)
+  C1024(x,y);
+#else
   C4096(x,y);
+#endif
   
   return 0x01234567;
  gt:

@@ -9,6 +9,10 @@
 void foo()
 {
   if (0) { }
+#ifdef __HOST_MINGW__
+  THOU THOU THOU THOU THOU
+#else
   /* 11,000 else if's.  */
   THOU THOU THOU THOU THOU THOU THOU THOU THOU THOU THOU
+#endif
 }

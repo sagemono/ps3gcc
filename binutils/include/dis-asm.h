@@ -1,6 +1,6 @@
 /* Interface between the opcode library and its callers.
 
-   Copyright 1999, 2000, 2001, 2002, 2003, 2004, 2005
+   Copyright 1999, 2000, 2001, 2002, 2003, 2004, 2005, 2010
    Free Software Foundation, Inc.
 
    This program is free software; you can redistribute it and/or modify
@@ -24,6 +24,11 @@
    a large variety of instruction sets, callable with an identical
    interface, for making instruction-processing programs more independent
    of the instruction set being processed.  */
+
+/* -Mmfc-cmd option patch is contributed by luke@gmail.com,
+   Original patches are
+      http://sourceware.org/ml/binutils/2010-12/msg00192.html
+      http://sourceware.org/ml/binutils/2010-12/msg00195.html */
 
 #ifndef DIS_ASM_H
 #define DIS_ASM_H
@@ -276,6 +281,7 @@ extern disassembler_ftype cris_get_disassembler (bfd *);
 
 extern void print_mips_disassembler_options (FILE *);
 extern void print_ppc_disassembler_options (FILE *);
+extern void print_spu_disassembler_options (FILE *);
 extern void print_arm_disassembler_options (FILE *);
 extern void parse_arm_disassembler_option (char *);
 extern int get_arm_regname_num_options (void);

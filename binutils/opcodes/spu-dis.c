@@ -4,7 +4,7 @@
    Sony Computer Entertainment, Inc.,
    Toshiba Corporation,
    International Business Machines Corporation,
-   2001,2002,2003,2004,2005.
+   2001,2002,2003,2004,2005,2010
 
    This file is free software; you can redistribute it and/or modify it under
    the terms of the GNU General Public License as published by the Free
@@ -21,9 +21,15 @@
    Software Foundation, 51 Franklin Street, Fifth Floor, Boston, MA
    02110-1301, USA.  */
 
+/* -Mmfc-cmd option patch is contributed by luke@gmail.com,
+   Original patches are
+      http://sourceware.org/ml/binutils/2010-12/msg00192.html
+      http://sourceware.org/ml/binutils/2010-12/msg00195.html */
+ 
 #include <stdio.h>
 #include "sysdep.h"
 #include "dis-asm.h"
+#include "opintl.h"
 #include "opcode/spu.h"
 
 /* This file provides a disassembler function which uses
@@ -35,6 +41,49 @@ extern const struct spu_opcode spu_opcodes[];
 extern const int spu_num_opcodes;
 
 static const struct spu_opcode *spu_disassemble_table[(1<<11)];
+
+void
+print_spu_disassembler_options (FILE *stream)
+{
+  fprintf (stream,
+           _("\n"
+             "The following spu specific disassembler options are supported for use\n"
+             "with the -M switch (multiple options should be separated by commas):\n"));
+  fprintf (stream, _("  mfc-cmd     Comment immediate values that match common mfc commands\n"));
+  fprintf (stream, _("  mfc-cmd-all Comment immediate values that match any mfc command\n"));
+}
+
+struct spu_options
+{
+  unsigned int mfc_cmd_comment_level;
+};
+
+static void
+parse_spu_options (struct spu_options *options, char *string)
+{
+  char *arg;
+
+  options->mfc_cmd_comment_level = 0;
+
+  arg = string;
+  while (arg != NULL)
+    {
+      char *end = strchr (arg, ',');
+      if (end != NULL)
+        *end = '\0';
+
+      if (strcmp (arg, "mfc-cmd") == 0)
+        options->mfc_cmd_comment_level = 1;
+      else if (strcmp (arg, "mfc-cmd-all") == 0)
+        options->mfc_cmd_comment_level = 2;
+      else
+        fprintf (stderr, _("warning: ignoring unknown -M%s option\n"), arg);
+
+      if (end != NULL)
+        *end++ = ',';
+      arg = end;
+    }
+}
 
 static void
 init_spu_disassemble()
@@ -92,6 +141,80 @@ get_index_for_opcode(unsigned int insn)
    return 0;
 }
 
+/* Convert immediate value to displayable string to be appended to insn comment. */
+static const char *
+get_comment_for_immediate (int immed, const struct spu_options *options)
+{
+  struct value_string_pair
+  {
+    int val;
+    const char *str;
+  };
+  static const struct value_string_pair mfc_common[] =
+  {
+    {0x0020, " (put)"},
+    {0x0021, " (putb)"},
+    {0x0022, " (putf)"},
+    {0x0024, " (putl)"},
+    {0x0025, " (putlb)"},
+    {0x0026, " (putlf)"},
+    {0x0040, " (get)"},
+    {0x0041, " (getb)"},
+    {0x0042, " (getf)"},
+    {0x0044, " (getl)"},
+    {0x0045, " (getlb)"},
+    {0x0046, " (getlf)"},
+    {0x00b0, " (putlluc)"},
+    {0x00b4, " (putllc)"},
+    {0x00b8, " (putqlluc)"},
+    {0x00d0, " (getllar)"},
+  };
+  static const struct value_string_pair mfc_others[] =
+  {
+    {0x0028, " (puts)"},
+    {0x0029, " (putbs)"},
+    {0x002a, " (putfs)"},
+    {0x0030, " (putr)"},
+    {0x0031, " (putrb)"},
+    {0x0032, " (putrf)"},
+    {0x0034, " (putrl)"},
+    {0x0035, " (putrlb)"},
+    {0x0036, " (putrlf)"},
+    {0x0048, " (gets)"},
+    {0x0049, " (getbs)"},
+    {0x004a, " (getfs)"},
+    {0x0080, " (sdcrt)"},
+    {0x0081, " (sdcrtst)"},
+    {0x0089, " (sdcrz)"},
+    {0x008d, " (sdcrst)"},
+    {0x008f, " (sdcrf)"},
+    {0x00a0, " (sndsig)"},
+    {0x00a1, " (sndsigb)"},
+    {0x00a2, " (sndsigf)"},
+    {0x00c0, " (barrier)"},
+    {0x00c8, " (mfceieio)"},
+    {0x00cc, " (mfcsync)"},
+  };
+  unsigned i;
+  if (options->mfc_cmd_comment_level > 0)
+    {
+      for (i=0; i<sizeof(mfc_common)/sizeof(*mfc_common); ++i)
+      {
+        if (mfc_common[i].val == immed)
+          return mfc_common[i].str;
+      }
+    }
+  if (options->mfc_cmd_comment_level > 1)
+    {
+      for (i=0; i<sizeof(mfc_others)/sizeof(*mfc_others); ++i)
+      {
+        if (mfc_others[i].val == immed)
+          return mfc_others[i].str;
+      }
+    }
+  return "";
+}
+
 /* Print a Spu instruction.  */
 
 int
@@ -106,6 +229,9 @@ print_insn_spu (memaddr, info)
   unsigned int insn;
   const struct spu_opcode *index;
   enum spu_insns tag;
+  struct spu_options options;
+
+  parse_spu_options (&options, info->disassembler_options);
 
   status = (*info->read_memory_func) (memaddr, buffer, 4, info);
   if (status != 0)
@@ -251,8 +377,18 @@ print_insn_spu (memaddr, info)
 	      paren--;
 	    }
 	}
-      if (hex_value > 16)
-	(*info->fprintf_func) (info->stream, "\t# %x", hex_value);
+      if (hex_value != 0)
+        {
+          const char * comment = get_comment_for_immediate (hex_value, &options);
+          if (hex_value > 16)
+            {
+              (*info->fprintf_func) (info->stream, "\t# %x%s", hex_value, comment);
+            }
+          else if (comment[0] != '\0')
+            {
+              (*info->fprintf_func) (info->stream, "\t# %s", comment);
+            }
+        }
     }
   return 4;
 }

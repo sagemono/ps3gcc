@@ -331,6 +331,13 @@ struct bfd_link_info
   unsigned int just_syms: 1;
   /* end sce local */
 
+  /* begin sce local bugzilla 94415 */
+  /* TRUE if --ignore-reloc-overflow is specifed. If this flag is
+     asserted, all of 'relocation truncated to fit ... ' error 
+     are turned into warning. */
+  unsigned int ignore_reloc_overflow: 1;
+  /* end sce local */
+
   /* What to do with unresolved symbols in an object file.
      When producing executables the default is GENERATE_ERROR.
      When producing shared libraries the default is IGNORE.  The
@@ -433,6 +440,10 @@ struct bfd_link_info
   /* begin sce local bugzilla #2878 */
   bfd_boolean spuguid;
   /* end sce local */
+
+  /* begin sce local bugzilla #93859 */
+  bfd_boolean gc_debug;
+  /* end sce local bugzilla #93859 */
 };
 
 /* This structures holds a set of callback functions.  These are
