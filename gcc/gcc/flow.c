@@ -1,6 +1,6 @@
 /* Data flow analysis for GNU compiler.
    Copyright (C) 1987, 1988, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
-   1999, 2000, 2001, 2002, 2003, 2004, 2005 Free Software Foundation, Inc.
+   1999, 2000, 2001, 2002, 2003, 2004, 2005, 2011 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -2933,8 +2933,14 @@ mark_set_1 (struct propagate_block_info *pbi, enum rtx_code code, rtx reg, rtx c
 		     dead store that cannot be eliminated (because the
 		     same insn does something useful).  Indicate this
 		     by marking the reg being set as dying here.  */
-		  REG_NOTES (insn)
-		    = alloc_EXPR_LIST (REG_UNUSED, reg, REG_NOTES (insn));
+                  /* If there have already been REG_UNUSED in the
+                     insn_notes, avoid to append the same REG_UNUSED
+                     to the insn_notes */
+                  if (! find_reg_note (insn, REG_UNUSED, reg))
+                    {
+                      REG_NOTES (insn)
+                        = alloc_EXPR_LIST (REG_UNUSED, reg, REG_NOTES (insn));
+                    }
 		}
 	    }
 	  else
@@ -2998,7 +3004,11 @@ mark_set_1 (struct propagate_block_info *pbi, enum rtx_code code, rtx reg, rtx c
      here and count it.  */
   else if (GET_CODE (reg) == SCRATCH)
     {
-      if (flags & PROP_DEATH_NOTES)
+      /* If there have already been REG_UNUSED in the
+         insn_notes, avoid to append the same REG_UNUSED
+         to the insn_notes */
+      if ((flags & PROP_DEATH_NOTES)
+          && ! find_reg_note (insn, REG_UNUSED, reg))
 	REG_NOTES (insn)
 	  = alloc_EXPR_LIST (REG_UNUSED, reg, REG_NOTES (insn));
     }

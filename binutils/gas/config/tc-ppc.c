@@ -2839,8 +2839,7 @@ md_assemble (str)
 
 	  if (bfd_opcode_ppc_direct_call_or_jump_p(opcode)
 	      && fix->fx_addsy
-	      && symbol_constant_p (fix->fx_addsy)
-	      && ! is_local_label (fix->fx_addsy))
+	      && symbol_constant_p (fix->fx_addsy))
 	    {
 	      REMAIN_UNRESOLVED(fix);
 	    }

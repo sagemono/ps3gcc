@@ -208,7 +208,7 @@ main (int argc, char **argv)
     const char *response_file = expandargv (&argc, &argv, &expanded);
     if (response_file)
       {
-	einfo (_("%X%P: can't set BFD default target to `%s': %E\n"), 
+	einfo (_("%X%P: error: can't set BFD default target to `%s': %E\n"), 
 	       response_file);
 	xexit (1);
       }
@@ -244,7 +244,7 @@ main (int argc, char **argv)
      a different target.  The macro TARGET is defined by Makefile.  */
   if (! bfd_set_default_target (TARGET))
     {
-      einfo (_("%X%P: can't set BFD default target to `%s': %E\n"), TARGET);
+      einfo (_("%X%P: error: can't set BFD default target to `%s': %E\n"), TARGET);
       xexit (1);
     }
 
@@ -540,10 +540,10 @@ main (int argc, char **argv)
 	      dst = fopen (dst_name, FOPEN_WB);
 
 	      if (!src)
-		einfo (_("%X%P: unable to open for source of copy `%s'\n"),
+		einfo (_("%X%P: error: unable to open for source of copy `%s'\n"),
 		       output_filename);
 	      if (!dst)
-		einfo (_("%X%P: unable to open for destination of copy `%s'\n"),
+		einfo (_("%X%P: error: unable to open for destination of copy `%s'\n"),
 		       dst_name);
 	      while ((l = fread (buf, 1, bsize, src)) > 0)
 		{
@@ -850,7 +850,7 @@ add_keepsyms_file (const char *filename)
   if (file == NULL)
     {
       bfd_set_error (bfd_error_system_call);
-      einfo ("%X%P: %s: %E\n", filename);
+      einfo ("%X%P: error: %s: %E\n", filename);
       return;
     }
 
@@ -1022,7 +1022,7 @@ multiple_definition (struct bfd_link_info *info ATTRIBUTE_UNUSED,
 		     bfd_vma oval,
 		     bfd *nbfd,
 		     asection *nsec,
-		     bfd_vma nval)
+		     bfd_vma nval __attribute__ ((unused)))
 {
   /* If either section has the output_section field set to
      bfd_abs_section_ptr, it means that the section is being
@@ -1037,8 +1037,8 @@ multiple_definition (struct bfd_link_info *info ATTRIBUTE_UNUSED,
 	  && bfd_is_abs_section (nsec->output_section)))
     return TRUE;
 
-  einfo (_("%X%C: multiple definition of `%T'\n"),
-	 nbfd, nsec, nval, name);
+  einfo (_("%X%B: error: multiple definition of `%T'\n"),
+	 nbfd, name);
   if (obfd != NULL)
     einfo (_("%D: first defined here\n"), obfd, osec, oval);
 
@@ -1385,8 +1385,8 @@ undefined_symbol (struct bfd_link_info *info ATTRIBUTE_UNUSED,
       if (error_count < MAX_ERRORS_IN_A_ROW)
 	{
 	  if (error)
-	    einfo (_("%X%C: undefined reference to `%T'\n"),
-		   abfd, section, address, name);
+	    einfo (_("%X%B: error: undefined reference to `%T'\n"),
+		   abfd, name);
 	  else
 	    einfo (_("%C: warning: undefined reference to `%T'\n"),
 		   abfd, section, address, name);
@@ -1394,8 +1394,8 @@ undefined_symbol (struct bfd_link_info *info ATTRIBUTE_UNUSED,
       else if (error_count == MAX_ERRORS_IN_A_ROW)
 	{
 	  if (error)
-	    einfo (_("%X%D: more undefined references to `%T' follow\n"),
-		   abfd, section, address, name);
+	    einfo (_("%X%B: error: more undefined references to `%T' follow\n"),
+		   abfd, name);
 	  else
 	    einfo (_("%D: warning: more undefined references to `%T' follow\n"),
 		   abfd, section, address, name);
@@ -1408,7 +1408,7 @@ undefined_symbol (struct bfd_link_info *info ATTRIBUTE_UNUSED,
       if (error_count < MAX_ERRORS_IN_A_ROW)
 	{
 	  if (error)
-	    einfo (_("%X%B: undefined reference to `%T'\n"),
+	    einfo (_("%X%B: error: undefined reference to `%T'\n"),
 		   abfd, name);
 	  else
 	    einfo (_("%B: warning: undefined reference to `%T'\n"),
@@ -1417,7 +1417,7 @@ undefined_symbol (struct bfd_link_info *info ATTRIBUTE_UNUSED,
       else if (error_count == MAX_ERRORS_IN_A_ROW)
 	{
 	  if (error)
-	    einfo (_("%X%B: more undefined references to `%T' follow\n"),
+	    einfo (_("%X%B: error: more undefined references to `%T' follow\n"),
 		   abfd, name);
 	  else
 	    einfo (_("%B: warning: more undefined references to `%T' follow\n"),
@@ -1448,13 +1448,13 @@ reloc_overflow (struct bfd_link_info *info ATTRIBUTE_UNUSED,
 		const char *reloc_name,
 		bfd_vma addend,
 		bfd *abfd,
-		asection *section,
-		bfd_vma address)
+		asection *section __attribute ((unused)),
+		bfd_vma address __attribute ((unused)))
 {
   if (overflow_cutoff_limit == -1)
     return TRUE;
 
-  einfo ("%X%C:", abfd, section, address);
+  einfo ("%X%B: error:", abfd);
 
   if (overflow_cutoff_limit >= 0
       && overflow_cutoff_limit-- == 0)
@@ -1503,11 +1503,11 @@ static bfd_boolean
 reloc_dangerous (struct bfd_link_info *info ATTRIBUTE_UNUSED,
 		 const char *message,
 		 bfd *abfd,
-		 asection *section,
-		 bfd_vma address)
+		 asection *section __attribute ((unused)),
+		 bfd_vma address __attribute__ ((unused)))
 {
-  einfo (_("%X%C: dangerous relocation: %s\n"),
-	 abfd, section, address, message);
+  einfo (_("%X%B: error: dangerous relocation: %s\n"),
+	 abfd, message);
   return TRUE;
 }
 
@@ -1518,11 +1518,11 @@ static bfd_boolean
 unattached_reloc (struct bfd_link_info *info ATTRIBUTE_UNUSED,
 		  const char *name,
 		  bfd *abfd,
-		  asection *section,
-		  bfd_vma address)
+		  asection *section __attribute__ ((unused)),
+		  bfd_vma address __attribute__ ((unused)))
 {
-  einfo (_("%X%C: reloc refers to symbol `%T' which is not being output\n"),
-	 abfd, section, address, name);
+  einfo (_("%X%B: error: reloc refers to symbol `%T' which is not being output\n"),
+	 abfd, name);
   return TRUE;
 }
 

@@ -1,11 +1,12 @@
 /* A pass for lowering trees to RTL.
-   Copyright (C) 2004, 2005 Free Software Foundation, Inc.
+   Copyright (C) 2004, 2005, 2011
+   Free Software Foundation, Inc.
 
 This file is part of GCC.
 
 GCC is free software; you can redistribute it and/or modify
 it under the terms of the GNU General Public License as published by
-the Free Software Foundation; either version 2, or (at your option)
+the Free Software Foundation; either version 3, or (at your option)
 any later version.
 
 GCC is distributed in the hope that it will be useful,
@@ -14,9 +15,8 @@ MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
 GNU General Public License for more details.
 
 You should have received a copy of the GNU General Public License
-along with GCC; see the file COPYING.  If not, write to
-the Free Software Foundation, 51 Franklin Street, Fifth Floor,
-Boston, MA 02110-1301, USA.  */
+along with GCC; see the file COPYING3.  If not see
+<http://www.gnu.org/licenses/>. */
 
 #include "config.h"
 #include "system.h"
@@ -377,6 +377,14 @@ has_common_area (struct stack_var *stack_var1,
       for (field = TYPE_FIELDS (type_i); field; field = TREE_CHAIN (field)) {
         if (TREE_CODE (field) == FIELD_DECL) {
           tree field_type = TREE_TYPE (field);
+
+          /** Bug94797 **/
+          if (DECL_SIZE_UNIT (field) == 0) {
+              /** In case of the variable length array type, we cannot
+                  get the size tree from field object. **/
+              return false;
+          }
+
           HOST_WIDE_INT field_size = tree_low_cst (DECL_SIZE_UNIT (field), 1);
           HOST_WIDE_INT align = DECL_ALIGN_UNIT(field) - 1;
 
@@ -894,6 +902,16 @@ expand_one_var (tree var, bool toplevel)
     expand_one_hard_reg_var (var);
   else if (use_register_for_decl (var))
     expand_one_register_var (var);
+  else if (!host_integerp (DECL_SIZE_UNIT (var), 1)) {
+      /** Bug88091
+       * The code below is almost copied from gcc original trunk
+       * r155641 (PR other/42611).
+       * Because this patch is based on GPL3, I'd like to change
+       * the copyright of this file into GPL3
+       **/
+      error ("size of variable %q+D is too large", var);
+      expand_one_error_var (var);
+  }
   else if (defer_stack_allocation (var, toplevel))
     add_stack_var (var);
   else

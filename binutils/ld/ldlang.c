@@ -3334,7 +3334,7 @@ process_insert_statements (void)
 	    }
 	  if (where == NULL)
 	    {
-	      einfo (_("%X%P: %s not found for insert\n"), i->where);
+	      einfo (_("%X%P: error: %s not found for insert\n"), i->where);
 	      continue;
 	    }
 	  /* You can't insert into the list you are moving.  */
@@ -3343,7 +3343,7 @@ process_insert_statements (void)
 	      break;
 	  if (os == where)
 	    {
-	      einfo (_("%X%P: %s not found for insert\n"), i->where);
+	      einfo (_("%X%P: error: %s not found for insert\n"), i->where);
 	      continue;
 	    }
 
@@ -4308,7 +4308,7 @@ lang_check_section_addresses (void)
 
       /* Look for an overlap.  */
       if (s_end >= os_start && s_start <= os_end)
-	einfo (_("%X%P: section %s [%V -> %V] overlaps section %s [%V -> %V]\n"),
+	einfo (_("%X%P: error: section %s [%V -> %V] overlaps section %s [%V -> %V]\n"),
 	       s->name, s_start, s_end, os->name, os_start, os_end);
     }
 
@@ -4333,7 +4333,7 @@ os_region_check (lang_output_section_statement_type *os,
     {
       if (tree != NULL)
 	{
-	  einfo (_("%X%P: address 0x%v of %B section %s"
+	  einfo (_("%X%P: error: address 0x%v of %B section %s"
 		   " is not within region %s\n"),
 		 region->current,
 		 os->bfd_section->owner,
@@ -4342,7 +4342,7 @@ os_region_check (lang_output_section_statement_type *os,
 	}
       else
 	{
-	  einfo (_("%X%P: region %s is full (%B section %s)\n"),
+	  einfo (_("%X%P: error: region %s is full (%B section %s)\n"),
 		 region->name,
 		 os->bfd_section->owner,
 		 os->bfd_section->name);
@@ -4406,7 +4406,7 @@ lang_size_sections_1
 		    || os->children.head->header.next != NULL
 		    || (os->children.head->header.type
 			!= lang_input_section_enum))
-		  einfo (_("%P%X: Internal error on COFF shared library"
+		  einfo (_("%P%X: error: Internal error on COFF shared library"
 			   " section %s\n"), os->name);
 
 		input = os->children.head->input_section.section;
@@ -5193,7 +5193,7 @@ lang_check (void)
 	  if (! bfd_merge_private_bfd_data (input_bfd, output_bfd))
 	    {
 	      if (command_line.warn_mismatch)
-		einfo (_("%P%X: failed to merge target specific data"
+		einfo (_("%P%X: error: failed to merge target specific data"
 			 " of file %B\n"), input_bfd);
 	    }
 	  if (! command_line.warn_mismatch)
@@ -6066,7 +6066,7 @@ lang_get_regions (lang_memory_region_type **region,
     *region = lang_memory_region_lookup (memspec, FALSE);
 
   if (have_lma && lma_memspec != 0)
-    einfo (_("%X%P:%S: section has both a load address and a load region\n"));
+    einfo (_("%X%P:%S: error: section has both a load address and a load region\n"));
 }
 
 void
@@ -6334,7 +6334,7 @@ lang_record_phdrs (void)
 	   pl != NULL;
 	   pl = pl->next)
 	if (! pl->used && strcmp (pl->name, "NONE") != 0)
-	  einfo (_("%X%P: section `%s' assigned to non-existent phdr `%s'\n"),
+	  einfo (_("%X%P: error: section `%s' assigned to non-existent phdr `%s'\n"),
 		 os->name, pl->name);
     }
 }
@@ -6725,7 +6725,7 @@ lang_new_vers_pattern (struct bfd_elf_version_expr *orig,
     ret->mask = BFD_ELF_VERSION_JAVA_TYPE;
   else
     {
-      einfo (_("%X%P: unknown language `%s' in version information\n"),
+      einfo (_("%X%P: error: unknown language `%s' in version information\n"),
 	     lang);
       ret->mask = BFD_ELF_VERSION_C_TYPE;
     }
@@ -6867,7 +6867,7 @@ lang_register_vers_node (const char *name,
   if ((name[0] == '\0' && lang_elf_version_info != NULL)
       || (lang_elf_version_info && lang_elf_version_info->name[0] == '\0'))
     {
-      einfo (_("%X%P: anonymous version tag cannot be combined"
+      einfo (_("%X%P: error: anonymous version tag cannot be combined"
 	       " with other version tags\n"));
       free (version);
       return;
@@ -6876,7 +6876,7 @@ lang_register_vers_node (const char *name,
   /* Make sure this node has a unique name.  */
   for (t = lang_elf_version_info; t != NULL; t = t->next)
     if (strcmp (t->name, name) == 0)
-      einfo (_("%X%P: duplicate version tag `%s'\n"), name);
+      einfo (_("%X%P: error: duplicate version tag `%s'\n"), name);
 
   lang_finalize_version_expr_head (&version->globals);
   lang_finalize_version_expr_head (&version->locals);
@@ -6896,7 +6896,7 @@ lang_register_vers_node (const char *name,
 	      while (e2 && strcmp (e1->symbol, e2->symbol) == 0)
 		{
 		  if (e1->mask == e2->mask)
-		    einfo (_("%X%P: duplicate expression `%s'"
+		    einfo (_("%X%P: error: duplicate expression `%s'"
 			     " in version information\n"), e1->symbol);
 		  e2 = e2->next;
 		}
@@ -6905,7 +6905,7 @@ lang_register_vers_node (const char *name,
 	    for (e2 = t->locals.remaining; e2 != NULL; e2 = e2->next)
 	      if (strcmp (e1->pattern, e2->pattern) == 0
 		  && e1->mask == e2->mask)
-		einfo (_("%X%P: duplicate expression `%s'"
+		einfo (_("%X%P: error: duplicate expression `%s'"
 			 " in version information\n"), e1->pattern);
 	}
     }
@@ -6922,7 +6922,7 @@ lang_register_vers_node (const char *name,
 	      while (e2 && strcmp (e1->symbol, e2->symbol) == 0)
 		{
 		  if (e1->mask == e2->mask)
-		    einfo (_("%X%P: duplicate expression `%s'"
+		    einfo (_("%X%P: error: duplicate expression `%s'"
 			     " in version information\n"),
 			   e1->symbol);
 		  e2 = e2->next;
@@ -6932,7 +6932,7 @@ lang_register_vers_node (const char *name,
 	    for (e2 = t->globals.remaining; e2 != NULL; e2 = e2->next)
 	      if (strcmp (e1->pattern, e2->pattern) == 0
 		  && e1->mask == e2->mask)
-		einfo (_("%X%P: duplicate expression `%s'"
+		einfo (_("%X%P: error: duplicate expression `%s'"
 			 " in version information\n"), e1->pattern);
 	}
     }
@@ -6972,7 +6972,7 @@ lang_add_vers_depend (struct bfd_elf_version_deps *list, const char *name)
 	}
     }
 
-  einfo (_("%X%P: unable to find version dependency `%s'\n"), name);
+  einfo (_("%X%P: error: unable to find version dependency `%s'\n"), name);
 
   return ret;
 }
@@ -6994,7 +6994,7 @@ lang_do_version_exports_section (void)
       len = sec->size;
       contents = xmalloc (len);
       if (!bfd_get_section_contents (is->the_bfd, sec, contents, 0, len))
-	einfo (_("%X%P: unable to read .exports section contents\n"), sec);
+	einfo (_("%X%P: error: unable to read .exports section contents\n"), sec);
 
       p = contents;
       while (p < contents + len)

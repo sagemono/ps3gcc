@@ -1,6 +1,6 @@
 [SCE CONFIDENTIAL DOCUMENT]
 Toolchain src GCC41
-                    Copyright(C) 2011 Sony Computer Entertainment Inc.
+                    Copyright(C) 2012 Sony Computer Entertainment Inc.
                                                    All Rights Reserved.
 ======================================================================
 このパッケージは、PlayStation(R)3 Programmer Tool Toolchain パッケージ
@@ -30,6 +30,8 @@ diff-from-gcc           GCC 4.1.1およびBinutils 2.17からの差分情報
                         これには、当社による変更点のみが含まれます。
 binutils/               GNU development toolsソースファイル
 gcc/                    GNU Compiler Collection (GCC)ソースファイル
+pgo/                    GCCが使用する Profile-Guided Optimization framework
+                        (PGO)のソースファイル
 mingw/                  ダウンロードしたMinGWランタイムを置く場所
 
 ----------------------------------------------------------------------
@@ -48,7 +50,7 @@ PlayStation(R)3 Programmer Tool Toolchain を、
 
 例:
     mkdir work/src
-    unzip toolchain-src-3.7.0-GCC411.zip -d work/src
+    unzip toolchain-src-4.2.0-GCC411.zip -d work/src
     mkdir work/build
     cd work/build
     ../src/build.sh

@@ -81,7 +81,7 @@ ldctor_add_set_entry (struct bfd_link_hash_entry *h,
     {
       if (p->reloc != reloc)
 	{
-	  einfo (_("%P%X: Different relocs used in set %s\n"),
+	  einfo (_("%P%X: error: Different relocs used in set %s\n"),
 		 h->root.string);
 	  return;
 	}
@@ -99,7 +99,7 @@ ldctor_add_set_entry (struct bfd_link_hash_entry *h,
 	  && strcmp (bfd_get_target (section->owner),
 		     bfd_get_target (p->elements->section->owner)) != 0)
 	{
-	  einfo (_("%P%X: Different object file formats composing set %s\n"),
+	  einfo (_("%P%X: error: Different object file formats composing set %s\n"),
 		 h->root.string);
 	  return;
 	}
@@ -278,7 +278,7 @@ ldctor_build_sets (void)
 	{
 	  if (link_info.relocatable)
 	    {
-	      einfo (_("%P%X: %s does not support reloc %s for set %s\n"),
+	      einfo (_("%P%X: error: %s does not support reloc %s for set %s\n"),
 		     bfd_get_target (output_bfd),
 		     bfd_get_reloc_code_name (p->reloc),
 		     p->h->root.string);
@@ -292,7 +292,7 @@ ldctor_build_sets (void)
 					   p->reloc);
 	  if (howto == NULL)
 	    {
-	      einfo (_("%P%X: %s does not support reloc %s for set %s\n"),
+	      einfo (_("%P%X: error: %s does not support reloc %s for set %s\n"),
 		     bfd_get_target (p->elements->section->owner),
 		     bfd_get_reloc_code_name (p->reloc),
 		     p->h->root.string);
@@ -313,7 +313,7 @@ ldctor_build_sets (void)
 	    size = QUAD;
 	  break;
 	default:
-	  einfo (_("%P%X: Unsupported size %d for set %s\n"),
+	  einfo (_("%P%X: error: Unsupported size %d for set %s\n"),
 		 bfd_get_reloc_size (howto), p->h->root.string);
 	  size = LONG;
 	  break;

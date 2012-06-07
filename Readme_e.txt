@@ -1,6 +1,6 @@
 [SCE CONFIDENTIAL DOCUMENT]
 Toolchain src GCC41
-                    Copyright(C) 2011 Sony Computer Entertainment Inc.
+                    Copyright(C) 2012 Sony Computer Entertainment Inc.
                                                    All Rights Reserved.
 ======================================================================
 This package contains source codes for GCC 4.1 provided in 
@@ -29,8 +29,10 @@ build-mp-lv2.sh         script for rebuilding Lv-2 PPU toolchain for Windows
 build-ms-lv2.sh         script for rebuilding Lv-2 SPU toolchain for Windows
 diff-from-gcc           differences from GCC 4.1.1 and Binutils 2.17
                         Only the changes made by our company are included.
-binutils/               GNU development tools source file
-gcc/                    GNU Compiler Collection (GCC) source file
+binutils/               GNU development tools source files
+gcc/                    GNU Compiler Collection (GCC) source files
+pgo/                    Source files of Profile-Guided Optimization framework
+                        (PGO) used by GCC
 mingw/                  place for downloaded MinGW runtime
 
 ----------------------------------------------------------------------
@@ -47,7 +49,7 @@ environment variables.  See comments in script files for details.
 
 Example:
     mkdir work/src
-    unzip toolchain-src-3.7.0-GCC411.zip -d work/src
+    unzip toolchain-src-4.2.0-GCC411.zip -d work/src
     mkdir work/build
     cd work/build
     ../src/build.sh

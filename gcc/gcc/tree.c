@@ -4538,6 +4538,10 @@ tree_int_cst_compare (tree t1, tree t2)
 int
 host_integerp (tree t, int pos)
 {
+    if (t == NULL_TREE) {
+        return 0;
+    }
+
   return (TREE_CODE (t) == INTEGER_CST
 	  && ! TREE_OVERFLOW (t)
 	  && ((TREE_INT_CST_HIGH (t) == 0

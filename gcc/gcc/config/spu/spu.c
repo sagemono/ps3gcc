@@ -89,6 +89,10 @@ static bool spu_cannot_modify_jumps_p 		(void);
 
 static void fix_range (const char *);
 
+/** Bug 83845 **/
+static bool spu_call_saved_register_used (tree argument_list);
+
+
 extern const char *reg_names[];
 rtx spu_compare_op0, spu_compare_op1;
 
@@ -6591,18 +6595,89 @@ spu_eh_return_filter_mode (void)
   return fast_mode;
 }
 
+
+/**
+ * Bug83845
+ * Check whether the parameter register is a kind of call_saved one.
+ * Return true if a parameter register is a call_saved one.
+ * Otherwise, return false.
+ *
+ * This function is for checking that the target function is OK for
+ * sibcall optimization. If the target function uses a register which
+ * should be restored after returning the target function, the target
+ * function shouldn't be a sibcall optimized one.
+ **/
+static bool
+spu_call_saved_register_used (tree argument_list)
+{
+    /** SPU parameter registers are r3-r74 **/
+    int parameter_num = 3;
+    tree parameter;
+    tree type;
+    enum machine_mode mode;
+
+    while (argument_list != NULL_TREE) {
+        parameter = TREE_VALUE (argument_list);
+        argument_list = TREE_CHAIN (argument_list);
+
+        gcc_assert (parameter);
+
+        type = TREE_TYPE (parameter);
+        gcc_assert (type);
+
+        mode = TYPE_MODE (type);
+        gcc_assert (mode);
+
+        if (mode == BLKmode) {
+            int i = (int_size_in_bytes(type)+15) / 16;
+            for (; i > 0; i--) {
+                if ( call_used_regs[parameter_num] == 0) {
+                    return true;
+                }
+
+                parameter_num++; /** use one register **/
+            }
+        } else { /** any mode other than BLKmode uses 1 register **/
+            if ( call_used_regs[parameter_num] == 0) {
+                return true;
+            }
+            
+            parameter_num++; /** use one register **/
+        }
+
+        if (parameter_num > 74) break;
+    }
+
+    return false;
+}
+
 /* Decide whether we can make a sibling call to a function.  DECL is the
    declaration of the function being targeted by the call and EXP is the
    CALL_EXPR representing the call.  */
 
 static bool
-spu_function_ok_for_sibcall (tree decl, tree exp ATTRIBUTE_UNUSED)
+spu_function_ok_for_sibcall (tree decl, tree exp)
 {
+  /** Bug83845
+      If decl == NULL_TREE, then the call is an indirect one.
+      Because this function is called before register allocation,
+      we don't know whether the register for indirect call is
+      caller save or callee save. So we just avoid sibcall optimization
+      in this situation. **/
+  if (flag_call_saved && decl == NULL_TREE)
+    return false;
+
   if (spu_init_fini_function_p (decl))
     return false;
 
   if (TARGET_LARGE_MEM)
     return false;
+
+  /** Bug83845
+      Check whether the parameter register includes a call_saved register. **/
+  if (TREE_OPERAND (exp, 1) &&
+      spu_call_saved_register_used (TREE_OPERAND (exp, 1)))
+      return false;
 
   return true;
 }

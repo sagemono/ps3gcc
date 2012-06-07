@@ -1098,7 +1098,7 @@ phdr_type:
 			  else
 			    {
 			      einfo (_("\
-%X%P:%S: unknown phdr type `%s' (try integer literal)\n"),
+%X%P:%S: error: unknown phdr type `%s' (try integer literal)\n"),
 				     s);
 			      $$ = exp_intop (0);
 			    }
@@ -1122,7 +1122,7 @@ phdr_qualifiers:
 		  else if (strcmp ($1, "FLAGS") == 0 && $2 != NULL)
 		    $$.flags = $2;
 		  else
-		    einfo (_("%X%P:%S: PHDRS syntax error at `%s'\n"), $1);
+		    einfo (_("%X%P:%S: error: PHDRS syntax error at `%s'\n"), $1);
 		}
 	|	AT '(' exp ')' phdr_qualifiers
 		{

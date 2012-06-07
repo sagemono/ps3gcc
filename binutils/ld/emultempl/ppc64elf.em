@@ -127,7 +127,7 @@ get_tls_section_in_just_symbol_object (void)
 	  if ((sec->flags & SEC_THREAD_LOCAL) != 0)
 	    {
 	      if (elf_hash_table (&link_info)->tls_sec != NULL)
-		einfo ("%X%P: TLS section conflicts with %s\n", sec->owner->filename);
+		einfo ("%X%P: error: TLS section conflicts with %s\n", sec->owner->filename);
 	      elf_hash_table (&link_info)->tls_sec = sec;
 	      return sec;
 	    }
@@ -147,7 +147,7 @@ ppc_before_allocation (void)
       if (! link_info.relocatable
 	  && !ppc64_elf_edit_opd (output_bfd, &link_info, no_opd_opt,
 				  non_overlapping_opd))
-	einfo ("%X%P: can not edit %s %E\n", "opd");
+	einfo ("%X%P: error: can not edit %s %E\n", "opd");
 
       tls_sec = ppc64_elf_tls_setup (output_bfd, &link_info);
 
@@ -163,7 +163,7 @@ ppc_before_allocation (void)
 	  one_lang_size_sections_pass (NULL, TRUE);
 
 	  if (!ppc64_elf_tls_optimize (output_bfd, &link_info))
-	    einfo ("%X%P: TLS problem %E\n");
+	    einfo ("%X%P: error: TLS problem %E\n");
 
 	  /* We must not cache anything from the preliminary sizing.  */
 	  lang_reset_memory_regions ();
@@ -172,7 +172,7 @@ ppc_before_allocation (void)
       if (!no_toc_opt
 	  && !link_info.relocatable
 	  && !ppc64_elf_edit_toc (output_bfd, &link_info))
-	einfo ("%X%P: can not edit %s %E\n", "toc");
+	einfo ("%X%P: error: can not edit %s %E\n", "toc");
     }
 
   gld${EMULATION_NAME}_before_allocation ();
@@ -299,7 +299,7 @@ ppc_add_stub_section (const char *stub_sec_name, asection *input_section)
     return stub_sec;
 
  err_ret:
-  einfo ("%X%P: can not make stub section: %E\n");
+  einfo ("%X%P: error: can not make stub section: %E\n");
   return NULL;
 }
 
@@ -356,7 +356,7 @@ build_section_lists (lang_statement_union_type *statement)
 	  && i->output_section->owner == output_bfd)
 	{
 	  if (!ppc64_elf_next_input_section (&link_info, i))
-	    einfo ("%X%P: can not size stub section: %E\n");
+	    einfo ("%X%P: error: can not size stub section: %E\n");
 	}
     }
 }
@@ -386,7 +386,7 @@ ppc_finish (void)
       int ret = ppc64_elf_setup_section_lists (output_bfd, &link_info,
 					       no_multi_toc);
       if (ret < 0)
-	einfo ("%X%P: can not size stub section: %E\n");
+	einfo ("%X%P: error: can not size stub section: %E\n");
       else if (ret > 0)
 	{
 	  toc_section = bfd_get_section_by_name (output_bfd, ".got");
@@ -403,7 +403,7 @@ ppc_finish (void)
 				     group_size,
 				     &ppc_add_stub_section,
 				     &ppc_layout_sections_again))
-	    einfo ("%X%P: can not size stub section: %E\n");
+	    einfo ("%X%P: error: can not size stub section: %E\n");
 	}
     }
 
@@ -415,7 +415,7 @@ ppc_finish (void)
       asection *toc = bfd_get_section_by_name (output_bfd, ".toc");
       if (toc != NULL
 	  && bfd_section_size (output_bfd, toc) > 0x10000)
-	einfo ("%X%P: TOC section size exceeds 64k\n");
+	einfo ("%X%P: error: TOC section size exceeds 64k\n");
     }
 
   if (stub_added)
@@ -426,7 +426,7 @@ ppc_finish (void)
       emit_stub_syms |= link_info.emitrelocations;
       if (!ppc64_elf_build_stubs (emit_stub_syms, &link_info,
 				  config.stats ? &msg : NULL))
-	einfo ("%X%P: can not build stubs: %E\n");
+	einfo ("%X%P: error: can not build stubs: %E\n");
 
       for (line = msg; line != NULL; line = endline)
 	{

@@ -1422,7 +1422,7 @@ parse_args (unsigned argc, char **argv)
             if (new_size)
               config.hash_table_size = new_size;
             else
-              einfo (_("%P%X: --hash-size needs a numeric argument\n"));
+              einfo (_("%P%X: error: --hash-size needs a numeric argument\n"));
           }
           break;
 	}

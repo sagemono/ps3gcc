@@ -48,7 +48,7 @@ spu_after_open (void)
       && !link_info.relocatable
       && link_info.input_bfds != NULL
       && !spu_elf_create_sections (output_bfd, &link_info))
-    einfo ("%X%P: can not create note section: %E\n");
+    einfo ("%X%P: error: can not create note section: %E\n");
 
   gld${EMULATION_NAME}_after_open ();
 }
@@ -77,7 +77,7 @@ spu_finish (void)
 
       s = spu_elf_check_vma (output_bfd, local_store_lo, local_store_hi);
       if (s != NULL)
-	einfo ("%X%P: %A exceeds local store range\n", s);
+	einfo ("%X%P: error %A exceeds local store range\n", s);
     }
 
    /* Set EFLAGS */

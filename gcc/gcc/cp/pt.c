@@ -10628,7 +10628,8 @@ more_specialized_fn (tree pat1, tree pat2, int len)
 
   processing_template_decl++;
 
-  while (len--)
+  while (len-- &&
+         (args1 != NULL_TREE && args2 != NULL_TREE))
     {
       tree arg1 = TREE_VALUE (args1);
       tree arg2 = TREE_VALUE (args2);

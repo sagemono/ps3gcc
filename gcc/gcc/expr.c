@@ -8227,6 +8227,7 @@ expand_expr_real_1 (tree exp, rtx target, enum machine_mode tmode,
 				      (HOST_WIDE_INT) 0,
 				      TYPE_MODE (TREE_TYPE (TREE_OPERAND (exp, 1))));
 	      op1 = plus_constant (op1, INTVAL (constant_part));
+          op1 = gen_int_mode (INTVAL (op1), tmode);
 	      if (modifier != EXPAND_SUM && modifier != EXPAND_INITIALIZER)
 		op1 = force_operand (op1, target);
 	      return REDUCE_BIT_FIELD (op1);

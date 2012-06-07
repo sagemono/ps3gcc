@@ -151,13 +151,13 @@ add_cref (const char *name,
     {
       if (!bfd_hash_table_init (&cref_table.root, cref_hash_newfunc,
 				sizeof (struct cref_hash_entry)))
-	einfo (_("%X%P: bfd_hash_table_init of cref table failed: %E\n"));
+	einfo (_("%X%P: error: bfd_hash_table_init of cref table failed: %E\n"));
       cref_initialized = TRUE;
     }
 
   h = cref_hash_lookup (&cref_table, name, TRUE, FALSE);
   if (h == NULL)
-    einfo (_("%X%P: cref_hash_lookup failed: %E\n"));
+    einfo (_("%X%P: error: cref_hash_lookup failed: %E\n"));
 
   for (r = h->refs; r != NULL; r = r->next)
     if (r->abfd == abfd)
@@ -588,9 +588,8 @@ check_reloc_refs (bfd *abfd, asection *sec, void *iarg)
 	     in OUTSECNAME.  This reloc is from a section which is
 	     mapped into a section from which references to OUTSECNAME
 	     are prohibited.  We must report an error.  */
-	  einfo (_("%X%C: prohibited cross reference from %s to `%T' in %s\n"),
-		 abfd, sec, q->address, outsecname,
-		 bfd_asymbol_name (*q->sym_ptr_ptr), outdefsecname);
+	  einfo (_("%X%B: error: prohibited cross reference from %s to `%T' in %s\n"),
+		 abfd, bfd_asymbol_name (*q->sym_ptr_ptr), outdefsecname);
 	}
     }
 

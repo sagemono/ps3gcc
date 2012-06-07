@@ -2694,9 +2694,16 @@ spu_elf_relocate_section (bfd *output_bfd,
 		      htab->sfixup->reloc_count);
 #endif
 	    }
-	  /* When it is not a dynamic symbol, leave the add instruction. */
-	  else if (r_type == R_SPU_ADD_PIC)
-	    continue;
+	  else if (r_type == R_SPU_ADD_PIC) {
+          /* When it is a defined and regular symbol leave the add
+             instruction. */
+          if (h == NULL || (h->def_regular || ELF_COMMON_DEF_P (h)))
+              continue;
+          /* This symbol is undefined and weak and should be changed
+             to a reg copy. */
+          relocation = 0x1c000000;
+          addend = 0;
+      }
 	  break;
 	}
 

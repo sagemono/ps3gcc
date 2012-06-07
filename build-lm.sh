@@ -1,9 +1,9 @@
 #! /bin/csh
 # SCE CONFIDENTIAL
-# Copyright(C) 2011 Sony Computer Entertainment Inc.
+# Copyright(C) 2012 Sony Computer Entertainment Inc.
 # All Rights Reserved.
 
-# This script builds and installs linux->mingw toolchain for SDK3.7.0-GCC411.
+# This script builds and installs linux->mingw toolchain for SDK4.2.0-GCC411.
 # If environment variable TOOLCHAIN_BUILDDIR is set, it is used as a working
 # directory to build the toolchain.  The default is the current working
 # directory.

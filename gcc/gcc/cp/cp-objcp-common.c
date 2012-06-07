@@ -179,6 +179,11 @@ cxx_initialize_diagnostics (diagnostic_context *context)
 int
 cxx_types_compatible_p (tree x, tree y)
 {
+  /** Bug93656
+      Should check the tree x or y shouldn't be error_mark_node. **/
+  if (x == error_mark_node || y == error_mark_node)
+    return 0;
+
   if (same_type_ignoring_top_level_qualifiers_p (x, y))
     return 1;
 

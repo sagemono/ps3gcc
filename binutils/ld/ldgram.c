@@ -3868,7 +3868,7 @@ yyreduce:
 			  else
 			    {
 			      einfo (_("\
-%X%P:%S: unknown phdr type `%s' (try integer literal)\n"),
+%X%P:%S: error: unknown phdr type `%s' (try integer literal)\n"),
 				     s);
 			      (yyval.etree) = exp_intop (0);
 			    }
@@ -3895,7 +3895,7 @@ yyreduce:
 		  else if (strcmp ((yyvsp[(1) - (3)].name), "FLAGS") == 0 && (yyvsp[(2) - (3)].etree) != NULL)
 		    (yyval.phdr).flags = (yyvsp[(2) - (3)].etree);
 		  else
-		    einfo (_("%X%P:%S: PHDRS syntax error at `%s'\n"), (yyvsp[(1) - (3)].name));
+		    einfo (_("%X%P:%S: error: PHDRS syntax error at `%s'\n"), (yyvsp[(1) - (3)].name));
 		}
     break;
 

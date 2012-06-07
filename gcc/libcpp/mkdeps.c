@@ -60,9 +60,24 @@ static const char *munge (const char *, struct deps *);
 static const char *
 munge (const char *filename, struct deps *d)
 {
-  int len, do_vs_quote = 0, do_cygdrive = 0;
+  int len, do_vs_quote = 0, do_cygdrive = 0, vs_already_quated = 0;
   const char *p, *q;
   char *dst, *buffer;
+
+  /** Bug96269
+   *  To avoid adding an extra `"' around filename,
+   *  we should check whether the filename is already
+   *  quated.
+   *
+   *  This isn't correct very much, but enough for this
+   *  purpose I think.
+   **/
+  if (filename && 
+      *filename == '"' &&
+      *(filename + strlen(filename) - 1) == '"') {
+      vs_already_quated = 1;
+  }
+
 
   for (p = filename, len = 0; *p; p++, len++)
     {
@@ -93,7 +108,7 @@ munge (const char *filename, struct deps *d)
 	}
     }
 
-  if (do_vs_quote)
+  if (do_vs_quote && !vs_already_quated)
     len += 2;
   /* begin sce local, bugzilla 51130 */
   else if (
@@ -112,7 +127,7 @@ munge (const char *filename, struct deps *d)
 
   p = filename;
   dst = buffer;
-  if (do_vs_quote)
+  if (do_vs_quote && !vs_already_quated)
     *dst++ = '"';
   /* begin sce local, bugzilla 51130 */
   else if (do_cygdrive)
@@ -147,7 +162,7 @@ munge (const char *filename, struct deps *d)
       *dst = *p;
     }
 
-  if (do_vs_quote)
+  if (do_vs_quote && !vs_already_quated)
     *dst++ = '"';
   *dst = '\0';
   return buffer;

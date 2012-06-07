@@ -533,7 +533,7 @@ fold_name (etree_type *tree)
 		  if (output_section == NULL)
 		    {
 		      if (expld.phase != lang_mark_phase_enum)
-			einfo (_("%X%S: unresolvable symbol `%s'"
+			einfo (_("%X%S: error: unresolvable symbol `%s'"
 				 " referenced in expression\n"),
 			       tree->name.name);
 		    }
@@ -658,7 +658,7 @@ exp_fold_tree_1 (etree_type *tree)
     case etree_assert:
       exp_fold_tree_1 (tree->assert_s.child);
       if (expld.phase == lang_final_phase_enum && !expld.result.value)
-	einfo ("%X%P: %s\n", tree->assert_s.message);
+	einfo ("%X%P: error: %s\n", tree->assert_s.message);
       break;
 
     case etree_unary:

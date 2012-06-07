@@ -1,1 +1,4 @@
 LDFLAGS += -Wl,--large-address-aware
+
+# Increase stack limit to same as Linux default.
+LDFLAGS += -Wl,--stack,8388608

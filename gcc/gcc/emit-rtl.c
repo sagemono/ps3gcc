@@ -1,6 +1,6 @@
 /* Emit RTL for the GCC expander.
    Copyright (C) 1987, 1988, 1992, 1993, 1994, 1995, 1996, 1997, 1998,
-   1999, 2000, 2001, 2002, 2003, 2004, 2005 Free Software Foundation, Inc.
+   1999, 2000, 2001, 2002, 2003, 2004, 2005, 2011 Free Software Foundation, Inc.
 
 This file is part of GCC.
 
@@ -4936,8 +4936,9 @@ init_virtual_regs (struct emit_status *es)
 
 
 /* Used by copy_insn_1 to avoid copying SCRATCHes more than once.  */
-static rtx copy_insn_scratch_in[MAX_RECOG_OPERANDS];
-static rtx copy_insn_scratch_out[MAX_RECOG_OPERANDS];
+#define COPY_INSN_N_SCRATCHES_MAXSIZ (MAX_RECOG_OPERANDS * 2)
+static rtx copy_insn_scratch_in[COPY_INSN_N_SCRATCHES_MAXSIZ];
+static rtx copy_insn_scratch_out[COPY_INSN_N_SCRATCHES_MAXSIZ];
 static int copy_insn_n_scratches;
 
 /* When an insn is being copied by copy_insn_1, this is nonzero if we have
@@ -5071,7 +5072,7 @@ copy_insn_1 (rtx orig)
   if (code == SCRATCH)
     {
       i = copy_insn_n_scratches++;
-      gcc_assert (i < MAX_RECOG_OPERANDS);
+      gcc_assert (i < COPY_INSN_N_SCRATCHES_MAXSIZ);
       copy_insn_scratch_in[i] = orig;
       copy_insn_scratch_out[i] = copy;
     }
@@ -5490,14 +5491,14 @@ emit_copy_of_insn_after (rtx insn, rtx after)
       {
 	if (GET_CODE (link) == EXPR_LIST)
 	  REG_NOTES (new)
-	    = copy_insn_1 (gen_rtx_EXPR_LIST (REG_NOTE_KIND (link),
-					      XEXP (link, 0),
-					      REG_NOTES (new)));
+	    = gen_rtx_EXPR_LIST (REG_NOTE_KIND (link),
+                                 copy_insn_1 (XEXP (link, 0)),
+                                 REG_NOTES (new));
 	else
 	  REG_NOTES (new)
 	    = copy_insn_1 (gen_rtx_INSN_LIST (REG_NOTE_KIND (link),
-					      XEXP (link, 0),
-					      REG_NOTES (new)));
+                                              XEXP (link, 0),
+                                              REG_NOTES (new)));
       }
 
   /* Fix the libcall sequences.  */

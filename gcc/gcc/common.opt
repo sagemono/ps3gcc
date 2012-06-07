@@ -301,7 +301,7 @@ Common Report Var(flag_btr_bb_exclusive)
 Restrict target load migration not to re-use registers in any basic block
 
 fcall-saved-
-Common Joined RejectNegative
+Common Joined RejectNegative Var(flag_call_saved, 1)
 -fcall-saved-<register>	Mark <register> as being preserved across functions
 
 fcall-used-
