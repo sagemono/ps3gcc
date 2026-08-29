@@ -1,0 +1,43 @@
+2006-09-27  Doug Evans  <dje@transmeta.com>
+
+	* pgo-io.h: Don't include gcov-config.h, libext/gcov-io.h.
+	(gcov_info,gcov_fn_info): Provide forward decls.
+
+2006-09-26  Doug Evans  <dje@transmeta.com>
+
+	* pgo-io.h (pgo_io_c): Delete curr_gcov_info_offset.
+
+2006-09-24  Doug Evans  <dje@transmeta.com>
+
+	* pgo-io.h ({read,do}_rec_{interval,pow2}): Remove `flags' arg.
+	* pgo.h (PGO_INTERVAL_FLAG_MAY_BE_LESS,PGO_INTERVAL_FLAG_MAY_BE_MORE,
+	PGO_POW2_FLAG_MAY_BE_OTHER): Delete.  No longer used in gcc 4.1.0.
+
+2006-09-16  Doug Evans  <dje@transmeta.com>
+
+	* pgo-io.h (pgo_io_c): New members iptr_size, dptr_size.
+	* pgo.h (pgo_rec_e): New enum values PGO_REC_UNKNOWN,
+	PGO_REC_COUNTER_MIN.
+
+2006-09-14  Doug Evans  <dje@transmeta.com>
+
+	* pgo-io.h (pgo_io_c): New methods read_rec_interval,read_rec_pow2,
+	read_rec_delta,do_rec_interval,do_rec_pow2,do_rec_delta.
+	* pgo.h (PGO_INTERVAL_FLAG_MAY_BE_LESS): New macro.
+	(PGO_INTERVAL_FLAG_MAY_BE_MORE): New macro.
+	(PGO_POW2_FLAG_MAY_BE_OTHER): New macro.
+
+2006-09-07  Doug Evans  <dje@transmeta.com>
+
+	* pgo-modes.def: New file.
+	* pgo.h (pgo_mode_e,pgo_mode_kind_e): New enums.
+	* pgo-io.h (get_mode_name,get_mode_kind,get_mode_bitsize): Declare.
+	(read_rec_single,do_rec_single): Declare.
+
+2006-08-24  Doug Evans  <dje@transmeta.com>
+
+	* pgo-io.h: New file.
+
+2006-08-17  Doug Evans  <dje@transmeta.com>
+
+	* pgo.h: New file.

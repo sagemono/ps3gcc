@@ -1,0 +1,80 @@
+#!/bin/sh
+# This script automatically test the given tool with the tool's test cases,
+# reporting anything of interest.
+
+# exits with 0 if there is nothing of interest
+# exits with 1 if there is something interesting
+# exits with 2 if an error occurred
+
+# Give two .sum files to compare them
+
+# Written by Mike Stump <mrs@cygnus.com>
+
+tool=gxx
+
+tmp1=/tmp/$tool-testing.$$a
+tmp2=/tmp/$tool-testing.$$b
+now_s=/tmp/$tool-testing.$$d
+before_s=/tmp/$tool-testing.$$e
+
+if [ "$2" = "" ]; then
+	echo "Usage: $0 previous current" >&2
+	exit 2
+fi
+
+before=$1
+now=$2
+
+exit_status=0
+trap "rm -f $tmp1 $tmp2 $now_s $before_s" 0 1 2 3 5 9 13 15
+
+sort -t ':' -k 2 "$now" > "$now_s"
+sort -t ':' -k 2 "$before" > "$before_s"
+
+for bef in 'FAIL' 'XFAIL' 'PASS' 'XPASS' ; do
+  for aft in 'FAIL' 'XFAIL' 'PASS' 'XPASS' ; do
+    if [ "$bef" != "$aft" ] ; then
+
+grep ^$aft "$now_s" | sed 's/^[^:]*:[ 	]//' >$tmp1
+grep ^$bef "$before_s" | sed 's/^[^:]*:[ 	]//' | comm -12 $tmp1 - >$tmp2
+
+grep -s . $tmp2 >/dev/null
+if [ $? = 0 ]; then
+	echo "Tests that now $aft, but $bef before:"
+	echo
+	cat $tmp2
+	echo
+	exit_status=1
+fi
+fi
+done
+done
+
+for aft in 'FAIL' 'XFAIL' 'PASS' 'XPASS' ; do
+grep ^$aft "$now_s" | sed 's/^[^:]*:[ 	]//' >$tmp1
+grep -e '^[PF]A[SI][SL]' -e '^X[PF]A[SI][SL]' "$before_s" | sed 's/^[^:]*:[ 	]//' | comm -23 $tmp1 - >$tmp2
+
+grep -s . $tmp2 >/dev/null
+if [ $? = 0 ]; then
+	echo "New tests that $aft:"
+	echo
+	cat $tmp2
+	echo
+	exit_status=1
+fi
+done
+
+for bef in 'FAIL' 'XFAIL' 'PASS' 'XPASS' ; do
+grep -e '^[PF]A[SI][SL]' -e '^X[PF]A[SI][SL]' "$now_s" | sed 's/^[^:]*:[ 	]//' >$tmp1
+grep ^$bef "$before_s" | sed 's/^[^:]*:[ 	]//' | comm -13 $tmp1 - >$tmp2
+
+grep -s . $tmp2 >/dev/null
+if [ $? = 0 ]; then
+	echo "Old tests that $bef, that have disappeared: (Eeek!)"
+	echo
+	cat $tmp2
+	echo
+fi
+done
+
+exit $exit_status

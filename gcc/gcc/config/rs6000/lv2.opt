@@ -1,0 +1,115 @@
+; Options for LV-2
+;
+; Copyright (C) 2005 Free Software Foundation, Inc.
+;
+; This file is part of GCC.
+;
+; GCC is free software; you can redistribute it and/or modify it under
+; the terms of the GNU General Public License as published by the Free
+; Software Foundation; either version 2, or (at your option) any later
+; version.
+;
+; GCC is distributed in the hope that it will be useful, but WITHOUT
+; ANY WARRANTY; without even the implied warranty of MERCHANTABILITY
+; or FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public
+; License for more details.
+;
+; You should have received a copy of the GNU General Public License
+; along with GCC; see the file COPYING.  If not, write to the Free
+; Software Foundation, 51 Franklin Street, Fifth Floor, Boston, MA
+; 02110-1301, USA.
+
+mprofile-kernel
+Target Report Mask(PROFILE_KERNEL)
+Call mcount for profiling before a function prologue
+
+;  Select pointer size. This flag only used for CellOS Lv-2
+;  Enable 64bit features, but address and pointer is handles in 32bit
+;  space. This flag is asserted by -mp32 or -mlp32 option
+mlp32
+Target Report RejectNegative Mask(PPC64_LP32)
+Generate codes in ILP32 model.(defualt)
+
+;
+mlp64
+Target Report RejectNegative InverseMask(PPC64_LP32, PPC64_LP64)
+Generate codes in LP64 model.
+
+mp32
+Target Report RejectNegative Mask(PPC64_LP32) MaskExists
+same as -mlp32 option
+
+; Added Undocumented because licensee does not use -mno-prxfixup
+mprxfixup
+Target Report RejectNegative Undocumented
+Invoke ppu-lv2-prx-fixup after linking. This is default.
+
+; Added Undocumented because licensee does not use -mno-prxfixup
+mno-prxfixup
+Target Report RejectNegative Undocumented
+Does not invoke ppu-lv2-prx-fixup after linking. Special option for toolchain developer.
+
+mprx
+Target Report RejectNegative
+Link objects in PRX mode.
+
+mprx-with-runtime
+Target Report RejectNegative
+Link objects in PRX mode with the PRX runtime.
+
+; Added Undocumented because licensee does not use -mno-prxfixup
+mlv2-stub
+Target Report RejectNegative Undocumented
+Link with the lv2_stub.a library (even when using -mno-prxfixup)
+
+msn-ld
+Target Rerpot
+Invoke SN linker instead of GNU binutils LD. This is default.
+
+mforce-prx-fixup
+Target Rerpot RejectNegative
+Invoke ppu-lv2-fixup instead of oneramp linking built in SN LD. This is for debug perpose.
+
+; Bz50260
+mppuguid
+Target Report
+Embed PPU GUID after linking.
+
+; Bz51659
+;  - Supress NOP to restore TOC
+mno-nop-after-bl
+Target Report RejectNegative Undocumented Var(lv2_no_nop_after_bl) Init (0)
+Does not generate nop after bl. This option should be used only for a single TOC executable.
+
+; Bz51659
+;  - Supress STD/LD to save/restore R2 (TOC base)
+mno-save-restore-tocbase
+Target Report RejectNegative Undocumented Var(lv2_no_save_restore_tocbase) Init (0)
+Does not save/restore TOC base. This option should be used only for a single TOC executable.
+
+; Bz51659
+;  - Enable the following options:
+;      -mno-nop-after-bl
+;      -mno-save-restore-tocbase
+;      -falign-functions=1
+;      -falign-jumps=1
+;      -falign-labels=1
+;      -falign-loops=1
+mcellos-kernel
+Target Report RejectNegative Undocumented Var(cellos_lv2_kernel) Init (0)
+For Cell OS kernel
+
+; Bz50853
+;  - Link libcs
+mfast-libc
+Target Report RejectNegative
+Link with libcs.a instead of libc.a from the point of view of performance.
+
+; Bz57983
+mcallprof=
+Target Var(lv2_callprof) Init(0) Joined UInteger
+Generate programs that are available for CallProf of SN Tuner.
+-mcallprof=0 has no effect (default).
+-mcallprof=1 enables function profiling by Tuner.
+-mcallprof=2 enables callgraph profiling. (It will be available at SDK300 or later).
+

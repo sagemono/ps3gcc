@@ -1,0 +1,76 @@
+
+#  (C) Copyright
+#  Sony Computer Entertainment, Inc.,
+#  Toshiba Corporation,
+#  International Business Machines Corporation,
+#  2001,2002,2003,2004,2005,2006,2007.
+
+#  This file is free software; you can redistribute it and/or modify it under
+#  the terms of the GNU General Public License as published by the Free
+#  Software Foundation; either version 2 of the License, or (at your option) 
+#  any later version.
+
+#  This file is distributed in the hope that it will be useful, but WITHOUT
+#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+#  FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+#  for more details.
+
+#  You should have received a copy of the GNU General Public License
+#  along with this file; see the file COPYING.  If not, write to the Free
+#  Software Foundation, 51 Franklin Street, Fifth Floor, Boston, MA
+#  02110-1301, USA.
+
+
+#rs6000/t-lv2
+
+NATIVE_SYSTEM_HEADER_DIR = /include
+
+# Need to remove header files in the gcc/include directory so that dejagnu 
+# tests are seeing the dinkumware version.
+int-hdr-cleanup:
+	hdrs="float.h math.h stdbool.h stdlib.h varargs.h iso646.h stddef.h syslimits.h limits.h stdarg.h stdio.h" ; \
+	for f in $$hdrs ; do \
+	  rm -f include/$$f ; \
+	done
+
+LIB2FUNCS_EXTRA = tramp.S $(srcdir)/config/rs6000/ppc64-fp.c xp-bit.c \
+			$(srcdir)/config/rs6000/gthr-lv2.c
+
+TARGET_LIBGCC2_CFLAGS = -mno-minimal-toc -fPIC -mno-altivec
+
+MULTILIB_OPTIONS        = fno-exceptions fno-rtti
+# need to define MULTILIB_DIRNAMES even if the option and dir name are same...
+MULTILIB_DIRNAMES	= fno-exceptions fno-rtti
+LIBGCC = stmp-multilib
+INSTALL_LIBGCC    = install-multilib
+#  plain -fno-rtti is not valid multilib
+MULTILIB_EXCEPTIONS=fno-rtti
+
+# We want fine grained libraries, so use the new code to build the
+# floating point emulation libraries.
+# fp-bit is only to be used by 32-bit multilibs
+FPBIT = fp-bit32.c
+DPBIT = dp-bit32.c
+
+dp-bit32.c: $(srcdir)/config/fp-bit.c
+	( echo '#if !defined(__powerpc64__) || (defined __powerpc64__ &&  defined _SOFT_FLOAT)'; \
+	  cat $(srcdir)/config/fp-bit.c; \
+	  echo '#endif' ) > dp-bit32.c
+
+fp-bit32.c: $(srcdir)/config/fp-bit.c
+	( echo '#if !defined(__powerpc64__) || (defined __powerpc64__ &&  defined _SOFT_FLOAT)'; \
+	  echo '#define FLOAT'; \
+	  cat $(srcdir)/config/fp-bit.c; \
+	  echo '#endif' ) > fp-bit32.c
+
+xp-bit.c: $(srcdir)/config/fp-bit.c
+	echo '#define EXTENDED_FLOAT_STUBS' > xp-bit.c
+	cat $(srcdir)/config/fp-bit.c >> xp-bit.c
+
+# The SN linker needs an implementation of the save/restore functions.
+EXTRA_PARTS = lv2saveres.o
+
+$(T)lv2saveres.o: $(srcdir)/config/rs6000/lv2saveres.S $(GCC_PASSES)
+	$(GCC_FOR_TARGET) $(GCC_CFLAGS) $(INCLUDES) \
+	-c -o $(T)lv2saveres.o $(srcdir)/config/rs6000/lv2saveres.S
+

@@ -1,0 +1,159 @@
+
+#  (C) Copyright
+#  Sony Computer Entertainment, Inc.,
+#  Toshiba Corporation,
+#  International Business Machines Corporation,
+#  2001,2002,2003,2004,2005,2006.
+
+#  This file is free software; you can redistribute it and/or modify it under
+#  the terms of the GNU General Public License as published by the Free
+#  Software Foundation; either version 2 of the License, or (at your option) 
+#  any later version.
+
+#  This file is distributed in the hope that it will be useful, but WITHOUT
+#  ANY WARRANTY; without even the implied warranty of MERCHANTABILITY or
+#  FITNESS FOR A PARTICULAR PURPOSE.  See the GNU General Public License
+#  for more details.
+
+#  You should have received a copy of the GNU General Public License
+#  along with this file; see the file COPYING.  If not, write to the Free
+#  Software Foundation, 51 Franklin Street, Fifth Floor, Boston, MA
+#  02110-1301, USA.
+
+
+NATIVE_SYSTEM_HEADER_DIR = /include
+
+# Need to remove header files in the gcc/include directory so that dejagnu 
+# tests are seeing the dinkumware version.
+int-hdr-cleanup:
+	hdrs="float.h math.h stdbool.h stdlib.h varargs.h iso646.h stddef.h syslimits.h limits.h stdarg.h stdio.h" ; \
+	for f in $$hdrs ; do \
+	  rm -f include/$$f ; \
+	done
+
+# Suppress building libgcc1.a, since the MIPS compiler port is complete
+# and does not need anything from libgcc1.a.
+LIBGCC1 =
+CROSS_LIBGCC1 =
+
+# Build libgcc.a with special flags
+TARGET_LIBGCC2_CFLAGS = -fPIC
+
+LIB2FUNCS_EXTRA = $(srcdir)/config/spu/divf.c  $(srcdir)/config/spu/sqrtf.c  \
+		  $(srcdir)/config/spu/float_unssidf.c \
+		  $(srcdir)/config/spu/float_unsdidf.c
+
+LIB2ADDEH = $(srcdir)/unwind-dw2.c $(srcdir)/unwind-dw2-fde.c \
+   $(srcdir)/unwind-sjlj.c $(srcdir)/unwind-c.c
+
+# We want fine grained libraries, so use the new code to build the
+# floating point emulation libraries.
+FPBIT = fp-bit.c
+DPBIT = dp-bit.c
+
+dp-bit.c: $(srcdir)/config/fp-bit.c
+	echo '#undef US_SOFTWARE_GOFAST' > dp-bit.c
+	cat $(srcdir)/config/fp-bit.c >> dp-bit.c
+
+fp-bit.c: $(srcdir)/config/fp-bit.c
+	echo '#define FLOAT' > fp-bit.c
+	echo '#undef US_SOFTWARE_GOFAST' >> fp-bit.c
+	cat $(srcdir)/config/fp-bit.c >> fp-bit.c
+
+# Don't let CTOR_LIST end up in sdata section.
+CRTSTUFF_T_CFLAGS =
+
+MULTILIB_OPTIONS=fPIC
+MULTILIB_DIRNAMES=pic
+MULTILIB_EXCEPTIONS=
+MULTILIB_MATCHES=fPIC=fpic fPIC=shared fPIC=mcustom-module fPIC=mfixups
+
+# Neither gcc or newlib seem to have a standard way to generate multiple
+# crt*.o files.  So we don't use the standard crt0.o name anymore.
+EXTRA_MULTILIB_PARTS = crti.o crtn.o crt1.o crt2.o crt3.o crt4.o spurs_task.o crtend1.o \
+                       init_fixups.o init_zerobss.o init_crtend.o fini_crtbegin.o job_crt.o dll_crt.o
+
+LIBGCC = stmp-multilib
+INSTALL_LIBGCC = install-multilib
+
+# Need to rebuild spu.o whenever spu_builtins.def is changed.
+$(out_object_file): $(srcdir)/config/spu/spu_builtins.def
+
+# Make sure spu.c never has warnings.  
+spu.o-warn = -Werror -Wno-format -Wno-missing-format-attribute
+
+# Assemble startup files.
+$(T)crti.o: $(srcdir)/config/spu/crti.asm $(GCC_PASSES)
+	$(GCC_FOR_TARGET) $(GCC_CFLAGS) $(MULTILIB_CFLAGS) $(INCLUDES) \
+	-c -o $(T)crti.o -x assembler-with-cpp $(srcdir)/config/spu/crti.asm
+
+$(T)crtn.o: $(srcdir)/config/spu/crtn.asm $(GCC_PASSES)
+	$(GCC_FOR_TARGET) $(GCC_CFLAGS) $(MULTILIB_CFLAGS) $(INCLUDES) \
+	-c -o $(T)crtn.o -x assembler-with-cpp $(srcdir)/config/spu/crtn.asm
+
+$(T)crt1.o: $(srcdir)/config/spu/crt0.c $(GCC_PASSES)
+	$(GCC_FOR_TARGET) $(GCC_CFLAGS) $(MULTILIB_CFLAGS) $(INCLUDES) \
+	-Os -D_SPU_THREAD \
+	-c -o $(T)crt1.o $(srcdir)/config/spu/crt0.c
+
+$(T)crt2.o: $(srcdir)/config/spu/crt0.c $(GCC_PASSES)
+	$(GCC_FOR_TARGET) $(GCC_CFLAGS) $(MULTILIB_CFLAGS) $(INCLUDES) \
+	-Os -D_STD_MAIN \
+	-c -o $(T)crt2.o $(srcdir)/config/spu/crt0.c
+
+$(T)crt3.o: $(srcdir)/config/spu/crt0.c $(GCC_PASSES)
+	$(GCC_FOR_TARGET) $(GCC_CFLAGS) $(MULTILIB_CFLAGS) $(INCLUDES) \
+	-Os -D_RAW_SPU \
+	-c -o $(T)crt3.o $(srcdir)/config/spu/crt0.c
+
+$(T)crt4.o: $(srcdir)/config/spu/crt0.c $(GCC_PASSES)
+	$(GCC_FOR_TARGET) $(GCC_CFLAGS) $(MULTILIB_CFLAGS) $(INCLUDES) \
+	-Os -D_ISO_SPU \
+	-c -o $(T)crt4.o $(srcdir)/config/spu/crt0.c
+
+$(T)spurs_task.o: $(srcdir)/config/spu/crt0.c $(GCC_PASSES)
+	$(GCC_FOR_TARGET) $(GCC_CFLAGS) $(MULTILIB_CFLAGS) $(INCLUDES) \
+	-Os -D_SPURS_TASK \
+	-c -o $(T)spurs_task.o $(srcdir)/config/spu/crt0.c
+
+$(T)crtend1.o: $(srcdir)/config/spu/crtend.c $(GCC_PASSES)
+	$(GCC_FOR_TARGET) $(GCC_CFLAGS) $(MULTILIB_CFLAGS) $(INCLUDES) \
+	-Os \
+	-c -o $(T)crtend1.o $(srcdir)/config/spu/crtend.c
+
+$(T)init_fixups.o: $(srcdir)/config/spu/init_fixups.c $(GCC_PASSES)
+	$(GCC_FOR_TARGET) $(GCC_CFLAGS) $(MULTILIB_CFLAGS) $(INCLUDES) \
+	-Os -ffixed-79 \
+	-c -o $(T)init_fixups.o $(srcdir)/config/spu/init_fixups.c
+
+$(T)init_zerobss.o: $(srcdir)/config/spu/init_zerobss.c $(GCC_PASSES)
+	$(GCC_FOR_TARGET) $(GCC_CFLAGS) $(MULTILIB_CFLAGS) $(INCLUDES) \
+	-Os -ffixed-79 \
+	-c -o $(T)init_zerobss.o $(srcdir)/config/spu/init_zerobss.c
+
+$(T)init_crtend.o: $(srcdir)/config/spu/init_crtend.c $(GCC_PASSES)
+	$(GCC_FOR_TARGET) $(GCC_CFLAGS) $(MULTILIB_CFLAGS) $(INCLUDES) \
+	-Os -ffixed-79 \
+	-c -o $(T)init_crtend.o $(srcdir)/config/spu/init_crtend.c
+
+$(T)fini_crtbegin.o: $(srcdir)/config/spu/fini_crtbegin.c $(GCC_PASSES)
+	$(GCC_FOR_TARGET) $(GCC_CFLAGS) $(MULTILIB_CFLAGS) $(INCLUDES) \
+	-Os -ffixed-79 \
+	-c -o $(T)fini_crtbegin.o $(srcdir)/config/spu/fini_crtbegin.c
+
+$(T)job_crt.o: $(srcdir)/config/spu/job_crt.c $(GCC_PASSES)
+	$(GCC_FOR_TARGET) $(GCC_CFLAGS) $(MULTILIB_CFLAGS) $(INCLUDES) \
+	-Os \
+	-c -o $(T)job_crt.o $(srcdir)/config/spu/job_crt.c
+
+$(T)dll_crt.o: $(srcdir)/config/spu/dll_crt.c $(GCC_PASSES)
+	$(GCC_FOR_TARGET) $(GCC_CFLAGS) $(MULTILIB_CFLAGS) $(INCLUDES) \
+	-Os \
+	-c -o $(T)dll_crt.o $(srcdir)/config/spu/dll_crt.c
+
+spu-c.o: $(srcdir)/config/spu/spu-c.c \
+    $(srcdir)/config/spu/spu-protos.h \
+    $(CONFIG_H) $(SYSTEM_H) $(TREE_H) $(CPPLIB_H) \
+    $(TM_P_H) c-pragma.h errors.h coretypes.h $(TM_H) $(OPTABS_H)
+	$(CC) -c $(ALL_CFLAGS) $(ALL_CPPFLAGS) $(INCLUDES) $(srcdir)/config/spu/spu-c.c
+
