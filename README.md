@@ -1,4 +1,4 @@
-# PS3 Programmer Toolchain GCC 4.1.1 Source
+# PS3 Programmer Toolchain GCC 4.1.1 Source (Rev: 3547)
 
 This repository preserves the source package identified as `toolchain-src-4.2.0-GCC411`, containing the GCC 4.1.1- and GNU Binutils-derived source used for the PlayStation 3 Programmer Tool toolchain.
 
