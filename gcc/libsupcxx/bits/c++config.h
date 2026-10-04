@@ -1,2 +1,0 @@
-
-#define __GXX_MERGED_TYPEINFO_NAMES 1
